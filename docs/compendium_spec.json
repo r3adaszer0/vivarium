@@ -1,0 +1,398 @@
+{
+ "title": "Vivarium — Design Compendium",
+ "author": "r3adaszer0 + Hermes",
+ "subject": "Artificial life inside the Hermes Agent: ideas catalog, privacy analysis, math foundations",
+ "elements": [
+  {
+   "type": "heading",
+   "text": "Vivarium — Design Compendium",
+   "level": 0
+  },
+  {
+   "type": "paragraph",
+   "text": "A persistent artificial-life ecosystem living inside the Hermes Agent. A cellular-automaton dish hosts genome-carrying creatures; the user's real agent activity feeds the world; Hermes narrates the ecology. This document catalogs every idea generated in the design session, grouped by playability and implementation cost, with the privacy analysis and the mathematical foundations that make the project sound."
+  },
+  {
+   "type": "heading",
+   "text": "Part 1 — The Core Concept",
+   "level": 1
+  },
+  {
+   "type": "paragraph",
+   "text": "The dish is a 48x48 grid where food regrows with neighbour-fertility feedback and diffuses like heat - blooms and barren patches travel like weather fronts. Creatures are agents on top of the automaton: each carries a genome (forage drive, aggression, metabolism, sense radius, mutation rate), spends energy to live, eats to gain energy, reproduces stochastically past a maturity age with gaussian mutation, and dies when starved or old. Four founder strains (amber, violet, jade, ember) give the narrator names from tick one."
+  },
+  {
+   "type": "paragraph",
+   "text": "Two hooks bind the world to the agent. post_tool_call: every real tool call drops nutrients - terminal commands feed most, file reads least - so the population is a living histogram of how the agent is used. pre_llm_call: a compact ecology report is injected each turn, so Hermes always knows what is alive in its own head and can narrate it like a nature documentary."
+  },
+  {
+   "type": "paragraph",
+   "text": "Status (Milestone 1 complete): simulation core running, ecology tuned for lineage turnover (met=0.42, reg=0.003 - boom-bust cycles with constant lineage change), 18/18 tests green, Hermes catalog validator passing, persistence via plugin state, challenge codes implemented."
+  },
+  {
+   "type": "heading",
+   "text": "Part 2 — Ideas Catalog (by playability)",
+   "level": 1
+  },
+  {
+   "type": "heading",
+   "text": "Tier S — Ship for the hackathon (the core loop)",
+   "level": 2
+  },
+  {
+   "type": "table",
+   "header": true,
+   "rows": [
+    [
+     "Idea",
+     "Player experience",
+     "Cost"
+    ],
+    [
+     "Living dish + boom-bust",
+     "Alive when you return; zero effort",
+     "done"
+    ],
+    [
+     "Activity mirror",
+     "Your work feeds your world",
+     "done"
+    ],
+    [
+     "Ecology narration",
+     "Nature-show morning reports",
+     "done*"
+    ],
+    [
+     "Skill-birthed lifeforms",
+     "New skill -> new species crawls out",
+     "0.5 d"
+    ],
+    [
+     "Glyph + name genomes",
+     "Each creature looks like its DNA",
+     "0.5 d"
+    ],
+    [
+     "Challenge codes",
+     "Paste a creature to a friend",
+     "done"
+    ],
+    [
+     "Morning report (cron)",
+     "Wildlife news when you wake",
+     "0.5 d"
+    ]
+   ]
+  },
+  {
+   "type": "paragraph",
+   "text": "The skill-birth loop, concretely: when Hermes saves a new skill (the skill_manage tool call), the plugin hashes the skill content with a keyed hash, uses the digest to sample a genome and glyph, spawns a creature named after the skill, and announces it. Cost: under 100 ms, zero API calls. The dish becomes a living index of everything the agent has ever learned - each lineage literally descended from a skill."
+  },
+  {
+   "type": "heading",
+   "text": "Tier A — High play, moderate cost (week 2)",
+   "level": 2
+  },
+  {
+   "type": "table",
+   "header": true,
+   "rows": [
+    [
+     "Idea",
+     "Player experience",
+     "Cost"
+    ],
+    [
+     "Competence market",
+     "Skill usage feeds its lineage",
+     "0.5 d"
+    ],
+    [
+     "Detectors + Codex",
+     "GoL-style discovery hunting",
+     "1 d"
+    ],
+    [
+     "Grudge matches",
+     "Two strains, one dish, one winner",
+     "1 d"
+    ],
+    [
+     "Targeted feeding",
+     "Food where YOU want a boom",
+     "2 h"
+    ],
+    [
+     "Gauntlet + fingerprints",
+     "SHA-256 verifiable scores",
+     "1 d"
+    ],
+    [
+     "Serverless leaderboard",
+     "PR champions, CI verifies",
+     "0.5 d"
+    ]
+   ]
+  },
+  {
+   "type": "heading",
+   "text": "Tier B — Delightful, deferrable",
+   "level": 2
+  },
+  {
+   "type": "table",
+   "header": true,
+   "rows": [
+    [
+     "Idea",
+     "Player experience",
+     "Cost"
+    ],
+    [
+     "World events",
+     "Droughts, ice ages, meteors",
+     "0.5 d"
+    ],
+    [
+     "Mutagens",
+     "Irradiate a lineage, watch survivors",
+     "0.5 d"
+    ],
+    [
+     "Matchmaking",
+     "Two codes, crossover, one offspring",
+     "1 d"
+    ],
+    [
+     "Protected species",
+     "Shield a lineage from famine",
+     "2 h"
+    ],
+    [
+     "Group dish",
+     "One shared world per chat channel",
+     "1-2 d"
+    ],
+    [
+     "Desktop pane",
+     "Live canvas in Hermes Desktop",
+     "1 d"
+    ],
+    [
+     "Prompt-to-lifeform",
+     "Describe it, Hermes breeds it",
+     "1 d"
+    ]
+   ]
+  },
+  {
+   "type": "heading",
+   "text": "Tier R — Research grade (credibility layer)",
+   "level": 2
+  },
+  {
+   "type": "table",
+   "header": true,
+   "rows": [
+    [
+     "Idea",
+     "What it adds",
+     "Cost"
+    ],
+    [
+     "Monte Carlo p-values",
+     "Every find gets significance",
+     "1 d"
+    ],
+    [
+     "Carrying-capacity fit",
+     "Testable K predictions",
+     "0.5 d"
+    ],
+    [
+     "Adaptive-walk metrics",
+     "Fisher-style fitness plots",
+     "1 d"
+    ],
+    [
+     "Genome -> skill",
+     "Bred instincts become a real skill",
+     "2+ d"
+    ]
+   ]
+  },
+  {
+   "type": "heading",
+   "text": "Part 3 — The Skill-to-Lifeform Loop",
+   "level": 1
+  },
+  {
+   "type": "heading",
+   "text": "How a skill becomes a species",
+   "level": 2
+  },
+  {
+   "type": "paragraph",
+   "text": "1. Hermes learns a skill (skill_manage fires; the hook sees it). 2. The plugin computes HMAC-SHA256(secret, skill_content). 3. The digest seeds a deterministic sampler that produces a genome (forage, aggression, metabolism, sense, mutate) plus a glyph and a species name derived from the skill's title. 4. A creature is released. 5. Hermes announces the birth in its reply: 'New skill banked - and a new species crawled out of it: the ledger-keeper (glyph #), hatched from your invoice-parsing skill.'"
+  },
+  {
+   "type": "paragraph",
+   "text": "Same skill content always produces the same species on the same machine (the key is local), so a skill has a deterministic avatar - but the hash published publicly reveals nothing (see Part 4)."
+  },
+  {
+   "type": "heading",
+   "text": "How fast",
+   "level": 2
+  },
+  {
+   "type": "paragraph",
+   "text": "Hashing: microseconds. Genome sampling: O(1). Map re-render: milliseconds. Total added latency to skill creation: under 100 ms of local CPU, zero network, zero API credits. The announcement rides the reply the agent was already writing."
+  },
+  {
+   "type": "heading",
+   "text": "Multiple rounds of evolution",
+   "level": 2
+  },
+  {
+   "type": "paragraph",
+   "text": "Three stacked rhythms. (a) Continuous drift: the world ticks on cron and on your activity - evolution never pauses. (b) Generational divergence: every lineage keeps mutating, so a skill-species splits into sub-strains over days. (c) Punctuated selection: the user injects pressures any time - feed events, droughts, imported rival genomes, mutagens, protected species. One 'round' = one pressure change plus an observation window; the Codex records what each round produced. Selection pressure can also be endogenous: the competence market makes skill usage itself the fitness function, so the ecosystem rounds are driven by what the user actually does with their agent."
+  },
+  {
+   "type": "heading",
+   "text": "Part 4 — Privacy Analysis (critical)",
+   "level": 1
+  },
+  {
+   "type": "heading",
+   "text": "The problem with plain hashes",
+   "level": 2
+  },
+  {
+   "type": "paragraph",
+   "text": "A content hash is a fingerprint, not a secret. If a user publishes 'my creature was born from skill hash a3f9...', anyone who obtains the skill file - or guesses likely skill text - can hash candidates offline and CONFIRM the match. Hashes are invertible by dictionary attack when the input space is small and guessable. Skill files are exactly that: short, structured, template-like text with predictable headers and phrasing."
+  },
+  {
+   "type": "paragraph",
+   "text": "Leak vectors if plain (unkeyed) hashes were published with a public repo: (1) skill-content confirmation - attacker collects candidate skill texts and matches hashes; (2) cross-user correlation - identical skill templates produce identical hashes, linking users who share or copy skills; (3) metadata inference - timestamps plus hash prefixes still narrow what was learned when; (4) dictionary rebuild - every published (hash, skill-title) pair trains guesses about the user's skill collection."
+  },
+  {
+   "type": "heading",
+   "text": "The fix: keyed derivation, publish only the creature",
+   "level": 2
+  },
+  {
+   "type": "paragraph",
+   "text": "Rule 1 - derive genomes with HMAC-SHA256 using a machine-local secret (generated once per profile, stored in plugin state, never synced, never published). The genome is a one-way function of (secret, skill content): same machine -> same species for the same skill; different users -> completely different species for identical skills (no cross-user correlation)."
+  },
+  {
+   "type": "paragraph",
+   "text": "Rule 2 - the challenge code contains ONLY the genome, never the hash, never the skill reference. Sharing a creature shares looks and instincts, nothing about provenance."
+  },
+  {
+   "type": "paragraph",
+   "text": "Rule 3 - opt-in provenance. If a user WANTS to claim 'this species was born from my open-source skill X', that is a deliberate disclosure they make in text - the plugin never does it for them. Default: silent."
+  },
+  {
+   "type": "paragraph",
+   "text": "Rule 4 - names sanitized. Species names derive from the skill TITLE only if the user opts in; default names are generated from the genome itself (strain + glyph + number), carrying zero semantic content."
+  },
+  {
+   "type": "paragraph",
+   "text": "Residual risks, stated honestly: genome values themselves are harmless (they are game stats); if a user publishes both their creature AND their skill text AND their secret (they would have to extract it from plugin state deliberately), linkage returns - that is user action, not plugin leak; timing metadata (when species were born) can reveal activity rhythms if the user publishes birth logs - the Codex should store day-granularity, not timestamps."
+  },
+  {
+   "type": "paragraph",
+   "text": "Bottom line: with keyed derivation + provenance-free challenge codes, publishing creatures leaks nothing about skills. The ecosystem is shareable; the mind that feeds it stays private."
+  },
+  {
+   "type": "pagebreak"
+  },
+  {
+   "type": "heading",
+   "text": "Part 5 — Mathematical Soundness",
+   "level": 1
+  },
+  {
+   "type": "heading",
+   "text": "Determinism as the foundation",
+   "level": 2
+  },
+  {
+   "type": "paragraph",
+   "text": "The simulation is a pure function F: (state, actions) -> state. One seeded RNG drives every stochastic decision; the same seed and action sequence reproduces the same history bit-for-bit. This makes every competitive claim verifiable without trust: a challenge code pins the initial genome, the Gauntlet applies F^T, and the final state's SHA-256 fingerprint is the score's receipt. Anyone with the plugin can re-run and check. The referee is physics, not a server."
+  },
+  {
+   "type": "heading",
+   "text": "Ecology math",
+   "level": 2
+  },
+  {
+   "type": "paragraph",
+   "text": "The food layer is a discrete consumer-resource system, cousin of logistic growth with spatial coupling. Carrying capacity is predictable: K is approximately total regrowth divided by per-capita consumption - so the plugin can fit K from telemetry and report it ('dish carrying capacity: 97 +/- 4'), then users can test predictions: after a drought event, does the population settle at the predicted reduced K? Boom-bust periods should scale with the maturity delay (15 ticks) - another testable claim the plugin can check against its own logs."
+  },
+  {
+   "type": "heading",
+   "text": "Evolution math",
+   "level": 2
+  },
+  {
+   "type": "paragraph",
+   "text": "Adaptive-walk metrics from telemetry: mean genome fitness trajectory over time, adaptation rate (change in genome means per tick), mutation-clock drift under neutral vs. selected traits. Selection converts variance into fitness gains (Fisher's fundamental theorem territory) - the plugin can plot whether its world actually does this, which is the difference between 'has evolution in it' and 'is an evolutionary system'."
+  },
+  {
+   "type": "heading",
+   "text": "Statistics for discoveries",
+   "level": 2
+  },
+  {
+   "type": "paragraph",
+   "text": "Structure detectors are public predicates over telemetry: Phoenix (lineage recovers from under 5 individuals after an 80%+ crash), Metronome (population autocorrelation peak at a stable period 8-40 ticks), Migratory wave (spatial autocorrelation peak moving at constant speed), Pioneer (first colonization of a quadrant barren 200+ ticks), Mutualism (two lineages anti-correlated with total food, positively with each other). Each claimed discovery gets a Monte Carlo p-value: re-run 10,000 seeded null worlds; if only 1% produce the pattern, the find is real, not luck. This is the Game-of-Life soup-census culture, rebuilt on a substrate with history and lineage - and every number is reproducible because the world is deterministic."
+  },
+  {
+   "type": "heading",
+   "text": "Part 6 — Build Plan",
+   "level": 1
+  },
+  {
+   "type": "table",
+   "header": true,
+   "rows": [
+    [
+     "Milestone",
+     "Scope",
+     "Status"
+    ],
+    [
+     "M1",
+     "Core, tuning, tests, persistence, codes",
+     "done"
+    ],
+    [
+     "M2",
+     "Hooks live, cron, glyphs, skill-birth",
+     "next"
+    ],
+    [
+     "M3",
+     "Gauntlet, Codex, detectors, leaderboard",
+     "planned"
+    ],
+    [
+     "M4",
+     "Docs, video, PR + form (Nov 11 5PM EST)",
+     "planned"
+    ],
+    [
+     "Stretch",
+     "Market, matches, events, p-values",
+     "if time"
+    ]
+   ]
+  },
+  {
+   "type": "paragraph",
+   "text": "Privacy rule for all milestones: genomes derived by keyed HMAC; challenge codes carry genomes only; provenance is always opt-in; Codex stores day-granularity events."
+  }
+ ]
+}

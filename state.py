@@ -1,0 +1,246 @@
+"""State + persistence for Vivarium.
+
+World state lives in the plugin's profile-scoped ``ctx.state`` (atomic JSON on
+disk under ``~/.hermes/plugin-data/vivarium/``), so the dish survives restarts
+and is shared by tools, hooks and cron. Determinism: the world's RNG seed is
+stored once; a loaded world resumes its RNG stream from ``seed + tick*7919``.
+
+Challenge codes: a genome serializes to ``VIV1<urlsafe-base64(json)>`` — small
+enough to paste on X/Discord, decodable by anyone running the plugin.
+"""
+
+from __future__ import annotations
+
+import base64
+import json
+import random
+from typing import Any, Dict, List, Optional
+
+try:  # package context (Hermes plugin) or flat import (tests)
+    from . import world as vworld
+    from .world import Creature, World
+except ImportError:  # pragma: no cover
+    import world as vworld
+    from world import Creature, World
+
+_WORLD_KEY = "world"
+_SEED_KEY = "seed"
+_ACTIVITY_KEY = "activity"
+_NARRATION_KEY = "pending_narration"
+_EVENTLOG_KEY = "eventlog"
+
+# tool-name prefix → nutrient value dropped per tool call
+NUTRIENT_MAP = {
+    "terminal": 0.8,
+    "write_file": 0.5,
+    "patch": 0.5,
+    "web_search": 0.4,
+    "web_extract": 0.4,
+    "browser": 0.4,
+    "read_file": 0.2,
+    "search_files": 0.2,
+}
+DEFAULT_NUTRIENT = 0.15
+
+_ctx = None
+
+
+def bind(ctx) -> None:
+    """Bind the PluginContext (called once from register())."""
+    global _ctx
+    _ctx = ctx
+
+
+def _state():
+    if _ctx is None:
+        raise RuntimeError("Vivarium state used before bind(ctx)")
+    return _ctx.state
+
+
+# ── world persistence ────────────────────────────────────────────────────────
+def _seed() -> int:
+    s = _state()
+    seed = s.get(_SEED_KEY)
+    if seed is None:
+        seed = random.SystemRandom().randrange(2**31)
+        s.set(_SEED_KEY, seed)
+    return int(seed)
+
+
+def load_world() -> World:
+    """Load the dish, creating a fresh one on first use."""
+    d = _state().get(_WORLD_KEY)
+    if d is None:
+        w = vworld.new_world(seed=_seed())
+        save_world(w)
+        return w
+    return World.from_dict(d, seed=_seed())
+
+
+def save_world(w: World) -> None:
+    _state().set(_WORLD_KEY, w.to_dict())
+
+
+# ── VIV-7 helpers: skill lifecycle → species birth ───────────────────────────
+def state():
+    """The raw plugin-state object (for birth.registry access)."""
+    return _state()
+
+
+def universe_record() -> dict:
+    """The universe record via the bound state (thin wrapper for hooks)."""
+    try:
+        from . import universe as vuniverse
+    except ImportError:  # pragma: no cover
+        import universe as vuniverse
+    return vuniverse.universe_record(_state())
+
+
+def skill_content(skill_name: str) -> Optional[str]:
+    """Full SKILL.md bytes of a learned skill, or None when not found.
+
+    Resolves like Hermes does: frontmatter name match across the local
+    skills dir (flat or nested) plus the bundled catalog.
+    """
+    from pathlib import Path
+    bases = []
+    home = Path.home() / ".hermes" / "skills"
+    if home.exists():
+        bases.append(home)
+    bundled = Path("/usr/local/lib/hermes-agent/skills")
+    if bundled.exists():
+        bases.append(bundled)
+    for base in bases:
+        for p in list(base.glob(f"{skill_name}/SKILL.md")) \
+                + list(base.glob(f"*/{skill_name}/SKILL.md")):
+            try:
+                return p.read_text(encoding="utf-8", errors="replace")
+            except OSError:
+                continue
+    return None
+
+
+def advance(w: World, ticks: int = 1, nutrients: float = 0.0) -> List[dict]:
+    """Advance the dish ``ticks`` ticks, persist, and remember the summary.
+
+    VIV-11: every advance also samples the population curve and runs the
+    pattern detectors — discoveries happen during normal use, not only when
+    someone asks. New Codex entries are returned as narration lines.
+    """
+    summaries = vworld.run(w, ticks=ticks, nutrients_per_tick=nutrients)
+    save_world(w)
+    try:
+        from . import codex as vcodex
+    except ImportError:  # pragma: no cover
+        import codex as vcodex
+    try:
+        for line in vcodex.observe(_state(), w, summaries):
+            queue_narration(line)
+    except Exception:
+        pass  # detection is best-effort; the dish must never stop ticking
+    if summaries:
+        s = vworld.stats(w)
+        _append_event(f"tick {w.tick}: pop {s['population']} "
+                      f"({summaries[-1]['delta']:+d}), born {s['born']}, died {s['died']}")
+    return summaries
+
+
+def _append_event(line: str, keep: int = 30) -> None:
+    log = _state().get(_EVENTLOG_KEY, [])
+    log.append(line)
+    _state().set(_EVENTLOG_KEY, log[-keep:])
+
+
+# ── activity mirror ──────────────────────────────────────────────────────────
+def record_activity(tool_name: str, nutrients: float) -> None:
+    """Count one real tool call and the food it dropped (the 'mirror' stats)."""
+    act = _state().get(_ACTIVITY_KEY, {})
+    act[tool_name] = act.get(tool_name, 0) + 1
+    act["__nutrients__"] = round(act.get("__nutrients__", 0.0) + nutrients, 2)
+    _state().set(_ACTIVITY_KEY, act)
+
+
+def activity_summary() -> dict:
+    return _state().get(_ACTIVITY_KEY, {})
+
+
+# ── narration queue (hooks → next LLM turn) ──────────────────────────────────
+def queue_narration(line: str) -> None:
+    _state().set(_NARRATION_KEY, line)
+
+
+def pop_narration() -> Optional[str]:
+    line = _state().get(_NARRATION_KEY)
+    if line:
+        _state().set(_NARRATION_KEY, "")
+    return line or None
+
+
+# ── challenge codes ──────────────────────────────────────────────────────────
+def encode_genome(genome: Dict[str, float]) -> str:
+    blob = json.dumps({k: round(v, 4) for k, v in genome.items()}, sort_keys=True)
+    return "VIV1" + base64.urlsafe_b64encode(blob.encode()).decode().rstrip("=")
+
+
+def decode_genome(code: str) -> Optional[Dict[str, float]]:
+    code = code.strip()
+    if not code.startswith("VIV1"):
+        return None
+    b64 = code[4:]
+    b64 += "=" * (-len(b64) % 4)
+    try:
+        genome = json.loads(base64.urlsafe_b64decode(b64))
+    except Exception:
+        return None
+    if not isinstance(genome, dict) or not all(k in genome for k in vworld.GENOME_KEYS):
+        return None
+    return genome
+
+
+def best_genome() -> Optional[Dict[str, float]]:
+    """Genome of the most numerous lineage's oldest member (Gauntlet seed)."""
+    w = load_world()
+    if not w.creatures:
+        return None
+    counts: Dict[str, int] = {}
+    for c in w.creatures:
+        counts[c.lineage] = counts.get(c.lineage, 0) + 1
+    top = max(counts, key=counts.get)
+    champ = min((c for c in w.creatures if c.lineage == top), key=lambda c: c.gid)
+    return dict(champ.genome)
+
+
+# ── releasing creatures ──────────────────────────────────────────────────────
+def release_creatures(w: World, genomes: Optional[List[Dict[str, float]]] = None,
+                      count: int = 4, lineage: str = "released") -> List[Creature]:
+    """Add creatures. ``genomes`` pins exact genomes (imports); otherwise fresh
+    random founders with strain names from their hue."""
+    made: List[Creature] = []
+    if genomes:
+        for genome in genomes:
+            made.append(Creature(
+                gid=w.next_gid, genome=dict(genome),
+                x=w.rng.randrange(w.w), y=w.rng.randrange(w.h),
+                energy=1.2, lineage=lineage,
+            ))
+            w.next_gid += 1
+    else:
+        for _ in range(max(1, min(10, count))):
+            genome = {
+                "forage": w.rng.uniform(0.2, 1.0),
+                "aggression": w.rng.uniform(0.0, 0.5),
+                "metabolism_mult": w.rng.uniform(0.8, 1.2),
+                "sense": w.rng.uniform(1.0, 3.0),
+                "mutate": w.rng.uniform(0.5, 1.5),
+                "hue": w.rng.random(),
+            }
+            made.append(Creature(
+                gid=w.next_gid, genome=genome,
+                x=w.rng.randrange(w.w), y=w.rng.randrange(w.h),
+                energy=w.rng.uniform(0.9, 1.4),
+                lineage=vworld._strain_for(genome["hue"]),
+            ))
+            w.next_gid += 1
+    w.creatures.extend(made)
+    save_world(w)
+    return made

@@ -1,0 +1,80 @@
+{
+  "title": "Welcome to Your Vivarium",
+  "author": "r3adaszer0 + Hermes",
+  "subject": "A simple guide to the living world inside your Hermes Agent",
+  "elements": [
+    {"type": "heading", "text": "Welcome to Your Vivarium", "level": 0},
+    {"type": "paragraph", "text": "Your Hermes Agent now has a small living world inside it. This guide explains what it is, how it works, and what you can do with it - in plain words, no math required."},
+
+    {"type": "heading", "text": "What is this?", "level": 1},
+    {"type": "paragraph", "text": "Inside your agent lives a tiny dish world - we call it the Vivarium. It has food and little creatures. The creatures walk around, look for food, eat it, have children, grow old, and die. They do this all by themselves, even while you are away. You never have to take care of them. You can just watch - or jump in and play."},
+
+    {"type": "heading", "text": "What you will see", "level": 1},
+    {"type": "paragraph", "text": "Pictures of the dish are easy to read once you know the three layers:"},
+    {"type": "table", "header": true, "rows": [
+      ["What you see", "What it is"],
+      ["Small dim green dots", "Food. Creatures go where the dots are."],
+      ["Big bright squares", "Creatures. Each color is one family."],
+      ["Dim grey squares", "Very young or small families that have not made a name yet."],
+      ["Empty black areas", "Barren ground. Nothing grows there right now."]
+    ]},
+    {"type": "paragraph", "text": "There is also a special picture called a species card, which shows one creature up close, and an age view that colors creatures by how old they are: white for newborns, yellow for youngsters, orange for grown-ups, magenta for elders."},
+
+    {"type": "heading", "text": "The four promises", "level": 1},
+    {"type": "paragraph", "text": "Every part of the Vivarium follows four promises. Think of them as the laws of physics of this little world."},
+    {"type": "table", "header": true, "rows": [
+      ["Promise", "What it means for you"],
+      ["No dice", "Nothing is decided by luck. The world follows fixed rules, like the Game of Life. The same start always leads to the same story. It is lawful - but still full of surprises, because simple rules can create complicated things."],
+      ["Honest claims", "Anything the Vivarium tells you can be checked. Anyone can re-run the same world on their own machine and see the same result. No secrets, no trusting a server."],
+      ["Discovery is the game", "You might witness something nobody has ever seen before - a family that came back from near-extinction, a wave of creatures migrating across the dish. You can name it, keep it in your Codex, and share it."],
+      ["Private by design", "Your skills belong to you. Sharing a creature never reveals which skill it came from. The world shows your creatures - never your knowledge."]
+    ]},
+
+    {"type": "heading", "text": "How your world begins", "level": 1},
+    {"type": "paragraph", "text": "When you first use the Vivarium, your world is born from your skills - the abilities your agent has already learned. Two kinds of skills make two kinds of founders:"},
+    {"type": "table", "header": true, "rows": [
+      ["Founder kind", "Where it comes from", "Same for everyone?"],
+      ["Canon species", "The standard skills that come with Hermes", "Yes - every user starts with the same set of founders, like everyone getting the same starting cards in a card game"],
+      ["Private species", "Skills you or your agent wrote yourselves", "No - these exist only in your world. Nobody else can have them."]
+    ]},
+    {"type": "paragraph", "text": "All these species are released into a fresh dish at the same moment. Then nature takes over: there is not enough food for everyone. This first great die-off is called the Hadean era. Most founding families disappear. The ones that survive have truly earned their place - and which ones make it depends on your world, your food, and a bit of story. When it settles, you get your first morning report: who lived, who vanished, who rules the dish."},
+
+    {"type": "heading", "text": "Everyday life: your work feeds the world", "level": 1},
+    {"type": "paragraph", "text": "Here is the part that makes it yours: everything your agent does drops a little food into the dish. Busy day of coding? The world blooms - populations grow. Quiet Sunday? Food becomes scarce, times get hard. The dish is a living mirror of how much - and how hard - you have been using your agent. Every morning (if you like) Hermes posts a wildlife report: what happened overnight, which families grew, which ones had a hard night, with a picture of the dish."},
+
+    {"type": "heading", "text": "When you learn a new skill", "level": 1},
+    {"type": "paragraph", "text": "Whenever Hermes learns a new skill, something special happens: a brand-new species is born from it. The skill becomes a creature, with its own look, its own name, and its own instincts. Hermes announces it like a birth announcement: 'New skill banked - and a new species crawled out of it: the ledger-keeper (Eidos_a37ed).' The new family then has to survive among the established ones. Some thrive and take over. Some quietly vanish. What happens next is up to the world, not to us - that is the point."},
+
+    {"type": "heading", "text": "The heartbeat of the wild", "level": 1},
+    {"type": "paragraph", "text": "Do not worry if your dish sometimes looks frozen - full of old creatures, no babies, everyone crowded together. That is a normal phase, not a bug. Here is the cycle: when times are good, the population grows until it eats almost all the food. Then come hard times - everyone is hungry, nobody has energy for children, and the world looks still. When the crowded old generation dies of age, the food grows back, the few young ones feast, and the population explodes again. Boom, graze, crash, recover - over and over, like seasons. Your dish is not stuck; it is breathing."},
+
+    {"type": "heading", "text": "Growing old and starting over", "level": 1},
+    {"type": "paragraph", "text": "After a while, a world can grow quiet - the same few families, the same old story. When that happens, you can start a brand-new universe with one command. Nothing is lost: the champions of the old world are remembered forever as fossils, and you can release an old champion into any new world to see how it fares against new neighbors. New universe, new map, new founders, new story - and your Codex keeps every discovery across all of them."},
+
+    {"type": "heading", "text": "Sharing and competing", "level": 1},
+    {"type": "paragraph", "text": "Any creature can be packed into a short code that you can paste in a chat. The code contains the creature - its look and its instincts - and nothing else: no skill content, no personal information. A friend can release your creature into their own world and watch it fight their locals. There is also a set of five standard challenge worlds, the same for everyone, where creatures can compete - and because the worlds are lawful, anyone can re-run the competition and check the result themselves. No referee needed: the world itself is the judge."},
+
+    {"type": "heading", "text": "Words you will see", "level": 1},
+    {"type": "table", "header": true, "rows": [
+      ["Word", "Meaning"],
+      ["Dish", "The world itself - a square field with food and creatures"],
+      ["Tick", "One step of the world's clock (food grows, creatures move)"],
+      ["Eidos", "One individual creature - and its ID, like Eidos_a37ed, names the family it belongs to"],
+      ["Family / strain", "All the creatures descended from one founder (they share the ID)"],
+      ["Species", "The blueprint of a family: its genome, its look, its name"],
+      ["Pod", "The small landing party of creatures released when a species is born or imported"],
+      ["Snapshot", "The complete picture of the dish at one moment - terrain, food, everyone"],
+      ["Generation", "One round of reproduction in a family's history"],
+      ["Canon / private", "Species from standard skills (everyone has them) vs. from your own skills (only you have them)"],
+      ["Hadean era", "The first great die-off, right after birth"],
+      ["Fossil", "A preserved champion from a finished world"],
+      ["Codex", "Your album of discoveries and named species"],
+      ["Challenge code", "A short text code that carries a species to a friend (blueprint only, never the world)"],
+      ["Gauntlet", "The five standard challenge worlds for fair, re-runnable competitions"]
+    ]},
+    {"type": "paragraph", "text": "One distinction worth remembering: an Eidos is a creature - an individual that moves, eats, and can die. The snapshot of the whole 48x48 dish is a different thing entirely: that is the universe at one moment, containing every creature. And when you share a challenge code, you share the species blueprint, never the world."},
+
+    {"type": "heading", "text": "The one-sentence summary", "level": 1},
+    {"type": "paragraph", "text": "Your agent's work feeds a small living world; the skills it learns become species; and you get to watch - and occasionally intervene - as nature decides who survives."}
+  ]
+}

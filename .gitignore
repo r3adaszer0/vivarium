@@ -1,0 +1,12 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Hermes / plugin runtime data
+*.state.json
+plugin-data/
+
+# OS
+.DS_Store
