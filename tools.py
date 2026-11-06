@@ -306,7 +306,12 @@ def _cmd(raw_args: str) -> str:
         return _HELP
     cmd, rest = argv[0], argv[1:]
     if cmd == "status":
-        return _tool_status({}) and json.loads(_tool_status({}))["summary"]
+        out = json.loads(_tool_status({}))
+        text = out.get("summary", "")
+        if out.get("map"):
+            text += "\n\nThe dish:\n" + out["map"] + \
+                "\n\n(X = creatures, dots/: = food blooms)"
+        return text
     if cmd == "render":
         return _tool_render({"rich": "rich" in rest or "--rich" in rest,
                              "image": "image" in rest or "--image" in rest})

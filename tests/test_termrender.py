@@ -162,6 +162,17 @@ class TestToolWiring(unittest.TestCase):
         # this dev box has no graphics terminal -> path fallback, not garbage
         self.assertIn("saved to", out["graphics"])
 
+    def test_status_slash_includes_dish_map(self):
+        """/vivarium status must SHOW the dish (summary alone hid it)."""
+        import tools
+        tmp = tempfile.mkdtemp()
+        store = self._bound(tmp)
+        store["universe"] = {"status": "live", "era": 2}
+        out = tools._cmd("status")
+        self.assertIn("The dish:", out)
+        self.assertIn("X", out)          # creatures render as X
+        self.assertIn("X = creatures", out)   # legend line
+
     def test_serve_slash_returns_localhost_url(self):
         import tools
         tmp = tempfile.mkdtemp()
