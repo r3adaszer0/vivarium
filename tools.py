@@ -110,12 +110,18 @@ def _tool_render(args: Dict[str, Any], **_) -> str:
     if not _universe_live():
         return _dormant_tool_result("render")
     w = _world()
+    rich = bool(args.get("rich"))
+    fn = vworld.render_ascii_rich if rich else vworld.render_ascii
+    cols = int(args.get("cols", 96 if rich else 64))
+    rows = int(args.get("rows", 32 if rich else 24))
     return tool_result({
         "success": True,
         "tick": w.tick,
         "population": len(w.creatures),
-        "map": vworld.render_ascii(w, cols=int(args.get("cols", 64)),
-                                   rows=int(args.get("rows", 24))),
+        "map": fn(w, cols=cols, rows=rows),
+        "legend": ("█ = creatures · ░▒▓ = food blooms (lush→faint)"
+                   if rich else
+                   "X = creatures, dots/: = food blooms"),
     })
 
 
@@ -226,7 +232,7 @@ _HELP = """\
 Subcommands:
   help                  this list (also: bare /vivarium)
   status                population, lineages, ages, and an ASCII map
-  render                just the ASCII map
+  render [--rich]       the ASCII map (--rich: dense block view, needs a wide terminal)
   feed [0-3]            drop nutrients into the dish (default 0.5)
   release [count]       release fresh founders (default 4, max 10)
   import <code>         release a strain from a challenge code
@@ -247,7 +253,7 @@ def _cmd(raw_args: str) -> str:
     if cmd == "status":
         return _tool_status({}) and json.loads(_tool_status({}))["summary"]
     if cmd == "render":
-        return _tool_render({})
+        return _tool_render({"rich": "rich" in rest or "--rich" in rest})
     if cmd == "feed":
         amount = float(rest[0]) if rest and rest[0].replace(".", "", 1).isdigit() else 0.5
         out = json.loads(_tool_feed({"amount": amount}))
@@ -382,14 +388,16 @@ def register_tools(ctx) -> None:
         schema={
             "description": (
                 "Draw the current Vivarium dish as an ASCII map — food blooms as "
-                "shading, creatures as letters of their strain. Use when the user "
+                "shading, creatures as X marks. Set rich=true for a denser "
+                "block-character view (needs a wide terminal). Use when the user "
                 "wants to *see* the ecosystem."
             ),
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "cols": {"type": "integer", "description": "map width (default 64)"},
-                    "rows": {"type": "integer", "description": "map height (default 24)"},
+                    "cols": {"type": "integer", "description": "map width (default 64, rich 96)"},
+                    "rows": {"type": "integer", "description": "map height (default 24, rich 32)"},
+                    "rich": {"type": "boolean", "description": "dense block-character view"},
                 },
                 "required": [],
             },

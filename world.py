@@ -480,8 +480,17 @@ def empty_age_stats() -> dict:
             "verdict": "the dish is empty"}
 
 
+CREATURE_GLYPH = "X"          # VIV-28a: creatures read as organisms, not letters
+
+
 def render_ascii(world: World, cols: int = 64, rows: int = 24) -> str:
-    """ASCII map of the dish: terrain fertility shading + creature dots."""
+    """ASCII map of the dish: X creatures over food-fertility shading.
+
+    VIV-28a redesign: creatures used to render as their lineage's initial
+    letter (E/J/V...) — visually lost in the food ramp and misleading as
+    text. Now every creature is `X` (alive things look alike; lineage info
+    lives in the legend under the map). Pure function of world state.
+    """
     cols = max(1, min(cols, world.w))
     rows = max(1, min(rows, world.h))
     sx, sy = world.w / cols, world.h / rows
@@ -494,9 +503,48 @@ def render_ascii(world: World, cols: int = 64, rows: int = 24) -> str:
             x0, x1 = int(c * sx), max(int((c + 1) * sx), int(c * sx) + 1)
             block = max(world.food[y][x] for y in range(y0, min(y1, world.h))
                         for x in range(x0, min(x1, world.w)))
-            dot = next((cr.lineage[0] for cr in world.creatures
-                        if x0 <= cr.x < min(x1, world.w) and y0 <= cr.y < min(y1, world.h)), None)
-            line.append(dot.upper() if dot else shade[min(9, int(block / MAX_FOOD * 9.999))])
+            has = any(x0 <= cr.x < min(x1, world.w) and y0 <= cr.y < min(y1, world.h)
+                      for cr in world.creatures)
+            line.append(CREATURE_GLYPH if has
+                        else shade[min(9, int(block / MAX_FOOD * 9.999))])
+        lines.append("".join(line))
+    return "\n".join(lines)
+
+
+def render_ascii_rich(world: World, cols: int = 96, rows: int = 32) -> str:
+    """Dense 'pretty terminal' map: solid-block creatures over ░▒▓ blooms.
+
+    The middle tier of the display ladder (VIV-28): ASCII < rich ASCII <
+    terminal graphics (kitty/sixel) < localhost gallery. ~2x the width of
+    render_ascii; for terminals (and demo footage) that can afford it.
+    Pure function of world state — no RNG.
+    """
+    cols = max(1, min(cols, world.w))
+    rows = max(1, min(rows, world.h))
+    sx, sy = world.w / cols, world.h / rows
+    ramp = "  ·:░▒▓"          # empty → faint → lush bloom
+    lines = []
+    for r in range(rows):
+        y0, y1 = int(r * sy), max(int((r + 1) * sy), int(r * sy) + 1)
+        line = []
+        for c in range(cols):
+            x0, x1 = int(c * sx), max(int((c + 1) * sx), int(c * sx) + 1)
+            block = max(world.food[y][x] for y in range(y0, min(y1, world.h))
+                        for x in range(x0, min(x1, world.w)))
+            has = any(x0 <= cr.x < min(x1, world.w) and y0 <= cr.y < min(y1, world.h)
+                      for cr in world.creatures)
+            if has:
+                line.append("█")
+            elif block <= 0.01:
+                line.append(" ")
+            elif block < 0.4:
+                line.append("·")
+            elif block < 1.0:
+                line.append("░")
+            elif block < 1.8:
+                line.append("▒")
+            else:
+                line.append("▓")
         lines.append("".join(line))
     return "\n".join(lines)
 
