@@ -232,6 +232,7 @@ Subcommands:
   import <code>         release a strain from a challenge code
   codex                 the Vivarium Codex: discovered patterns + artifact images
   codex export          write codex.md + the media gallery for sharing
+  race <code> | <seed> [codes]   run a scenario duel (shareable, deterministic)
   start                 welcome/briefing (any time — shows the dormant promise)
   staleness             is this universe going stale? (evidence-based)
   restart               end this era; the next skill triggers a new Big Bang
@@ -266,6 +267,8 @@ def _cmd(raw_args: str) -> str:
         if out.get("media"):
             text += "\n\nImages:\n" + "\n".join(f"  {p}" for p in out["media"])
         return text
+    if cmd == "race":
+        return _race_text(rest)
     if cmd == "staleness":
         return _staleness_text()
     if cmd == "start":
@@ -273,6 +276,34 @@ def _cmd(raw_args: str) -> str:
     if cmd == "restart":
         return _do_restart()
     return f"Unknown subcommand: {cmd}\n\n{_HELP}"
+
+
+def _race_text(rest: list) -> str:
+    """VIV-21: run a scenario duel. /vivarium race <code> or
+    /vivarium race <seed> [challenge-code ...] (new scenario from seed)."""
+    try:  # package mode (Hermes) / flat mode (tests)
+        from . import scenario as vscen
+    except ImportError:  # pragma: no cover
+        import scenario as vscen
+    if not rest:
+        return ("Usage:\n"
+                "  /vivarium race <scenario-code>\n"
+                "  /vivarium race <seed> [challenge-code ...]  — new duel "
+                "from a seed word; optional contestant strains\n"
+                "Contestant codes come from /vivarium codex exports or other "
+                "agents' challenge codes.")
+    if rest[0].startswith("SCEN1"):
+        spec = vscen.decode_scenario(rest[0])
+        if spec is None:
+            return "Invalid scenario code (must be SCEN1…)."
+    else:
+        seed = rest[0]
+        spec = vscen.decode_scenario(vscen.encode_scenario(seed, vscen.SCENARIO_TICKS, rest[1:]))
+    # scenarios are self-contained experiments — they run even while the
+    # profile universe is dormant; no plugin state is touched, no universe
+    # key is read (Rule 4, and safe for fresh installs)
+    res = vscen.run_scenario(spec)
+    return vscen.format_results(res)
 
 
 def _start_text() -> str:
