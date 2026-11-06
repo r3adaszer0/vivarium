@@ -36,10 +36,9 @@ def eidos_id(digest: bytes) -> str:
 
 
 def _release_pod(w, digest: bytes, lineage: str, bs) -> List:
-    from world import Creature
     made = []
     for _ in range(POD_SIZE):
-        made.append(Creature(
+        made.append(W.Creature(
             gid=w.next_gid, genome=genome_of_digest(digest),
             x=bs.uint(2, w.w), y=bs.uint(2, w.h),
             energy=EIDOS_RANGE[0] + (EIDOS_RANGE[1] - EIDOS_RANGE[0])
