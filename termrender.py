@@ -65,13 +65,13 @@ def detect_graphics(env: Optional[dict] = None) -> str:
 def _kitty_escape(png: bytes, img_id: int = 1) -> bytes:
     """PNG → kitty APC escape, chunked at 4096 b64 bytes.
 
-    ESC _ G f=32,a=T,I=<id>,m=<1|0> ; <b64> ESC \\
+    ESC _ G f=100,a=T,I=<id>,m=<1|0>,q=2 ; <b64> ESC \\
     Continuation chunks carry ONLY m. The payload may contain ';' — never
     split on it.
     """
     b64 = base64.b64encode(png).decode()
     first, rest = b64[:CHUNK], b64[CHUNK:]
-    out = [f"\x1b_Gf=32,a=T,I={img_id},m={1 if rest else 0};{first}\x1b\\".encode()]
+    out = [f"\x1b_Gf=100,a=T,I={img_id},m={1 if rest else 0},q=2;{first}\x1b\\".encode()]
     while rest:
         chunk, rest = rest[:CHUNK], rest[CHUNK:]
         out.append(f"\x1b_Gm={1 if rest else 0};{chunk}\x1b\\".encode())

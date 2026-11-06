@@ -72,9 +72,10 @@ def main() -> None:
         png = f.read()
     print(f"probe: painting {path} ({len(png)} bytes)…", flush=True)
     write_tty(_kitty_escape(png, img_id=78))
-    print("probe: done. If the red square painted but the dish didn't,"
-          " the PNG path/format is the problem; if neither painted,"
-          " kitty never got valid APC from this process.", flush=True)
+    print("probe: done — the dish should be painted above. The protocol"
+          " now uses f=100 (PNG) + q=2 (no kitty reply), fixing the"
+          " earlier EINVAL (f=32 means raw pixels, not PNG) and the"
+          " typed-in EINVAL garbage.", flush=True)
 
 
 if __name__ == "__main__":

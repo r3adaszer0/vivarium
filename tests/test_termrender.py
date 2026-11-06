@@ -51,11 +51,11 @@ class TestEscapes(unittest.TestCase):
 
     def test_kitty_escape_shape_and_roundtrip(self):
         esc = T._kitty_escape(self.png)
-        self.assertTrue(esc.startswith(b"\x1b_Gf=32,a=T,I=1,"))
+        self.assertTrue(esc.startswith(b"\x1b_Gf=100,a=T,I=1,"))
         self.assertTrue(esc.endswith(b"\x1b\\"))
         # single-chunk PNG: exactly one APC opener, m=0 terminator
         self.assertEqual(esc.count(b"\x1b_G"), 1)
-        payload = re.search(rb"m=0;([A-Za-z0-9+/=]+)\x1b\\", esc).group(1)
+        payload = re.search(rb"m=0(?:,q=2)?;([A-Za-z0-9+/=]+)\x1b\\", esc).group(1)
         self.assertEqual(base64.b64decode(payload), self.png)
 
     def test_kitty_chunking_over_4096(self):
@@ -71,7 +71,7 @@ class TestEscapes(unittest.TestCase):
         self.assertTrue(esc.endswith(b"\x1b\\"))
         # first chunk has the full header; continuations carry only m=
         # (m=1 while more follow, m=0 on the final chunk)
-        self.assertTrue(parts[1].startswith(b"f=32,a=T,I=1,m=1;"))
+        self.assertTrue(parts[1].startswith(b"f=100,a=T,I=1,m=1,q=2;"))
         for chunk in parts[2:-1]:
             self.assertTrue(chunk.startswith(b"m=1;"))
         self.assertTrue(parts[-1].startswith(b"m=0;"))
@@ -135,7 +135,7 @@ class TestEscapes(unittest.TestCase):
             out = T.emit_image_raw(self.path, env={"TERM": "xterm-kitty"})
         self.assertIn("kitty graphics emitted", out)
         written = buf.getvalue()
-        self.assertIn("\x1b_Gf=32", written)
+        self.assertIn("\x1b_Gf=100", written)
         self.assertTrue(written.endswith("\x1b\\"))
 
     def test_emit_image_raw_prefers_dev_tty(self):
@@ -169,7 +169,7 @@ class TestEscapes(unittest.TestCase):
         os.unlink(fake.name)
         self.assertIn("kitty graphics emitted", out)
         self.assertTrue(opened.get("hit"))
-        self.assertIn(b"\x1b_Gf=32", written["data"])
+        self.assertIn(b"\x1b_Gf=100", written["data"])
         self.assertEqual(buf.getvalue(), "")   # nothing through rich-wrapped stdout
 
 
