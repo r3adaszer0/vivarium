@@ -304,38 +304,6 @@ Subcommands:
 """
 
 
-def _can_paint_inline(vterm) -> bool:
-    """True when this slash can paint the dish inline: a graphics terminal
-    is detected AND the process can write the terminal device directly
-    (the interactive CLI case; gateways/containers fail os.open)."""
-    import os as _os
-    if vterm.detect_graphics() not in ("kitty", "iterm2", "sixel"):
-        return False
-    try:
-        fd = _os.open("/dev/tty", _os.O_WRONLY)
-        _os.close(fd)
-        return True
-    except OSError:
-        return False
-
-
-def _tty_write(payload: str) -> None:
-    """Raw write to the terminal device (bypasses the TUI's rich-wrapped
-    stdout). Used by the image flow, which must own the exact order of
-    text and graphics on screen."""
-    import os
-    if not payload:
-        return
-    try:
-        fd = os.open("/dev/tty", os.O_WRONLY)
-        try:
-            os.write(fd, payload.encode("utf-8"))
-        finally:
-            os.close(fd)
-    except OSError:
-        print(payload, end="")
-
-
 def _render_text(out: dict) -> str:
     """Human text for the render slash output. Slash-UX law: render the
     map; show the media path once (never duplicate via a graphics note)."""
@@ -373,30 +341,20 @@ def _cmd(raw_args: str) -> str:
             "color": ("color" in rest or "--color" in rest
                       or "colour" in rest or "--colour" in rest)}))
         if want_image:
-            try:
-                from . import termrender as vterm
-            except ImportError:  # pragma: no cover
-                import termrender as vterm
-            can_paint = _can_paint_inline(vterm)
-            if can_paint and out.get("media"):
-                out["map"] = ""      # pixels replace the ASCII map
-                out["legend"] = ""
-                text = _render_text(out)
-                # FULL OUTPUT TAKEOVER: the TUI prints returned text at its
-                # own modelled cursor and knows nothing about the image's
-                # height, so its print lands ON the image (kitty draws
-                # images over text — user screenshot). Instead write the
-                # whole flow ourselves to /dev/tty in the correct order
-                # (summary → image → path), and return "" so the TUI
-                # prints nothing extra.
-                summary, _, rest_text = text.partition("\n\n")
-                _tty_write(summary + "\n")
-                for m in out.get("media", []) or []:
-                    out["graphics"] = vterm.emit_image_raw(m)
-                _tty_write("\n" + (rest_text.lstrip("\n") if rest_text else ""))
-                return ""
+            # Inline paint INSIDE the live TUI is not reliable: the TUI is
+            # a full-screen prompt_toolkit app that redraws its viewport
+            # and owns the rows above its input bar — anything a plugin
+            # paints there gets clipped (status bar over the image bottom)
+            # or blended with stale buffer text on the next redraw. Three
+            # paint strategies were tried (tool-result escapes, /dev/tty
+            # takeover, C=1 cursor parking); all lose to the redraw engine.
+            # So the slash returns clean text; inline paint lives in the
+            # standalone path (examples/show_dish.py, plain shell) and the
+            # localhost gallery (/vivarium serve) inside the TUI.
+            out["map"] = ""
+            out["legend"] = ""
             if out.get("media"):
-                out["graphics"] = f"attached {out['media'][0]}"
+                out["graphics"] = f"inline paint not available in the TUI — run: python3 ~/.hermes/plugins/vivarium/examples/show_dish.py"
         return _render_text(out)
     if cmd == "serve":
         return _serve_text("keep" in rest or "--keep" in rest)

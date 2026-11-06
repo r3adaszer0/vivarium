@@ -183,14 +183,13 @@ class TestImagePaintFlow(unittest.TestCase):
         self.assertEqual(text, "Tick 24 — 22 creatures")
         self.assertNotIn("\n\n\n", text)
 
-    def test_takeover_writes_summary_then_image_then_path(self):
-        """Full output takeover: summary to tty, image bytes, then the
-        path note — and the slash returns "" (TUI prints nothing)."""
-        import importlib
-        import os
-        import tempfile
+    def test_tui_render_image_returns_clean_text_no_ascii(self):
+        """Inside the TUI the slash cannot paint reliably (the redraw
+        engine owns the screen) — it returns summary + path only, no
+        ASCII map, no escape bytes."""
+        import importlib, os, tempfile
         from types import SimpleNamespace
-        import state as vstate, world as W, artifacts as A, termrender
+        import state as vstate, world as W, artifacts as A
         import tools
         tmp = tempfile.mkdtemp()
         w = W.new_world(seed=5)
@@ -201,25 +200,14 @@ class TestImagePaintFlow(unittest.TestCase):
             set=lambda k, v: store.__setitem__(k, v),
             data_dir=lambda: tmp))
         vstate.bind(ctx)
-        path = A.render_dish_png(vstate.state(), w, "t_tk")
+        path = A.render_dish_png(vstate.state(), w, "t_tui")
         self.assertTrue(path and os.path.exists(path))
-        writes = []
-        real_emit, real_write = termrender.emit_image_raw, tools._tty_write
-        real_gate = tools._can_paint_inline
-        termrender.emit_image_raw = (
-            lambda pth, **k: writes.append(("img", pth)) or "kitty graphics emitted")
-        tools._tty_write = lambda s: writes.append(("txt", s))
-        tools._can_paint_inline = lambda vterm: True
-        try:
-            out = tools._cmd("render --image")
-        finally:
-            termrender.emit_image_raw = real_emit
-            tools._tty_write = real_write
-            tools._can_paint_inline = real_gate
-        self.assertEqual(out, "")
-        self.assertEqual([k for k, _ in writes], ["txt", "img", "txt"])
-        self.assertIn("Tick", writes[0][1])
-        self.assertIn("🖼️", writes[2][1])
+        out = tools._cmd("render --image")
+        self.assertIn("Tick", out)
+        self.assertIn("🖼️", out)
+        self.assertNotIn("\x1b", out)          # no escapes in TUI text
+        # ASCII map suppressed when an image was produced
+        self.assertNotIn("X = creatures", out)
     """When the image paints inline, the ASCII map is suppressed."""
 
     def test_painted_image_drops_ascii_map(self):
