@@ -224,6 +224,7 @@ _HELP = """\
 /vivarium — the living dish
 
 Subcommands:
+  help                  this list (also: bare /vivarium)
   status                population, lineages, ages, and an ASCII map
   render                just the ASCII map
   feed [0-3]            drop nutrients into the dish (default 0.5)
