@@ -219,22 +219,32 @@ def emit_image_raw(png_path: str, env: Optional[dict] = None,
         png = Path(png_path).read_bytes()
     except OSError as e:
         return f"could not read {png_path}: {e}"
+    payload = None
     if kind == "kitty":
-        sys.stdout.write(_kitty_escape(png).decode("latin-1"))
-        sys.stdout.flush()
-        return "kitty graphics emitted"
-    if kind == "iterm2":
-        sys.stdout.write(_iterm2_escape(png).decode("latin-1"))
-        sys.stdout.flush()
-        return "iTerm2 graphics emitted"
-    if kind == "sixel":
-        esc = _sixel_escape(png)
-        if esc:
-            sys.stdout.write(esc.decode("latin-1"))
-            sys.stdout.flush()
-            return "sixel graphics emitted"
+        payload = _kitty_escape(png).decode("latin-1")
+    elif kind == "iterm2":
+        payload = _iterm2_escape(png).decode("latin-1")
+    elif kind == "sixel":
+        payload = _sixel_escape(png).decode("latin-1")
+        if not payload:
+            return f"saved to {png_path}"
+    else:
         return f"saved to {png_path}"
-    return f"saved to {png_path}"
+    # Write to the RAW terminal device when possible: the Hermes TUI wraps
+    # stdout (prompt_toolkit patch_stdout -> rich), which re-encodes ANSI
+    # and mangles APC into visible text (user's kitty paste). /dev/tty
+    # bypasses the wrapper so the terminal itself sees the bytes.
+    try:
+        tty = os.open("/dev/tty", os.O_WRONLY)
+        try:
+            os.write(tty, payload.encode("latin-1"))
+        finally:
+            os.close(tty)
+    except OSError:
+        sys.stdout.write(payload)      # plain terminal: stdout IS the tty
+        sys.stdout.flush()
+    return f"{kind} graphics emitted"
+
 
 
 # ── localhost gallery ────────────────────────────────────────────────────────

@@ -333,11 +333,22 @@ def _cmd(raw_args: str) -> str:
                 "\n\n(X = creatures, dots/: = food blooms)"
         return text
     if cmd == "render":
+        want_image = "image" in rest or "--image" in rest
         out = json.loads(_tool_render({
             "rich": "rich" in rest or "--rich" in rest,
-            "image": "image" in rest or "--image" in rest,
+            "image": want_image,
             "color": ("color" in rest or "--color" in rest
                       or "colour" in rest or "--colour" in rest)}))
+        if want_image:
+            # Slash runs inside the CLI process, which owns the terminal —
+            # paint natively via /dev/tty (bypasses the TUI's rich wrapper,
+            # which would otherwise mangle the escape bytes into text).
+            for m in out.get("media", []) or []:
+                try:
+                    from . import termrender as vterm
+                except ImportError:  # pragma: no cover
+                    import termrender as vterm
+                out["graphics"] = vterm.emit_image_raw(m)
         return _render_text(out)
     if cmd == "serve":
         return _serve_text("keep" in rest or "--keep" in rest)

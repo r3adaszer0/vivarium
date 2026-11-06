@@ -127,7 +127,8 @@ class TestEscapes(unittest.TestCase):
         self.assertEqual(buf.getvalue(), "")       # nothing written
 
     def test_emit_image_raw_writes_kitty_escape(self):
-        """Interactive-only path: writes real APC bytes to stdout."""
+        """Interactive-only path: writes real APC bytes to stdout when no
+        /dev/tty is available (containers, pipes)."""
         import io, contextlib
         buf = io.StringIO()
         with contextlib.redirect_stdout(buf):
@@ -136,6 +137,40 @@ class TestEscapes(unittest.TestCase):
         written = buf.getvalue()
         self.assertIn("\x1b_Gf=32", written)
         self.assertTrue(written.endswith("\x1b\\"))
+
+    def test_emit_image_raw_prefers_dev_tty(self):
+        """With a /dev/tty, bytes go to the RAW terminal (bypassing the
+        TUI's rich-wrapped stdout which mangles APC into visible text —
+        the user's kitty mojibake)."""
+        import io, contextlib, os, tempfile
+        # fake tty device: a temp file standing in for /dev/tty
+        fake = tempfile.NamedTemporaryFile(delete=False)
+        fake.close()
+        real_open = os.open
+        opened = {}
+        def fake_open(path, flags, *a, **k):
+            if str(path) == "/dev/tty":
+                opened["hit"] = True
+                return os.open(fake.name, flags)
+            return real_open(path, flags, *a, **k)
+        buf = io.StringIO()
+        import termrender as Tm
+        with contextlib.redirect_stdout(buf):
+            real_write = os.write
+            written = {}
+            def fake_write(fd, data):
+                written["data"] = data
+                return real_write(fd, data)
+            os.open, os.write = fake_open, fake_write
+            try:
+                out = Tm.emit_image_raw(self.path, env={"TERM": "xterm-kitty"})
+            finally:
+                os.open, os.write = real_open, real_write
+        os.unlink(fake.name)
+        self.assertIn("kitty graphics emitted", out)
+        self.assertTrue(opened.get("hit"))
+        self.assertIn(b"\x1b_Gf=32", written["data"])
+        self.assertEqual(buf.getvalue(), "")   # nothing through rich-wrapped stdout
 
 
 class TestSlashPolish(unittest.TestCase):
