@@ -313,8 +313,17 @@ def _cmd(raw_args: str) -> str:
                 "\n\n(X = creatures, dots/: = food blooms)"
         return text
     if cmd == "render":
-        return _tool_render({"rich": "rich" in rest or "--rich" in rest,
-                             "image": "image" in rest or "--image" in rest})
+        out = json.loads(_tool_render({
+            "rich": "rich" in rest or "--rich" in rest,
+            "image": "image" in rest or "--image" in rest}))
+        text = f"Tick {out.get('tick')} — {out.get('population')} creatures\n\n" \
+               + out.get("map", "") + "\n\n" + out.get("legend", "")
+        for m in out.get("media", []) or []:
+            text += f"\n\n🖼️ {m}"
+        g = out.get("graphics") or ""
+        if g and not g.startswith("saved to"):   # real graphics were emitted
+            text += f"\n({g})"
+        return text
     if cmd == "serve":
         return _serve_text("keep" in rest or "--keep" in rest)
     if cmd == "images":
@@ -447,7 +456,10 @@ def _start_text() -> str:
 
 def _staleness_text() -> str:
     """Plain-language staleness verdict from the sampled curve + live dish."""
-    from . import codex as vcodex
+    try:
+        from . import codex as vcodex
+    except ImportError:  # pragma: no cover
+        import codex as vcodex
     s = vstate.state()
     curve = s.get("curve", []) or []
     try:

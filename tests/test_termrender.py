@@ -162,6 +162,23 @@ class TestToolWiring(unittest.TestCase):
         # this dev box has no graphics terminal -> path fallback, not garbage
         self.assertIn("saved to", out["graphics"])
 
+    def test_render_slash_is_plain_text_not_json(self):
+        """/vivarium render --rich must print real newlines (user screenshot:
+        raw JSON with literal \n garbage)."""
+        import tools
+        tmp = tempfile.mkdtemp()
+        self._bound(tmp)
+        store = {"universe": {"status": "live", "era": 2}}
+        out = tools._cmd("render --rich")
+        self.assertFalse(out.strip().startswith("{"))
+        self.assertNotIn("\\n", out)              # no literal backslash-n
+        self.assertIn("creatures", out)
+        self.assertIn("food blooms", out)
+        out = tools._cmd("render --image")
+        self.assertFalse(out.strip().startswith("{"))
+        self.assertIn("🖼️", out)                  # PNG path shown as artifact
+        self.assertIn(".png", out)
+
     def test_status_slash_includes_dish_map(self):
         """/vivarium status must SHOW the dish (summary alone hid it)."""
         import tools
