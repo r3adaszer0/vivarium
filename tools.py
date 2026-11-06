@@ -349,9 +349,8 @@ def _do_restart() -> str:
     return (
         f"🌌 Era {old_era} ended (universe {old_fp}). Champions archived as "
         f"fossils; they can be re-released into any future dish.\n\n"
-        f"The next skill this agent learns triggers the era-{rec['era']} Big "
-        f"Bang — a world no restart can replay (era-salted). Your Codex and "
-        f"species roster carry over."
+        f"The next skill this agent learns births a brand-new world, derived "
+        f"with a fresh key. Your Codex and species roster carry over."
     )
 
 
