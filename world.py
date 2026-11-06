@@ -511,7 +511,8 @@ def render_ascii(world: World, cols: int = 64, rows: int = 24) -> str:
     return "\n".join(lines)
 
 
-def render_ascii_rich(world: World, cols: int = 96, rows: int = 32) -> str:
+def render_ascii_rich(world: World, cols: int = 96, rows: int = 32,
+                      color: bool = False) -> str:
     """Dense 'pretty terminal' map: solid-block creatures over ░▒▓ blooms.
 
     The middle tier of the display ladder (VIV-28): ASCII < rich ASCII <
@@ -523,6 +524,16 @@ def render_ascii_rich(world: World, cols: int = 96, rows: int = 32) -> str:
     rows = max(1, min(rows, world.h))
     sx, sy = world.w / cols, world.h / rows
     ramp = "  ·:░▒▓"          # empty → faint → lush bloom
+    colorize = None
+    if color:
+        try:  # package mode / flat mode
+            from . import identity as I
+        except ImportError:  # pragma: no cover
+            import identity as I
+
+        def colorize(genome):
+            r, g, b = I.color_for(genome["hue"])
+            return f"\x1b[48;2;{r};{g};{b}m \x1b[0m"   # colored SPACE = block
     lines = []
     for r in range(rows):
         y0, y1 = int(r * sy), max(int((r + 1) * sy), int(r * sy) + 1)
@@ -531,10 +542,13 @@ def render_ascii_rich(world: World, cols: int = 96, rows: int = 32) -> str:
             x0, x1 = int(c * sx), max(int((c + 1) * sx), int(c * sx) + 1)
             block = max(world.food[y][x] for y in range(y0, min(y1, world.h))
                         for x in range(x0, min(x1, world.w)))
-            has = any(x0 <= cr.x < min(x1, world.w) and y0 <= cr.y < min(y1, world.h)
-                      for cr in world.creatures)
-            if has:
-                line.append("█")
+            occupant = next((cr for cr in world.creatures
+                             if x0 <= cr.x < min(x1, world.w)
+                             and y0 <= cr.y < min(y1, world.h)), None)
+            if occupant is not None:
+                # colored full-width block: a SPACE with a background color
+                # keeps the cell exactly 1 column wide (truecolor bg fill)
+                line.append(colorize(occupant.genome) if colorize else "█")
             elif block <= 0.01:
                 line.append(" ")
             elif block < 0.4:

@@ -210,6 +210,52 @@ class TestToolWiring(unittest.TestCase):
         self.assertIn("Localhost only", out)
 
 
+class TestColoredRichMap(unittest.TestCase):
+    """VIV-28c: --color creatures as truecolor background blocks."""
+
+    def test_colored_map_structure(self):
+        import re
+        import world as W
+        w = W.new_world(seed=9)
+        W.run(w, 30, 0.05)
+        plain = W.render_ascii_rich(w, color=False)
+        colored = W.render_ascii_rich(w, color=True)
+        stripped = re.sub(r"\x1b\[[0-9;]*m", "", colored)
+        # strip must yield exactly the same geometry (spaces where █ was)
+        self.assertEqual([len(l) for l in stripped.splitlines()],
+                         [len(l) for l in plain.splitlines()])
+        self.assertEqual(stripped.count(" "), plain.count("█"))
+        # every creature cell carries a truecolor bg escape
+        self.assertEqual(colored.count("\x1b[48;2;"), plain.count("█"))
+
+    def test_colors_differ_across_lineages(self):
+        import world as W
+        import identity as I
+        w = W.new_world(seed=9)
+        W.run(w, 30, 0.05)
+        hues = {c.genome["hue"] for c in w.creatures}
+        self.assertGreater(len({I.color_for(h) for h in hues}), 1)
+
+    def test_tool_gates_color_on_tty(self):
+        """color=true in a no-tty context (gateway/chat) must NOT embed
+        ANSI codes — same law as graphics escapes."""
+        import json, tools, tempfile
+        from types import SimpleNamespace
+        import state as vstate, world as W
+        tmp = tempfile.mkdtemp()
+        store = {"universe": {"status": "live", "era": 2},
+                 "world": W.new_world(seed=5).to_dict()}
+        w = W.World.from_dict(store["world"]); W.run(w, 30, 0.05)
+        store["world"] = w.to_dict()
+        ctx = SimpleNamespace(state=SimpleNamespace(
+            get=lambda k, d=None: store.get(k, d),
+            set=lambda k, v: store.__setitem__(k, v),
+            data_dir=lambda: tmp))
+        vstate.bind(ctx)
+        out = json.loads(tools._tool_render({"rich": True, "color": True}))
+        self.assertNotIn("\x1b[", out["map"])   # no ANSI in chat payload
+
+
 class TestMediaPref(unittest.TestCase):
     """VIV-27: the media preference knob + terminal-aware start offer."""
 

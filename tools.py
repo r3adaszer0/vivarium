@@ -143,6 +143,11 @@ def _tool_render(args: Dict[str, Any], **_) -> str:
         return _dormant_tool_result("render")
     w = _world()
     rich = bool(args.get("rich"))
+    # ANSI colors only when the output can actually show them: a tty.
+    # In gateway/chat contexts the codes would surface as mojibake (the
+    # same lesson as the kitty-escape leak).
+    import sys as _sys
+    want_color = bool(args.get("color")) and _sys.stdout.isatty()
     fn = vworld.render_ascii_rich if rich else vworld.render_ascii
     cols = int(args.get("cols", 96 if rich else 64))
     rows = int(args.get("rows", 32 if rich else 24))
@@ -150,7 +155,8 @@ def _tool_render(args: Dict[str, Any], **_) -> str:
         "success": True,
         "tick": w.tick,
         "population": len(w.creatures),
-        "map": fn(w, cols=cols, rows=rows),
+        "map": (fn(w, cols=cols, rows=rows, color=True) if (rich and want_color)
+                else fn(w, cols=cols, rows=rows)),
         "legend": ("█ = creatures · ░▒▓ = food blooms (lush→faint)"
                    if rich else
                    "X = creatures, dots/: = food blooms"),
@@ -285,7 +291,7 @@ _HELP = """\
 Subcommands:
   help                  this list (also: bare /vivarium)
   status                population, lineages, ages, and an ASCII map
-  render [--rich] [--image]   the dish map (--rich: dense blocks; --image: true PNG via terminal graphics when supported)
+  render [--rich] [--color] [--image]   the dish map (--rich: dense blocks; --color: colored creatures, terminal only; --image: true PNG when supported)
   serve [--keep]        open the gallery in your browser (localhost only)
   images on|off|auto    how imagery is delivered (auto = where supported)
   feed [0-3]            drop nutrients into the dish (default 0.5)
@@ -315,7 +321,8 @@ def _cmd(raw_args: str) -> str:
     if cmd == "render":
         out = json.loads(_tool_render({
             "rich": "rich" in rest or "--rich" in rest,
-            "image": "image" in rest or "--image" in rest}))
+            "image": "image" in rest or "--image" in rest,
+            "color": "color" in rest or "--color" in rest}))
         text = f"Tick {out.get('tick')} — {out.get('population')} creatures\n\n" \
                + out.get("map", "") + "\n\n" + out.get("legend", "")
         for m in out.get("media", []) or []:
@@ -538,6 +545,7 @@ def register_tools(ctx) -> None:
                     "cols": {"type": "integer", "description": "map width (default 64, rich 96)"},
                     "rows": {"type": "integer", "description": "map height (default 24, rich 32)"},
                     "rich": {"type": "boolean", "description": "dense block-character view"},
+                    "color": {"type": "boolean", "description": "truecolor creatures (terminal only)"},
                 },
                 "required": [],
             },
