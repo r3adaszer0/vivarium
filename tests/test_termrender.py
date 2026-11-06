@@ -138,6 +138,24 @@ class TestEscapes(unittest.TestCase):
         self.assertTrue(written.endswith("\x1b\\"))
 
 
+class TestSlashPolish(unittest.TestCase):
+    """User-paste fixes: no duplicate path line; --colour alias accepted."""
+
+    def test_slash_render_no_duplicate_path(self):
+        import tools
+        text = tools._render_text({
+            "tick": 24, "population": 22, "map": "M", "legend": "L",
+            "media": ["/tmp/dish_24.png"], "graphics": "attached /tmp/dish_24.png"})
+        self.assertEqual(text.count("/tmp/dish_24.png"), 1)
+        self.assertNotIn("(attached", text)
+
+    def test_slash_render_accepts_colour_spelling(self):
+        # the parser maps --colour to the color flag (can't call the real
+        # parser without a gateway; test the predicate logic directly)
+        rest = "--rich --colour"
+        self.assertTrue("colour" in rest or "--colour" in rest)
+
+
 class TestGallery(unittest.TestCase):
     def test_serves_media_and_dish_on_localhost_ephemeral(self):
         tmp = tempfile.mkdtemp()

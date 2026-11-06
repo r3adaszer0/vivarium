@@ -306,6 +306,20 @@ Subcommands:
 """
 
 
+def _render_text(out: dict) -> str:
+    """Human text for the render slash output. Slash-UX law: render the
+    map; show the media path once (never duplicate via a graphics note)."""
+    text = f"Tick {out.get('tick')} — {out.get('population')} creatures\n\n" \
+           + out.get("map", "") + "\n\n" + out.get("legend", "")
+    for m in out.get("media", []) or []:
+        text += f"\n\n🖼️ {m}"
+    g = out.get("graphics") or ""
+    if g and not g.startswith("saved to") \
+            and not g.startswith("attached"):  # path already shown via 🖼️
+        text += f"\n({g})"
+    return text
+
+
 def _cmd(raw_args: str) -> str:
     argv = raw_args.strip().split()
     if not argv or argv[0] in {"help", "-h", "--help"}:
@@ -322,15 +336,9 @@ def _cmd(raw_args: str) -> str:
         out = json.loads(_tool_render({
             "rich": "rich" in rest or "--rich" in rest,
             "image": "image" in rest or "--image" in rest,
-            "color": "color" in rest or "--color" in rest}))
-        text = f"Tick {out.get('tick')} — {out.get('population')} creatures\n\n" \
-               + out.get("map", "") + "\n\n" + out.get("legend", "")
-        for m in out.get("media", []) or []:
-            text += f"\n\n🖼️ {m}"
-        g = out.get("graphics") or ""
-        if g and not g.startswith("saved to"):   # real graphics were emitted
-            text += f"\n({g})"
-        return text
+            "color": ("color" in rest or "--color" in rest
+                      or "colour" in rest or "--colour" in rest)}))
+        return _render_text(out)
     if cmd == "serve":
         return _serve_text("keep" in rest or "--keep" in rest)
     if cmd == "images":
