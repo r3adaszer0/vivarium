@@ -12,22 +12,62 @@ from __future__ import annotations
 import json
 from typing import Any, Dict
 
+def _tool_shim(data=None, error=None, **kwargs):
+    """Test-context fallback for tools.registry (Hermes runtime absent)."""
+    import json as _json
+    if error is not None:
+        return _json.dumps({"success": False, "error": error, **kwargs})
+    return _json.dumps({"success": True, **(data or {}), **kwargs})
+
+
 try:  # package context (Hermes plugin) or flat import (tests)
     from . import state as vstate
     from . import world as vworld
     from tools.registry import tool_error, tool_result   # Hermes runtime path
-except ImportError:  # pragma: no cover
+except ImportError:  # pragma: no cover — flat test context
     import state as vstate
     import world as vworld
-    from tools.registry import tool_error, tool_result
+    try:
+        from tools.registry import tool_error, tool_result
+    except ImportError:
+        tool_error, tool_result = (lambda m, **k: _tool_shim(error=m, **k),
+                                   lambda d=None, **k: _tool_shim(d, **k))
 
 
 def _world():
     return vstate.load_world()
 
 
+_DORMANT_BRIEF = (
+    "🌌 The universe is dormant — the dish is empty and waiting. "
+    "The first skill this agent learns triggers the Big Bang: species are "
+    "seeded from every skill installed at that moment, and the dish comes "
+    "alive. Nothing to configure — just keep using Hermes. "
+    "(/vivarium start shows this briefing any time)")
+
+
+def _dormant_tool_result(tool_name: str = "") -> str:
+    """VIV-19c: read/action tools on a DORMANT universe never conjure a dish.
+
+    The hooks already gate on universe status; this closes the tool paths.
+    Feeding/releasing into a nonexistent world would lazily create a phantom
+    26-creature dish that the real Big Bang would then wipe.
+    """
+    return tool_result({
+        "success": True,
+        "dormant": True,
+        "summary": _DORMANT_BRIEF,
+    })
+
+
+def _universe_live() -> bool:
+    return vstate.universe_record().get("status") == "live"
+
+
 # ── vivarium_status ──────────────────────────────────────────────────────────
 def _tool_status(args: Dict[str, Any], **_) -> str:
+    if not _universe_live():
+        return _dormant_tool_result("status")
     w = _world()
     s = vworld.stats(w)
     a = s.get("ages", {})
@@ -67,6 +107,8 @@ def _tool_status(args: Dict[str, Any], **_) -> str:
 
 # ── vivarium_render ──────────────────────────────────────────────────────────
 def _tool_render(args: Dict[str, Any], **_) -> str:
+    if not _universe_live():
+        return _dormant_tool_result("render")
     w = _world()
     return tool_result({
         "success": True,
@@ -84,6 +126,8 @@ def _tool_feed(args: Dict[str, Any], **_) -> str:
         amount = max(0.0, min(3.0, float(amount)))
     except (TypeError, ValueError):
         return tool_error("amount must be a number")
+    if not _universe_live():
+        return _dormant_tool_result("feed")
     w = _world()
     before = len(w.creatures)
     vstate.advance(w, ticks=1, nutrients=amount)
@@ -101,6 +145,8 @@ def _tool_feed(args: Dict[str, Any], **_) -> str:
 # ── vivarium_release ─────────────────────────────────────────────────────────
 def _tool_release(args: Dict[str, Any], **_) -> str:
     code = str(args.get("code", "")).strip()
+    if not _universe_live():
+        return _dormant_tool_result("release")
     w = _world()
     if code:
         genome = vstate.decode_genome(code)
@@ -183,10 +229,11 @@ Subcommands:
   feed [0-3]            drop nutrients into the dish (default 0.5)
   release [count]       release fresh founders (default 4, max 10)
   import <code>         release a strain from a challenge code
-  codex                 the Codex: discovered patterns + artifact images
+  codex                 the Vivarium Codex: discovered patterns + artifact images
   codex export          write codex.md + the media gallery for sharing
-  restart               end this era; the next skill triggers a new Big Bang
+  start                 welcome/briefing (any time — shows the dormant promise)
   staleness             is this universe going stale? (evidence-based)
+  restart               end this era; the next skill triggers a new Big Bang
 """
 
 
@@ -220,9 +267,20 @@ def _cmd(raw_args: str) -> str:
         return text
     if cmd == "staleness":
         return _staleness_text()
+    if cmd == "start":
+        return _start_text()
     if cmd == "restart":
         return _do_restart()
     return f"Unknown subcommand: {cmd}\n\n{_HELP}"
+
+
+def _start_text() -> str:
+    """VIV-26: the welcome/briefing — the same text the dormant narration
+    gives on a fresh chat, available on demand in ANY session age."""
+    if _universe_live():
+        return ("🌌 The Vivarium is alive. Use /vivarium status to see the "
+                "dish, /vivarium codex for discoveries.\n" + _HELP)
+    return _DORMANT_BRIEF
 
 
 def _staleness_text() -> str:

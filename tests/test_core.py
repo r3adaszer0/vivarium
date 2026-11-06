@@ -227,10 +227,75 @@ class TestHookFlow(unittest.TestCase):
         self.assertIn("sleeps", out["context"])
         self.assertIsNone(self.ctx.state.get("world"))    # no phantom dish
 
+
+class DormantToolGating(unittest.TestCase):
+    """VIV-19c: tools on a dormant universe brief, never conjure a dish."""
+
+    def setUp(self):
+        import hooks, tools
+        from types import SimpleNamespace
+
+        class St:
+            def __init__(self):
+                self.d = {}
+            def get(self, k, d=None):
+                return self.d.get(k, d)
+            def set(self, k, v):
+                self.d[k] = v
+
+        self.st = St()
+        import state as vstate
+        self._old_ctx = vstate._ctx
+        vstate._ctx = SimpleNamespace(state=self.st)
+        self.tools = tools
+
+    def tearDown(self):
+        import state as vstate
+        vstate._ctx = self._old_ctx
+
+    def test_status_while_dormant_briefs_and_creates_nothing(self):
+        out = self.tools._tool_status({})
+        self.assertIn("dormant", out)
+        self.assertNotIn("creatures alive", out)
+        self.assertIsNone(self.st.d.get("world"))     # no phantom dish
+
+    def test_feed_release_render_dormant_brief(self):
+        self.assertIn("dormant", self.tools._tool_feed({"amount": 1.0}))
+        self.assertIn("dormant", self.tools._tool_release({}))
+        self.assertIn("dormant", self.tools._tool_render({}))
+        self.assertIsNone(self.st.d.get("world"))     # still nothing conjured
+
+    def test_all_tools_work_when_live(self):
+        import universe as U
+        import world as W
+        rec = U.universe_record(self.st)
+        rec["status"] = "live"
+        self.st.set(U.UNIVERSE_REC, rec)
+        self.st.set("world", W.new_world(seed=5).to_dict())
+        out = self.tools._tool_status({})
+        self.assertIn("creatures alive", out)         # live: the real status
+        self.assertNotIn("dormant", out)
+
+    def test_start_command_both_states(self):
+        # dormant: the briefing
+        self.assertIn("dormant", self.tools._cmd("start"))
+        # live: alive + help
+        import universe as U
+        import world as W
+        rec = U.universe_record(self.st)
+        rec["status"] = "live"
+        self.st.set(U.UNIVERSE_REC, rec)
+        self.st.set("world", W.new_world(seed=5).to_dict())
+        out = self.tools._cmd("start")
+        self.assertIn("alive", out)
+        self.assertIn("/vivarium status", out)
+
     def test_hooks_never_raise(self):
         # garbage input must never break the agent's tool loop
-        self.hooks._on_post_tool_call(tool_name="terminal", args=None)
-        self.hooks._on_pre_llm_call()  # no args at all
+        # (lives in DormantToolGating scope but exercises the hook module)
+        import hooks
+        hooks._on_post_tool_call(tool_name="terminal", args=None)
+        hooks._on_pre_llm_call()  # no args at all
         self.assertTrue(True)
 
 

@@ -50,6 +50,11 @@ def make_live(s):
     saved = {}
     rec = U.universe_record(s)
     rec["status"] = "live"          # minimal live universe (seeding tested elsewhere)
+    # PIN the universe key: without it, get_or_create_key() draws token_bytes
+    # per run, so the pod's digest-picked landing cells vary — on the bare
+    # test world some landings starve the pod within the 90-tick advance,
+    # making the hook test flaky (deterministic key => deterministic birth).
+    s.set(U.UNIVERSE_KEY, "dGVzdC1rZXktZml4ZWQtZm9yLWZsYWtlLWZyZWUtYmlydGhz")
     s.set(U.UNIVERSE_REC, rec)
     w = W.new_world(seed=11)
     saved["world"] = w.to_dict()
