@@ -65,6 +65,37 @@ def _universe_live() -> bool:
     return vstate.universe_record().get("status") == "live"
 
 
+# ── media preference (VIV-27) ────────────────────────────────────────────────
+MEDIA_PREF_KEY = "media_pref"          # "auto" | "image" | "ascii"
+_MEDIA_MODES = ("auto", "image", "ascii")
+
+
+def media_pref() -> str:
+    """How the plugin should deliver imagery.
+
+    auto  (default) — images when the current surface supports them
+                      (terminal graphics in a capable CLI; native
+                      attachments in chats), ASCII everywhere else
+    image           — always prefer images (fallback to ASCII paths)
+    ascii           — never auto-deliver images; render on demand only
+    """
+    val = vstate.state().get(MEDIA_PREF_KEY, "auto")
+    return val if val in _MEDIA_MODES else "auto"
+
+
+def set_media_pref(mode: str) -> str:
+    if mode not in _MEDIA_MODES:
+        return f"Unknown mode '{mode}'. Use: on (image), off (ascii), auto."
+    vstate.state().set(MEDIA_PREF_KEY, mode)
+    return {
+        "auto": "Media: auto — images where supported, ASCII elsewhere.",
+        "image": "Media: image — prefer real renders (kitty graphics, "
+                 "attachments); falls back to ASCII elsewhere.",
+        "ascii": "Media: ascii — text-only dish; images on demand via "
+                 "/vivarium render --image.",
+    }[mode]
+
+
 # ── vivarium_status ──────────────────────────────────────────────────────────
 def _tool_status(args: Dict[str, Any], **_) -> str:
     if not _universe_live():
@@ -124,7 +155,10 @@ def _tool_render(args: Dict[str, Any], **_) -> str:
                    if rich else
                    "X = creatures, dots/: = food blooms"),
     }
-    if args.get("image"):
+    # honor the media preference: "ascii" means images ONLY on explicit
+    # request (this call IS explicit when image=true, so it still renders);
+    # the pref gates AUTOMATIC delivery elsewhere (narration, hooks)
+    if args.get("image") or (media_pref() == "image"):
         # VIV-28b: render the true PNG and emit via the best graphics
         # protocol the terminal supports (opt-in only — the CALLER set
         # image=true deliberately). Non-supporting terminals get the path.
@@ -253,6 +287,7 @@ Subcommands:
   status                population, lineages, ages, and an ASCII map
   render [--rich] [--image]   the dish map (--rich: dense blocks; --image: true PNG via terminal graphics when supported)
   serve [--keep]        open the gallery in your browser (localhost only)
+  images on|off|auto    how imagery is delivered (auto = where supported)
   feed [0-3]            drop nutrients into the dish (default 0.5)
   release [count]       release fresh founders (default 4, max 10)
   import <code>         release a strain from a challenge code
@@ -277,6 +312,11 @@ def _cmd(raw_args: str) -> str:
                              "image": "image" in rest or "--image" in rest})
     if cmd == "serve":
         return _serve_text("keep" in rest or "--keep" in rest)
+    if cmd == "images":
+        if not rest:
+            return f"Media delivery: {media_pref()}.\n" \
+                   "Set with: /vivarium images on|off|auto"
+        return set_media_pref({"on": "image", "off": "ascii"}.get(rest[0], rest[0]))
     if cmd == "feed":
         amount = float(rest[0]) if rest and rest[0].replace(".", "", 1).isdigit() else 0.5
         out = json.loads(_tool_feed({"amount": amount}))
@@ -367,13 +407,37 @@ def _race_text(rest: list) -> str:
     return vscen.format_results(res)
 
 
+def _media_offer() -> str:
+    """VIV-27/start: surface image delivery once, at onboarding.
+
+    Terminal with graphics support -> offer the opt-in. Chat platforms
+    already deliver images natively -> say so. Dumb terminal -> silence
+    (nothing to offer). Never more than one line.
+    """
+    if media_pref() != "auto":
+        return ""                              # already decided — no nag
+    try:
+        from . import termrender as vterm
+    except ImportError:  # pragma: no cover
+        import termrender as vterm
+    kind = vterm.detect_graphics()
+    if kind == "none":
+        return ""
+    if kind in ("kitty", "iterm2", "sixel"):
+        return ("\n\n🖼️ Your terminal can show the dish as a real image — "
+                "enable with /vivarium images on (auto-detected, off by "
+                "default).")
+    return ""
+
+
 def _start_text() -> str:
     """VIV-26: the welcome/briefing — the same text the dormant narration
     gives on a fresh chat, available on demand in ANY session age."""
+    offer = _media_offer()
     if _universe_live():
         return ("🌌 The Vivarium is alive. Use /vivarium status to see the "
-                "dish, /vivarium codex for discoveries.\n" + _HELP)
-    return _DORMANT_BRIEF
+                "dish, /vivarium codex for discoveries.\n" + _HELP + offer)
+    return _DORMANT_BRIEF + offer
 
 
 def _staleness_text() -> str:

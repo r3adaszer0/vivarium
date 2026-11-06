@@ -171,5 +171,66 @@ class TestToolWiring(unittest.TestCase):
         self.assertIn("Localhost only", out)
 
 
+class TestMediaPref(unittest.TestCase):
+    """VIV-27: the media preference knob + terminal-aware start offer."""
+
+    def _bound(self, tmp):
+        from types import SimpleNamespace
+        import state as vstate, world as W
+        store = {"universe": {"status": "dormant", "era": 0}}
+        ctx = SimpleNamespace(state=SimpleNamespace(
+            get=lambda k, d=None: store.get(k, d),
+            set=lambda k, v: store.__setitem__(k, v),
+            data_dir=lambda: tmp))
+        vstate.bind(ctx)
+        return store
+
+    def test_default_is_auto_and_roundtrips(self):
+        import tools
+        tmp = tempfile.mkdtemp()
+        store = self._bound(tmp)
+        self.assertEqual(tools.media_pref(), "auto")
+        self.assertIn("image", tools.set_media_pref("image"))
+        self.assertEqual(tools.media_pref(), "image")
+        self.assertIn("ascii", tools.set_media_pref("ascii"))
+        self.assertEqual(tools.media_pref(), "ascii")
+        self.assertIn("auto", tools.set_media_pref("auto"))
+        self.assertEqual(tools.media_pref(), "auto")
+
+    def test_images_slash_command(self):
+        import tools
+        tmp = tempfile.mkdtemp()
+        self._bound(tmp)
+        self.assertIn("auto", tools._cmd("images"))
+        out = tools._cmd("images on")
+        self.assertIn("image", out)
+        out = tools._cmd("images off")
+        self.assertIn("ascii", out)
+        self.assertIn("Set with", tools._cmd("images"))  # no-arg: status+usage
+
+    def test_bad_mode_rejected(self):
+        import tools
+        tmp = tempfile.mkdtemp()
+        self._bound(tmp)
+        self.assertIn("Unknown mode", tools.set_media_pref("always"))
+        self.assertEqual(tools.media_pref(), "auto")   # unchanged
+
+    def test_start_offer_only_when_graphics_terminal(self):
+        import tools
+        tmp = tempfile.mkdtemp()
+        self._bound(tmp)
+        # plain env -> no offer (detect_graphics sees the real env here; on
+        # this dev box it's 'none', on a kitty box the test still holds
+        # because pref stays 'auto' and the offer must appear)
+        offer_present = "images on" in tools._cmd("start")
+        real = __import__("termrender").detect_graphics()
+        self.assertEqual(offer_present, real in ("kitty", "iterm2", "sixel"))
+        # once the user chooses, the offer never nags again
+        tools.set_media_pref("ascii")
+        self.assertNotIn("images on", tools._cmd("start"))
+        tools.set_media_pref("image")
+        self.assertNotIn("images on", tools._cmd("start"))
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
