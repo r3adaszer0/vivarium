@@ -311,6 +311,9 @@ def _render_text(out: dict) -> str:
     map; show the media path once (never duplicate via a graphics note)."""
     text = f"Tick {out.get('tick')} — {out.get('population')} creatures\n\n" \
            + out.get("map", "") + "\n\n" + out.get("legend", "")
+    if not out.get("map"):
+        # image painted inline: skip the map/legend block entirely
+        text = f"Tick {out.get('tick')} — {out.get('population')} creatures"
     for m in out.get("media", []) or []:
         text += f"\n\n🖼️ {m}"
     g = out.get("graphics") or ""
@@ -343,12 +346,18 @@ def _cmd(raw_args: str) -> str:
             # Slash runs inside the CLI process, which owns the terminal —
             # paint natively via /dev/tty (bypasses the TUI's rich wrapper,
             # which would otherwise mangle the escape bytes into text).
+            # C=1 in the APC makes the cursor advance BELOW the image, so
+            # the following text prints after it (no overlap).
             for m in out.get("media", []) or []:
                 try:
                     from . import termrender as vterm
                 except ImportError:  # pragma: no cover
                     import termrender as vterm
                 out["graphics"] = vterm.emit_image_raw(m)
+            # The pixels replaced the ASCII map — don't print both.
+            if "emitted" in (out.get("graphics") or ""):
+                out["map"] = ""
+                out["legend"] = ""
         return _render_text(out)
     if cmd == "serve":
         return _serve_text("keep" in rest or "--keep" in rest)

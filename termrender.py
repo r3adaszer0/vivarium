@@ -71,7 +71,7 @@ def _kitty_escape(png: bytes, img_id: int = 1) -> bytes:
     """
     b64 = base64.b64encode(png).decode()
     first, rest = b64[:CHUNK], b64[CHUNK:]
-    out = [f"\x1b_Gf=100,a=T,I={img_id},m={1 if rest else 0},q=2;{first}\x1b\\".encode()]
+    out = [f"\x1b_Gf=100,a=T,I={img_id},m={1 if rest else 0},q=2,C=1;{first}\x1b\\".encode()]
     while rest:
         chunk, rest = rest[:CHUNK], rest[CHUNK:]
         out.append(f"\x1b_Gm={1 if rest else 0};{chunk}\x1b\\".encode())

@@ -55,7 +55,7 @@ class TestEscapes(unittest.TestCase):
         self.assertTrue(esc.endswith(b"\x1b\\"))
         # single-chunk PNG: exactly one APC opener, m=0 terminator
         self.assertEqual(esc.count(b"\x1b_G"), 1)
-        payload = re.search(rb"m=0(?:,q=2)?;([A-Za-z0-9+/=]+)\x1b\\", esc).group(1)
+        payload = re.search(rb"m=0(?:,[a-zA-Z]=\d+)*;([A-Za-z0-9+/=]+)\x1b\\", esc).group(1)
         self.assertEqual(base64.b64decode(payload), self.png)
 
     def test_kitty_chunking_over_4096(self):
@@ -71,7 +71,7 @@ class TestEscapes(unittest.TestCase):
         self.assertTrue(esc.endswith(b"\x1b\\"))
         # first chunk has the full header; continuations carry only m=
         # (m=1 while more follow, m=0 on the final chunk)
-        self.assertTrue(parts[1].startswith(b"f=100,a=T,I=1,m=1,q=2;"))
+        self.assertTrue(parts[1].startswith(b"f=100,a=T,I=1,m=1,q=2,C=1;"))
         for chunk in parts[2:-1]:
             self.assertTrue(chunk.startswith(b"m=1;"))
         self.assertTrue(parts[-1].startswith(b"m=0;"))
@@ -171,6 +171,17 @@ class TestEscapes(unittest.TestCase):
         self.assertTrue(opened.get("hit"))
         self.assertIn(b"\x1b_Gf=100", written["data"])
         self.assertEqual(buf.getvalue(), "")   # nothing through rich-wrapped stdout
+
+
+class TestImagePaintFlow(unittest.TestCase):
+    """When the image paints inline, the ASCII map is suppressed."""
+
+    def test_painted_image_drops_ascii_map(self):
+        import tools
+        text = tools._render_text({
+            "tick": 24, "population": 22, "map": "", "legend": ""})
+        self.assertEqual(text, "Tick 24 — 22 creatures")
+        self.assertNotIn("\n\n\n", text)
 
 
 class TestSlashPolish(unittest.TestCase):
