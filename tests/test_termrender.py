@@ -91,13 +91,24 @@ class TestEscapes(unittest.TestCase):
         self.assertNotIn(b"\x00", esc)
         self.assertGreaterEqual(esc.count(b"-"), 3)       # 16 rows -> 3 bands
 
-    def test_emit_image_respects_force_and_fallback(self):
+    def test_emit_image_without_tty_attaches_instead(self):
+        # tests run without a tty -> attachment path, never escapes
         out = T.emit_image(self.path, env={}, force="none")
-        self.assertIn("saved to", out)
-        out = T.emit_image(self.path, env={"TERM": "xterm-kitty"}, force="kitty")
-        self.assertIn("kitty", out)
+        self.assertIn("attached", out)
         out = T.emit_image("/nonexistent.png", env={}, force="kitty")
         self.assertIn("could not read", out)
+
+    def test_emit_image_never_escapes_without_a_tty(self):
+        """Gateway/chat contexts have no tty — raw kitty escapes there show
+        up as mojibake in the message (user's kitty test). Must return the
+        attachment path instead of emitting bytes."""
+        import io, contextlib
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):     # not a tty
+            out = T.emit_image(self.path, env={"TERM": "xterm-kitty"})
+        self.assertIn("attached", out)
+        self.assertNotIn("emitted", out)
+        self.assertEqual(buf.getvalue(), "")       # NOTHING written to stdout
 
 
 class TestGallery(unittest.TestCase):
@@ -159,8 +170,8 @@ class TestToolWiring(unittest.TestCase):
         self.assertEqual(len(out["media"]), 1)
         self.assertTrue(out["media"][0].endswith(".png"))
         self.assertTrue(os.path.exists(out["media"][0]))
-        # this dev box has no graphics terminal -> path fallback, not garbage
-        self.assertIn("saved to", out["graphics"])
+        # no tty in the tool-execution context -> attach, never escape garbage
+        self.assertIn("attached", out["graphics"])
 
     def test_render_slash_is_plain_text_not_json(self):
         """/vivarium render --rich must print real newlines (user screenshot:

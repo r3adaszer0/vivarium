@@ -184,16 +184,21 @@ def emit_image(png_path: str, env: Optional[dict] = None,
                force: Optional[str] = None) -> str:
     """Emit a graphics-protocol escape for a PNG file, if the terminal can.
 
-    Returns a short status string ('kitty graphics emitted', 'sixel
-    emitted', 'saved to <path>' for 'none'). The caller decides whether to
-    opt in — this function itself is capability-checked but the CALLER
-    must gate on the user's explicit request (opt-in rule).
+    GUARD (learned from the user's kitty test): escapes are only legal when
+    THIS process owns the displaying tty — a local CLI session. In a
+    gateway/relay context (chat platforms, piped output, no tty) the bytes
+    cannot reach the screen and surface as mojibake in the message instead;
+    there we return 'attached <path>' and let the gateway deliver the PNG
+    natively as a chat attachment.
     """
-    kind = force or detect_graphics(env)
     try:
         png = Path(png_path).read_bytes()
     except OSError as e:
         return f"could not read {png_path}: {e}"
+    import sys as _sys
+    if not _sys.stdout.isatty():
+        return f"attached {png_path}"          # gateway/chat: native delivery
+    kind = force or detect_graphics(env)
     if kind == "kitty":
         sys.stdout.write(_kitty_escape(png).decode("latin-1"))
         sys.stdout.flush()
