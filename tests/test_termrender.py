@@ -110,6 +110,33 @@ class TestEscapes(unittest.TestCase):
         self.assertNotIn("emitted", out)
         self.assertEqual(buf.getvalue(), "")       # NOTHING written to stdout
 
+    def test_tool_path_never_emits_escapes_even_with_tty(self):
+        """The gateway may run attached to a tty (user's kitty session!) —
+        escapes would still travel the MESSAGE pipeline as mojibake. The
+        tool path ALWAYS attaches; only emit_image_raw may write bytes."""
+        import io, contextlib
+
+        class FakeTty(io.StringIO):
+            def isatty(self):
+                return True
+
+        buf = FakeTty()
+        with contextlib.redirect_stdout(buf):
+            out = T.emit_image(self.path, env={"TERM": "xterm-kitty"})
+        self.assertIn("attached", out)
+        self.assertEqual(buf.getvalue(), "")       # nothing written
+
+    def test_emit_image_raw_writes_kitty_escape(self):
+        """Interactive-only path: writes real APC bytes to stdout."""
+        import io, contextlib
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            out = T.emit_image_raw(self.path, env={"TERM": "xterm-kitty"})
+        self.assertIn("kitty graphics emitted", out)
+        written = buf.getvalue()
+        self.assertIn("\x1b_Gf=32", written)
+        self.assertTrue(written.endswith("\x1b\\"))
+
 
 class TestGallery(unittest.TestCase):
     def test_serves_media_and_dish_on_localhost_ephemeral(self):

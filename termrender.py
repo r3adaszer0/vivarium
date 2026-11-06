@@ -195,10 +195,30 @@ def emit_image(png_path: str, env: Optional[dict] = None,
         png = Path(png_path).read_bytes()
     except OSError as e:
         return f"could not read {png_path}: {e}"
-    import sys as _sys
-    if not _sys.stdout.isatty():
-        return f"attached {png_path}"          # gateway/chat: native delivery
     kind = force or detect_graphics(env)
+    # NEVER write raw escapes from inside a tool: tool results travel the
+    # message pipeline (gateway -> relay -> chat), where control bytes are
+    # not graphics but mojibake (user's kitty paste proved it: the escape
+    # payload arrived as visible text). Tools return 'attached <path>' and
+    # the gateway delivers the PNG natively.
+    # Escape emission is reserved for emit_image_raw() — callers that KNOW
+    # they are attached to the displaying terminal (interactive CLI paths).
+    return f"attached {png_path}"
+
+
+def emit_image_raw(png_path: str, env: Optional[dict] = None,
+                   force: Optional[str] = None) -> str:
+    """Interactive-only: write graphics escapes to stdout directly.
+
+    ONLY for processes that own the displaying terminal (a standalone
+    script or CLI run inside the target terminal). Never call from a
+    plugin tool — tool output travels the message pipeline.
+    """
+    kind = force or detect_graphics(env)
+    try:
+        png = Path(png_path).read_bytes()
+    except OSError as e:
+        return f"could not read {png_path}: {e}"
     if kind == "kitty":
         sys.stdout.write(_kitty_escape(png).decode("latin-1"))
         sys.stdout.flush()
