@@ -113,6 +113,44 @@ def render_discovery_stamp_png(s, discovery: dict, world_dict: dict) -> Optional
     return path
 
 
+def render_dish_png(s, w, name: str) -> Optional[str]:
+    """Snapshot of the CURRENT dish (VIV-28b): same visual language as the
+    discovery stamp — food blooms + lineage-colored creature squares."""
+    CELL, PAD = 6, 1
+    size = w.w * (CELL + PAD) + PAD
+    rows = [bytearray((13, 15, 18) * size) for _ in range(size)]
+
+    def px(x, y, rgb):
+        if 0 <= x < size and 0 <= y < size:
+            o = x * 3
+            rows[y][o:o + 3] = bytes(rgb)
+
+    for y in range(w.h):
+        for x in range(w.w):
+            f = w.food[y][x]
+            if f > 0.0:
+                g = int(55 + 110 * min(1.0, f / W.MAX_FOOD))
+                for iy in range(CELL - 1):
+                    for ix in range(CELL - 1):
+                        px(x * (CELL + PAD) + 1 + ix,
+                           y * (CELL + PAD) + 1 + iy, (30, g, 40))
+    counts: Dict[str, int] = {}
+    for c in w.creatures:
+        counts[c.lineage] = counts.get(c.lineage, 0) + 1
+    top = [l for l, _ in sorted(counts.items(), key=lambda kv: -kv[1])[:8]]
+    for c in w.creatures:
+        rgb = I.color_for(c.genome["hue"]) if c.lineage in top else (90, 96, 110)
+        for iy in range(CELL - 2):
+            for ix in range(CELL - 2):
+                px(c.x * (CELL + PAD) + 1 + ix,
+                   c.y * (CELL + PAD) + 1 + iy, rgb)
+    pixels = [[tuple(rows[y][x * 3:x * 3 + 3]) for x in range(size)]
+              for y in range(size)]
+    path = f"{media_dir(s)}/{name}.png"
+    write_png(path, pixels, size)
+    return path
+
+
 def render_population_curve_png(s, curve, discovery: dict) -> Optional[str]:
     """The population trace with the discovery window marked.
 

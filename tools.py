@@ -10,6 +10,7 @@ simulation logic lives in :mod:`world`, all state handling in :mod:`state`.
 from __future__ import annotations
 
 import json
+import os
 from typing import Any, Dict
 
 def _tool_shim(data=None, error=None, **kwargs):
@@ -114,7 +115,7 @@ def _tool_render(args: Dict[str, Any], **_) -> str:
     fn = vworld.render_ascii_rich if rich else vworld.render_ascii
     cols = int(args.get("cols", 96 if rich else 64))
     rows = int(args.get("rows", 32 if rich else 24))
-    return tool_result({
+    out = {
         "success": True,
         "tick": w.tick,
         "population": len(w.creatures),
@@ -122,7 +123,25 @@ def _tool_render(args: Dict[str, Any], **_) -> str:
         "legend": ("█ = creatures · ░▒▓ = food blooms (lush→faint)"
                    if rich else
                    "X = creatures, dots/: = food blooms"),
-    })
+    }
+    if args.get("image"):
+        # VIV-28b: render the true PNG and emit via the best graphics
+        # protocol the terminal supports (opt-in only — the CALLER set
+        # image=true deliberately). Non-supporting terminals get the path.
+        try:
+            from . import artifacts as vart
+        except ImportError:  # pragma: no cover
+            import artifacts as vart
+        media = vart.media_dir(vstate.state())
+        path = vart.render_dish_png(vstate.state(), w, f"dish_{w.tick}")
+        if path:
+            out["media"] = [path]
+            try:
+                from . import termrender as vterm
+            except ImportError:  # pragma: no cover
+                import termrender as vterm
+            out["graphics"] = vterm.emit_image(path)
+    return tool_result(out)
 
 
 # ── vivarium_feed ────────────────────────────────────────────────────────────
@@ -232,7 +251,8 @@ _HELP = """\
 Subcommands:
   help                  this list (also: bare /vivarium)
   status                population, lineages, ages, and an ASCII map
-  render [--rich]       the ASCII map (--rich: dense block view, needs a wide terminal)
+  render [--rich] [--image]   the dish map (--rich: dense blocks; --image: true PNG via terminal graphics when supported)
+  serve [--keep]        open the gallery in your browser (localhost only)
   feed [0-3]            drop nutrients into the dish (default 0.5)
   release [count]       release fresh founders (default 4, max 10)
   import <code>         release a strain from a challenge code
@@ -253,7 +273,10 @@ def _cmd(raw_args: str) -> str:
     if cmd == "status":
         return _tool_status({}) and json.loads(_tool_status({}))["summary"]
     if cmd == "render":
-        return _tool_render({"rich": "rich" in rest or "--rich" in rest})
+        return _tool_render({"rich": "rich" in rest or "--rich" in rest,
+                             "image": "image" in rest or "--image" in rest})
+    if cmd == "serve":
+        return _serve_text("keep" in rest or "--keep" in rest)
     if cmd == "feed":
         amount = float(rest[0]) if rest and rest[0].replace(".", "", 1).isdigit() else 0.5
         out = json.loads(_tool_feed({"amount": amount}))
@@ -282,6 +305,38 @@ def _cmd(raw_args: str) -> str:
     if cmd == "restart":
         return _do_restart()
     return f"Unknown subcommand: {cmd}\n\n{_HELP}"
+
+
+def _serve_text(keep: bool) -> str:
+    """VIV-28b: localhost-only gallery over the plugin's media dir."""
+    try:  # package mode / flat mode
+        from . import termrender as vterm
+    except ImportError:  # pragma: no cover
+        import termrender as vterm
+    try:
+        from . import artifacts as vart
+    except ImportError:  # pragma: no cover
+        import artifacts as vart
+    try:
+        media = vart.media_dir(vstate.state())
+    except Exception:
+        media = None
+    if not media or not os.path.isdir(media):
+        return ("No gallery yet — artifacts appear after Codex discoveries. "
+                "Use /vivarium codex first.")
+    try:
+        w = _world()
+        dish = vworld.render_ascii(w)
+    except Exception:
+        dish = ""
+    res = vterm.serve_gallery(media, dish_map=dish, keep=keep,
+                              open_browser=True)
+    if "error" in res:
+        return res["error"]
+    lifetime = "stays up until Hermes exits (--keep)" if keep \
+        else "dies with this session; use /vivarium serve --keep to persist"
+    return (f"🖼️ Gallery: {res['url']}  ({lifetime})\n"
+            f"Localhost only — nothing leaves this machine.")
 
 
 def _race_text(rest: list) -> str:
