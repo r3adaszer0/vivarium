@@ -322,3 +322,69 @@ def serve_gallery(media_dir: str, dish_map: str = "",
         except Exception:
             pass
     return {"url": url, "port": actual, "thread": t, "server": httpd}
+
+
+def png_size(png_path: str):
+    """(width, height) from a PNG's IHDR — no dependencies."""
+    with open(png_path, "rb") as f:
+        head = f.read(24)
+    if head[:8] != b"\x89PNG\r\n\x1a\n" or head[12:16] != b"IHDR":
+        return None
+    import struct
+    w, h = struct.unpack(">II", head[16:24])
+    return int(w), int(h)
+
+
+# terminal cell size estimate in pixels (kitty defaults ~10x20; a bad
+# estimate only shifts the overlay slightly — the ASCII fallback lives
+# underneath and the image hides it)
+CELL_W, CELL_H = 10, 20
+
+
+def paint_over(png_path: str, reserved_rows: int, trail_rows: int,
+               ascii_fallback: str = "", delay: float = 0.6,
+               env: Optional[dict] = None) -> str:
+    """Deferred overlay paint: the TUI prints `reserved_rows` blank rows
+    (part of the slash text, so its redraw engine owns/scrolls them);
+    `delay` seconds later this paints the PNG on top of that rectangle
+    via /dev/tty. Falls back to writing `ascii_fallback` line-by-line
+    into the same rows if the graphics paint fails.
+
+    `trail_rows` = text lines printed AFTER the reserved rows (path +
+    note) — the cursor-relative dance must climb over them too.
+    """
+    import threading
+    import time as _t
+
+    def _work():
+        _t.sleep(delay)
+        size = png_size(png_path)
+        try:
+            fd = os.open("/dev/tty", os.O_WRONLY)
+        except OSError:
+            return "no tty"
+        try:
+            up = reserved_rows + trail_rows
+            payload = (f"\x1b[{up}A".encode()          # cursor up to overlay top
+                       + _kitty_escape(open(png_path, "rb").read())
+                       + f"\x1b[{up}B".encode())        # restore cursor
+            os.write(fd, payload)
+            return f"overlay painted ({size[0]}x{size[1]}px over {reserved_rows} rows)"
+        except Exception:
+            if ascii_fallback:
+                try:
+                    lines = ascii_fallback.splitlines()[:reserved_rows]
+                    block = "".join(
+                        f"\x1b[{reserved_rows + trail_rows - i}A\r"
+                        f"\x1b[K{line}\x1b[0K"
+                        for i, line in enumerate(reversed(lines)))
+                    os.write(fd, block.encode("utf-8"))
+                except Exception:
+                    pass
+            return "fallback ascii written"
+        finally:
+            os.close(fd)
+
+    t = threading.Thread(target=_work, daemon=True)
+    t.start()
+    return "overlay scheduled"

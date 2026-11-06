@@ -10,6 +10,7 @@ simulation logic lives in :mod:`world`, all state handling in :mod:`state`.
 from __future__ import annotations
 
 import json
+import math
 import os
 from typing import Any, Dict
 
@@ -340,21 +341,38 @@ def _cmd(raw_args: str) -> str:
             "image": want_image,
             "color": ("color" in rest or "--color" in rest
                       or "colour" in rest or "--colour" in rest)}))
-        if want_image:
-            # Inline paint INSIDE the live TUI is not reliable: the TUI is
-            # a full-screen prompt_toolkit app that redraws its viewport
-            # and owns the rows above its input bar — anything a plugin
-            # paints there gets clipped (status bar over the image bottom)
-            # or blended with stale buffer text on the next redraw. Three
-            # paint strategies were tried (tool-result escapes, /dev/tty
-            # takeover, C=1 cursor parking); all lose to the redraw engine.
-            # So the slash returns clean text; inline paint lives in the
-            # standalone path (examples/show_dish.py, plain shell) and the
-            # localhost gallery (/vivarium serve) inside the TUI.
-            out["map"] = ""
+        if want_image and out.get("media"):
+            try:
+                from . import termrender as vterm
+            except ImportError:  # pragma: no cover
+                import termrender as vterm
+            # CLEVER OVERLAY: the returned text reserves blank rows where
+            # the image will sit; the TUI's own redraw engine owns and
+            # scrolls those rows (it printed them), so nothing gets
+            # clipped. A deferred paint drops the PNG on top of the
+            # reserved rectangle; if painting fails, the ASCII map is
+            # written into the same rows instead — the ASCII is both the
+            # placeholder AND the fallback.
+            path = out["media"][0]
+            size = vterm.png_size(path) or (342, 339)
+            res_rows = max(1, math.ceil(size[1] / vterm.CELL_H))
+            res_cols = max(20, math.ceil(size[0] / vterm.CELL_W))
+            out["map"] = ""      # the overlay replaces the inline ASCII
             out["legend"] = ""
-            if out.get("media"):
-                out["graphics"] = f"inline paint not available in the TUI — run: python3 ~/.hermes/plugins/vivarium/examples/show_dish.py"
+            text = _render_text(out)
+            summary, _, tail = text.partition("\n\n")
+            spacer = "\n".join(" " * res_cols for _ in range(res_rows))
+            # trail = path + graphics note lines (after the reserved rows)
+            trail = tail.lstrip("\n") if tail else ""
+            trail_rows = trail.count("\n") + 1 if trail else 0
+            ascii_fallback = _tool_render({
+                "rich": "rich" in rest or "--rich" in rest})
+            import json as _json
+            ascii_map = (_json.loads(ascii_fallback).get("map") or "")
+            out["graphics"] = vterm.paint_over(
+                path, res_rows, trail_rows,
+                ascii_fallback=ascii_map, delay=0.6)
+            return (summary + "\n\n" + spacer + "\n" + trail).rstrip() + "\n"
         return _render_text(out)
     if cmd == "serve":
         return _serve_text("keep" in rest or "--keep" in rest)

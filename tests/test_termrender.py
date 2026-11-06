@@ -183,6 +183,43 @@ class TestImagePaintFlow(unittest.TestCase):
         self.assertEqual(text, "Tick 24 — 22 creatures")
         self.assertNotIn("\n\n\n", text)
 
+    def test_overlay_reserves_rows_and_schedules_paint(self):
+        """The clever overlay: returned text reserves blank rows sized to
+        the PNG (cell-estimate), a deferred paint drops the PNG over
+        them, ASCII is the fallback (not printed inline)."""
+        import importlib, os, tempfile
+        from types import SimpleNamespace
+        import state as vstate, world as W, artifacts as A, termrender
+        import tools
+        tmp = tempfile.mkdtemp()
+        w = W.new_world(seed=5)
+        W.run(w, 30, 0.05)
+        store = {"universe": {"status": "live", "era": 2}, "world": w.to_dict()}
+        ctx = SimpleNamespace(state=SimpleNamespace(
+            get=lambda k, d=None: store.get(k, d),
+            set=lambda k, v: store.__setitem__(k, v),
+            data_dir=lambda: tmp))
+        vstate.bind(ctx)
+        path = A.render_dish_png(vstate.state(), w, "t_ov")
+        self.assertTrue(path and os.path.exists(path))
+        scheduled = []
+        real_paint = termrender.paint_over
+        termrender.paint_over = (
+            lambda *a, **k: scheduled.append(a) or "overlay scheduled")
+        try:
+            out = tools._cmd("render --image")
+        finally:
+            termrender.paint_over = real_paint
+        lines = out.splitlines()
+        self.assertIn("Tick", lines[0])
+        # spacer block present: at least one all-space row
+        self.assertTrue(any(l.strip() == "" and l != "" for l in lines[1:5]))
+        # path after the spacer
+        self.assertIn("🖼️", out)
+        self.assertEqual(len(scheduled), 1)
+        self.assertEqual(scheduled[0][0].endswith(".png"), True)
+        self.assertTrue(os.path.exists(scheduled[0][0]))
+
     def test_tui_render_image_returns_clean_text_no_ascii(self):
         """Inside the TUI the slash cannot paint reliably (the redraw
         engine owns the screen) — it returns summary + path only, no
