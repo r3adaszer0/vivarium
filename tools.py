@@ -176,11 +176,9 @@ def _tool_render(args: Dict[str, Any], **_) -> str:
         path = vart.render_dish_png(vstate.state(), w, f"dish_{w.tick}")
         if path:
             out["media"] = [path]
-            try:
-                from . import termrender as vterm
-            except ImportError:  # pragma: no cover
-                import termrender as vterm
-            out["graphics"] = vterm.emit_image(path)
+            # No graphics emission here: tool results travel the message
+            # pipeline (attach-only); the SLASH paints via /dev/tty.
+            out["graphics"] = f"attached {path}"
     return tool_result(out)
 
 
@@ -306,6 +304,38 @@ Subcommands:
 """
 
 
+def _can_paint_inline(vterm) -> bool:
+    """True when this slash can paint the dish inline: a graphics terminal
+    is detected AND the process can write the terminal device directly
+    (the interactive CLI case; gateways/containers fail os.open)."""
+    import os as _os
+    if vterm.detect_graphics() not in ("kitty", "iterm2", "sixel"):
+        return False
+    try:
+        fd = _os.open("/dev/tty", _os.O_WRONLY)
+        _os.close(fd)
+        return True
+    except OSError:
+        return False
+
+
+def _tty_write(payload: str) -> None:
+    """Raw write to the terminal device (bypasses the TUI's rich-wrapped
+    stdout). Used by the image flow, which must own the exact order of
+    text and graphics on screen."""
+    import os
+    if not payload:
+        return
+    try:
+        fd = os.open("/dev/tty", os.O_WRONLY)
+        try:
+            os.write(fd, payload.encode("utf-8"))
+        finally:
+            os.close(fd)
+    except OSError:
+        print(payload, end="")
+
+
 def _render_text(out: dict) -> str:
     """Human text for the render slash output. Slash-UX law: render the
     map; show the media path once (never duplicate via a graphics note)."""
@@ -343,21 +373,30 @@ def _cmd(raw_args: str) -> str:
             "color": ("color" in rest or "--color" in rest
                       or "colour" in rest or "--colour" in rest)}))
         if want_image:
-            # Slash runs inside the CLI process, which owns the terminal —
-            # paint natively via /dev/tty (bypasses the TUI's rich wrapper,
-            # which would otherwise mangle the escape bytes into text).
-            # C=1 in the APC makes the cursor advance BELOW the image, so
-            # the following text prints after it (no overlap).
-            for m in out.get("media", []) or []:
-                try:
-                    from . import termrender as vterm
-                except ImportError:  # pragma: no cover
-                    import termrender as vterm
-                out["graphics"] = vterm.emit_image_raw(m)
-            # The pixels replaced the ASCII map — don't print both.
-            if "emitted" in (out.get("graphics") or ""):
-                out["map"] = ""
+            try:
+                from . import termrender as vterm
+            except ImportError:  # pragma: no cover
+                import termrender as vterm
+            can_paint = _can_paint_inline(vterm)
+            if can_paint and out.get("media"):
+                out["map"] = ""      # pixels replace the ASCII map
                 out["legend"] = ""
+                text = _render_text(out)
+                # FULL OUTPUT TAKEOVER: the TUI prints returned text at its
+                # own modelled cursor and knows nothing about the image's
+                # height, so its print lands ON the image (kitty draws
+                # images over text — user screenshot). Instead write the
+                # whole flow ourselves to /dev/tty in the correct order
+                # (summary → image → path), and return "" so the TUI
+                # prints nothing extra.
+                summary, _, rest_text = text.partition("\n\n")
+                _tty_write(summary + "\n")
+                for m in out.get("media", []) or []:
+                    out["graphics"] = vterm.emit_image_raw(m)
+                _tty_write("\n" + (rest_text.lstrip("\n") if rest_text else ""))
+                return ""
+            if out.get("media"):
+                out["graphics"] = f"attached {out['media'][0]}"
         return _render_text(out)
     if cmd == "serve":
         return _serve_text("keep" in rest or "--keep" in rest)
