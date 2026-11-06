@@ -465,7 +465,10 @@ def _do_restart() -> str:
     era N+1 with a rotated key — never the same world twice. Fossils, Codex
     and the species roster carry over; the dish starts empty.
     """
-    from . import universe as vuniverse
+    try:
+        from . import universe as vuniverse
+    except ImportError:  # pragma: no cover
+        import universe as vuniverse
     s = vstate.state()
     old = vuniverse.universe_record(s)
     old_era, old_fp = old.get("era", 1), old.get("key_fp", "?")
@@ -476,6 +479,7 @@ def _do_restart() -> str:
         f"fossils; they can be re-released into any future dish.\n\n"
         f"The next skill this agent learns births a brand-new world, derived "
         f"with a fresh key. Your Codex and species roster carry over."
+        f"{_media_offer()}"
     )
 
 

@@ -230,6 +230,22 @@ class TestMediaPref(unittest.TestCase):
         self.assertNotIn("images on", tools._cmd("start"))
         tools.set_media_pref("image")
         self.assertNotIn("images on", tools._cmd("start"))
+        tools.set_media_pref("auto")
+
+    def test_restart_narration_carries_the_offer(self):
+        """Same offer on /vivarium restart — the user's testable moment."""
+        import tools
+        tmp = tempfile.mkdtemp()
+        store = self._bound(tmp)
+        store["universe"] = {"status": "live", "era": 1}
+        out = tools._cmd("restart")
+        self.assertIn("brand-new world", out)
+        real = __import__("termrender").detect_graphics()
+        self.assertEqual("images on" in out, real in ("kitty", "iterm2", "sixel"))
+        # and the no-nag rule holds here too
+        tools.set_media_pref("ascii")
+        out2 = tools._cmd("restart")
+        self.assertNotIn("images on", out2)
 
 
 if __name__ == "__main__":
