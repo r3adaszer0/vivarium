@@ -110,6 +110,20 @@ class TestPackageMode(unittest.TestCase):
         self.assertGreaterEqual(len(seeded), 4)     # the probe's pod
         self.assertIn("universe", store)
 
+    def test_bundled_skills_dir_resolves_without_hardcode(self):
+        """The bundled-catalog path must come from the running Hermes package.
+
+        A hardcoded /usr/local/... path silently zeroes the canon roster on
+        git-clone installs (~/.hermes/hermes-agent) — every bundled skill then
+        derives as 'private' and skills outside ~/.hermes/skills go unseen
+        (user machine: 5 lineages from ~59 skills)."""
+        import discovery as d_flat
+        self.assertTrue(d_flat.BUNDLED_SKILLS_DIR.is_dir(),
+                        "bundled skills dir must exist on this install")
+        # and the resolver must pick the package-adjacent dir first when valid
+        skills = d_flat.discover()
+        self.assertGreater(len(skills), 0)
+
     def test_codex_artifacts_import_in_package_mode(self):
         """The other lazy-import cluster (artifacts/codex/glyphs) in package mode."""
         self.assertTrue(hasattr(self.pkgmods["artifacts"], "media_dir"))

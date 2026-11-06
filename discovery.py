@@ -17,7 +17,28 @@ except Exception:  # pragma: no cover - outside Hermes runtime
     def get_hermes_home() -> Path:
         return Path(os.path.expanduser("~/.hermes"))
 
-BUNDLED_SKILLS_DIR = Path("/usr/local/lib/hermes-agent/skills")
+def _bundled_skills_dir() -> Path:
+    """The Hermes install's bundled skills, wherever Hermes actually lives.
+
+    /usr/local/lib/hermes-agent on system installs, ~/.hermes/hermes-agent on
+    git clones — resolve from the running package, not a hardcoded path (a
+    wrong guess silently zeroes the canon roster: every bundled skill then
+    derives as 'private', and whole skill dirs go unseen)."""
+    candidates = []
+    try:
+        import hermes_cli
+        pkg_root = Path(__import__("hermes_cli").__file__).resolve().parent.parent
+        candidates.append(pkg_root / "skills")
+    except Exception:
+        pass
+    candidates.append(Path("/usr/local/lib/hermes-agent/skills"))
+    for c in candidates:
+        if c.is_dir():
+            return c
+    return Path("/usr/local/lib/hermes-agent/skills")
+
+
+BUNDLED_SKILLS_DIR = _bundled_skills_dir()
 CANON_DOMAIN = b"VIVARUM-CANON-v1"   # domain-separated, version-pinned
 
 
