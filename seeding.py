@@ -105,7 +105,7 @@ def seed(s, skills: List[dict],
         canon_species.append({"name": sk["name"], "eidos": eidos_id(d)})
         births[sk["name"]] = {"eidos": eidos_id(d), "day": date.today().isoformat(),
                               "pod": POD_SIZE, "digest_fp": d[:8].hex(),
-                              "era": era}
+                              "era": era, "genome": W.genome_from_bytes(d[:24])}
 
     # private species: keyed derivation (unique per universe)
     priv_species = []
@@ -115,7 +115,8 @@ def seed(s, skills: List[dict],
         priv_species.append({"name": sk["name"], "eidos": eidos_id(d)})
         births[sk["name"]] = {"eidos": eidos_id(d), "day": date.today().isoformat(),
                               "pod": POD_SIZE, "digest_fp": d[:8].hex(),
-                              "era": era}
+                              "era": era,
+                              "genome": W.genome_from_bytes(d[:24])}
     s.set(BIRTHS_KEY, births)
 
     U.save_seed_record(s, {

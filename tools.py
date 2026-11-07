@@ -232,6 +232,15 @@ def _tool_release(args: Dict[str, Any], **_) -> str:
     })
 
 
+# ── vivarium_export ───────────────────────────────────────────────────────────
+def _tool_export(args: Dict[str, Any], **_) -> str:
+    name = str(args.get("name", "")).strip()
+    return tool_result({
+        "success": True,
+        "summary": _export_text([name] if name else []),
+    })
+
+
 # ── vivarium_codex ────────────────────────────────────────────────────────────
 def _tool_codex(args: Dict[str, Any], **_) -> str:
     """Show or export the Codex; optionally render artifact PNGs."""
@@ -298,6 +307,7 @@ Subcommands:
   import <code>         release a strain from a challenge code
   codex                 the Vivarium Codex: discovered patterns + artifact images
   codex export          write codex.md + the media gallery for sharing
+  export [name]         your species as VIV1 challenge codes (shareable)
   race <code> | <seed> [codes]   run a scenario duel (shareable, deterministic)
   start                 welcome/briefing (any time — shows the dormant promise)
   staleness             is this universe going stale? (evidence-based)
@@ -395,6 +405,8 @@ def _cmd(raw_args: str) -> str:
         if out.get("media"):
             text += "\n\nImages:\n" + "\n".join(f"  {p}" for p in out["media"])
         return text
+    if cmd == "export":
+        return _export_text(rest)
     if cmd == "race":
         return _race_text(rest)
     if cmd == "staleness":
@@ -463,7 +475,69 @@ def _race_text(rest: list) -> str:
     # profile universe is dormant; no plugin state is touched, no universe
     # key is read (Rule 4, and safe for fresh installs)
     res = vscen.run_scenario(spec)
-    return vscen.format_results(res)
+    share = vscen.encode_scenario(spec["seed"], spec["ticks"],
+                                  spec.get("contestants", []))
+    return (vscen.format_results(res)
+            + f"\n\nShare this exact race (same dish, same results "
+              f"everywhere):\n{share}")
+
+
+
+
+# ── VIV-13: challenge-code export ────────────────────────────────────────────
+def _export_text(rest: list) -> str:
+    """Export your species as VIV1 challenge codes (race entrants).
+
+    /vivarium export          — all species with their codes
+    /vivarium export <name>   — one species: code + species card
+    A code IS the genome (6 trait numbers) — safe to share; no skill
+    content, no key material. The genome is stored at birth (VIV-13);
+    species born before this version can be back-filled by re-deriving
+    from the still-installed skill.
+    """
+    s = vstate.state()
+    births = s.get("births", {})
+    if isinstance(births, list):      # manual-era shape — no genomes there
+        births = {}
+    if not births:
+        return ("No species have been born yet. Species appear when the "
+                "Big Bang seeds them (first skill learned) or when a new "
+                "skill is learned in a live universe.")
+    if rest:
+        name = rest[0]
+        rec = births.get(name)
+        if rec is None:
+            matches = [n for n in births if name.lower() in n.lower()]
+            if len(matches) == 1:
+                rec, name = births[matches[0]], matches[0]
+            elif matches:
+                return ("Ambiguous name — matches: " + ", ".join(sorted(matches)))
+            else:
+                return (f"Unknown species '{name}'. "
+                        f"/vivarium export lists every species.")
+        g = rec.get("genome")
+        if not g:
+            return (f"{rec.get('eidos', name)} was born before challenge-code "
+                    f"storage — its genome can no longer be re-derived "
+                    f"(the skill was removed). It lives on in the dish.")
+        code = vstate.encode_genome(g)
+        return (f"{rec.get('eidos', name)} — challenge code:\n{code}\n\n"
+                f"Enter a race: /vivarium race <seed> {code[:16]}…\n"
+                f"Anyone can run it — codes carry the genome only.")
+    lines = ["Your species — challenge codes (share freely, genome only):"]
+    for name in sorted(births):
+        rec = births[name]
+        g = rec.get("genome")
+        eidos = rec.get("eidos", "?")
+        if g:
+            code = vstate.encode_genome(g)
+            lines.append(f"  {eidos:<14} {name:<28} {code}")
+        else:
+            lines.append(f"  {eidos:<14} {name:<28} (code unavailable — "
+                         f"born pre-VIV-13, skill no longer installed)")
+    lines.append("")
+    lines.append("Race them: /vivarium race <seed-word> <code> [<code> …]")
+    return "\n".join(lines)
 
 
 def _media_offer() -> str:
@@ -626,6 +700,24 @@ def register_tools(ctx) -> None:
             },
         },
         handler=_tool_release, emoji="🦠",
+    )
+    ctx.register_tool(
+        name="vivarium_export", toolset="vivarium",
+        schema={
+            "description": (
+                "Export Vivarium species as VIV1 challenge codes — the shareable "
+                "genome strings used to enter races (/vivarium race) or send a "
+                "strain to another agent. Optionally narrow to one species by name."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string", "description": "species/skill name (optional; omit for all)"},
+                },
+                "required": [],
+            },
+        },
+        handler=_tool_export, emoji="🧾",
     )
     ctx.register_tool(
         name="vivarium_codex", toolset="vivarium",

@@ -81,6 +81,7 @@ def birth_species(s, name: str, content: str,
         "pod": POD_SIZE,
         "digest_fp": digest[:8].hex(),
         "era": rec.get("era", 1),
+        "genome": dict(genome),   # VIV-13: enables challenge-code export
     }
     s.set(BIRTHS_KEY, births)
     save_world(w)

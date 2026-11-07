@@ -13,6 +13,7 @@ provides_tools:
   - vivarium_feed
   - vivarium_render
   - vivarium_release
+  - vivarium_export
   - vivarium_codex
 provides_hooks:
   - post_tool_call
