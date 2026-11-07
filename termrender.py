@@ -343,7 +343,7 @@ CELL_W, CELL_H = 10, 20
 
 def paint_over(png_path: str, reserved_rows: int, trail_rows: int,
                ascii_fallback: str = "", delay: float = 0.6,
-               env: Optional[dict] = None) -> str:
+               env: Optional[dict] = None, extra_climb: int = 3) -> str:
     """Deferred overlay paint: the TUI prints `reserved_rows` blank rows
     (part of the slash text, so its redraw engine owns/scrolls them);
     `delay` seconds later this paints the PNG on top of that rectangle
@@ -364,7 +364,10 @@ def paint_over(png_path: str, reserved_rows: int, trail_rows: int,
         except OSError:
             return "no tty"
         try:
-            up = reserved_rows + trail_rows
+            # The TUI adds rows after our text (blank line + prompt) that the
+            # static count can't see — measured 2-3 on the live TUI. Climb
+            # those too, or the image lands low and covers the path line.
+            up = reserved_rows + trail_rows + max(0, extra_climb)
             payload = (f"\x1b[{up}A".encode()          # cursor up to overlay top
                        + _kitty_escape(open(png_path, "rb").read())
                        + f"\x1b[{up}B".encode())        # restore cursor
