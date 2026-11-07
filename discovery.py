@@ -27,7 +27,7 @@ def _bundled_skills_dir() -> Path:
     candidates = []
     try:
         import hermes_cli
-        pkg_root = Path(__import__("hermes_cli").__file__).resolve().parent.parent
+        pkg_root = Path(hermes_cli.__file__).resolve().parent.parent
         candidates.append(pkg_root / "skills")
     except Exception:
         pass
