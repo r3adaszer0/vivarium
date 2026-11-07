@@ -338,9 +338,10 @@ def png_size(png_path: str):
 # terminal cell size estimate in pixels (kitty defaults ~10x20; a bad
 # estimate only shifts the overlay slightly — the ASCII fallback lives
 # underneath and the image hides it)
-# Calibrated against the user's kitty (image needs ~30 rows for 339px
-# => cell height ≈ 11px; the original 20px estimate left a 13-row gap).
-CELL_W, CELL_H = 10, 11
+# Calibrated by direct user measurement (2026-11-06): the 339px dish
+# occupies 23 terminal lines => cell height ≈ 15px (339/23). Previous
+# estimates: 20px (assumed), 11px (over-corrected from a 13-row gap).
+CELL_W, CELL_H = 10, 15
 
 
 def paint_over(png_path: str, reserved_rows: int, trail_rows: int,

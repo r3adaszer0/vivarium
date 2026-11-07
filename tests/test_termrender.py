@@ -215,8 +215,8 @@ class TestImagePaintFlow(unittest.TestCase):
         # spacer block sized to the PNG at the calibrated cell height:
         # ceil(339/11) = 31 rows of spaces between summary and path
         spacer_rows = [l for l in lines[1:] if l and not l.strip()]
-        self.assertGreaterEqual(len(spacer_rows), 25)
-        self.assertLessEqual(len(spacer_rows), 40)
+        self.assertGreaterEqual(len(spacer_rows), 20)
+        self.assertLessEqual(len(spacer_rows), 26)
         # path after the spacer
         self.assertIn("🖼️", out)
         self.assertEqual(len(scheduled), 1)
