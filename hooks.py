@@ -55,7 +55,12 @@ def _on_skill_lifecycle(skill_name: str = "", action: str = "",
             load_world=vstate.load_world,
         )
         if result:
-            vstate.queue_narration(vbirth.announcement(result))
+            try:
+                from . import media_policy as vmp
+            except ImportError:  # pragma: no cover
+                import media_policy as vmp
+            vstate.queue_narration(
+                vbirth.announcement(result) + vmp.media_offer(vstate.state()))
     except Exception:
         logger.exception("vivarium on_skill_lifecycle failed (birth skipped)")
 
@@ -88,7 +93,12 @@ def _boot_from_dormant(rec: dict) -> None:
         return
     result = vseeding.seed(vstate.state(), skills, save_world=vstate.save_world)
     if result:
-        vstate.queue_narration(vseeding.onboard_message(result))
+        try:
+            from . import media_policy as vmp
+        except ImportError:  # pragma: no cover
+            import media_policy as vmp
+        vstate.queue_narration(
+            vseeding.onboard_message(result) + vmp.media_offer(vstate.state()))
 
 
 def _nutrients_for(tool_name: str) -> float:

@@ -136,6 +136,54 @@ class SkillBirth(unittest.TestCase):
         line = s.d.get("pending_narration") or ""
         self.assertIn("Universe born", line)              # onboarding narration
 
+    def test_big_bang_narration_carries_media_offer(self):
+        """Default-ON images: the Big Bang narration offers image delivery."""
+        import hooks as vhooks
+        import media_policy as vmp
+        ctx = self._wired()
+        s = ctx.state
+        U.universe_record(s)  # dormant
+        fake = [{"name": "boot-alpha", "path": "/tmp/a/SKILL.md",
+                 "bytes": b"# boot-alpha\n\nAlpha content one.",
+                 "is_canon": False, "kind": "private"}]
+        old, oldg = vhooks._discover_skills, vmp.vterm.detect_graphics
+        vhooks._discover_skills = lambda: fake
+        vmp.vterm.detect_graphics = lambda: "kitty"
+        try:
+            ctx._hooks["on_skill_lifecycle"](
+                skill_name="boot-alpha", action="created")
+        finally:
+            vhooks._discover_skills, vmp.vterm.detect_graphics = old, oldg
+        line = s.d.get("pending_narration") or ""
+        self.assertIn("Universe born", line)
+        self.assertIn("/vivarium images off", line)   # the offer rides along
+
+    def test_birth_narration_carries_media_offer_and_respects_off(self):
+        """Birth announcement offers images when capable; never when off."""
+        import media_policy as vmp
+        ctx = self._wired()
+        s = ctx.state
+        make_live(s)
+        oldg = vmp.vterm.detect_graphics
+        vmp.vterm.detect_graphics = lambda: "kitty"
+        try:
+            with TempSkills("offer-skill", "Offer test body content zzz."):
+                ctx._hooks["on_skill_lifecycle"](
+                    skill_name="offer-skill", action="created")
+            line = s.d.get("pending_narration") or ""
+            self.assertIn("Eidos_", line)
+            self.assertIn("/vivarium images off", line)
+            # flip to off -> new birth, no offer
+            s.set("media_pref", "ascii")
+            with TempSkills("offer-skill-2", "Different body content qqq."):
+                ctx._hooks["on_skill_lifecycle"](
+                    skill_name="offer-skill-2", action="created")
+            line2 = s.d.get("pending_narration") or ""
+            self.assertIn("Eidos_", line2)
+            self.assertNotIn("/vivarium images off", line2)
+        finally:
+            vmp.vterm.detect_graphics = oldg
+
     def test_dormant_boot_with_no_skills_narrates_waiting(self):
         import hooks as vhooks
         ctx = self._wired()

@@ -66,22 +66,17 @@ def _universe_live() -> bool:
     return vstate.universe_record().get("status") == "live"
 
 
-# ── media preference (VIV-27) ────────────────────────────────────────────────
+# ── media preference (VIV-27; shared policy in media_policy.py) ─────────────
 MEDIA_PREF_KEY = "media_pref"          # "auto" | "image" | "ascii"
 _MEDIA_MODES = ("auto", "image", "ascii")
 
 
 def media_pref() -> str:
-    """How the plugin should deliver imagery.
-
-    auto  (default) — images when the current surface supports them
-                      (terminal graphics in a capable CLI; native
-                      attachments in chats), ASCII everywhere else
-    image           — always prefer images (fallback to ASCII paths)
-    ascii           — never auto-deliver images; render on demand only
-    """
-    val = vstate.state().get(MEDIA_PREF_KEY, "auto")
-    return val if val in _MEDIA_MODES else "auto"
+    try:
+        from . import media_policy as vmp
+    except ImportError:  # pragma: no cover
+        import media_policy as vmp
+    return vmp.media_pref(vstate.state())
 
 
 def set_media_pref(mode: str) -> str:
@@ -541,26 +536,12 @@ def _export_text(rest: list) -> str:
 
 
 def _media_offer() -> str:
-    """VIV-27/start: surface image delivery once, at onboarding.
-
-    Terminal with graphics support -> offer the opt-in. Chat platforms
-    already deliver images natively -> say so. Dumb terminal -> silence
-    (nothing to offer). Never more than one line.
-    """
-    if media_pref() != "auto":
-        return ""                              # already decided — no nag
+    """Shared policy: see media_policy.py."""
     try:
-        from . import termrender as vterm
+        from . import media_policy as vmp
     except ImportError:  # pragma: no cover
-        import termrender as vterm
-    kind = vterm.detect_graphics()
-    if kind == "none":
-        return ""
-    if kind in ("kitty", "iterm2", "sixel"):
-        return ("\n\n🖼️ Graphics-capable terminal detected — the dish "
-                "renders as a real image by default. Disable anytime: "
-                "/vivarium images off")
-    return ""
+        import media_policy as vmp
+    return vmp.media_offer(vstate.state())
 
 
 def _start_text() -> str:
