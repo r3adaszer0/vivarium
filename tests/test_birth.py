@@ -157,6 +157,7 @@ class SkillBirth(unittest.TestCase):
         line = s.d.get("pending_narration") or ""
         self.assertIn("Universe born", line)
         self.assertIn("/vivarium images off", line)   # the offer rides along
+        self.assertIn("render --image", line)         # agent directive: paint NOW
 
     def test_birth_narration_carries_media_offer_and_respects_off(self):
         """Birth announcement offers images when capable; never when off."""
@@ -173,6 +174,7 @@ class SkillBirth(unittest.TestCase):
             line = s.d.get("pending_narration") or ""
             self.assertIn("Eidos_", line)
             self.assertIn("/vivarium images off", line)
+            self.assertIn("render --image", line)     # agent directive
             # flip to off -> new birth, no offer
             s.set("media_pref", "ascii")
             with TempSkills("offer-skill-2", "Different body content qqq."):

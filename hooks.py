@@ -60,7 +60,8 @@ def _on_skill_lifecycle(skill_name: str = "", action: str = "",
             except ImportError:  # pragma: no cover
                 import media_policy as vmp
             vstate.queue_narration(
-                vbirth.announcement(result) + vmp.media_offer(vstate.state()))
+                vbirth.announcement(result)
+                + vmp.media_offer(vstate.state(), directive=True))
     except Exception:
         logger.exception("vivarium on_skill_lifecycle failed (birth skipped)")
 
@@ -98,7 +99,8 @@ def _boot_from_dormant(rec: dict) -> None:
         except ImportError:  # pragma: no cover
             import media_policy as vmp
         vstate.queue_narration(
-            vseeding.onboard_message(result) + vmp.media_offer(vstate.state()))
+            vseeding.onboard_message(result)
+            + vmp.media_offer(vstate.state(), directive=True))
 
 
 def _nutrients_for(tool_name: str) -> float:

@@ -26,13 +26,25 @@ def set_media_pref(s, mode: str) -> str:
     return mode
 
 
-def media_offer(s) -> str:
-    """One-line offer for narrations; empty when decided or incapable."""
+def media_offer(s, *, directive: bool = False) -> str:
+    """One-line offer for narrations; empty when decided or incapable.
+
+    directive=True (Big Bang / birth narrations): also instruct the AGENT
+    to paint the dish now — the agent reads the narration as context and
+    can run ``/vivarium render --image`` in the same turn, so a
+    graphics-capable user sees the newborn dish without asking. The
+    paint itself must happen via the slash (tool results can't paint;
+    TUI-ownership law), which is exactly what the directive asks for.
+    """
     if media_pref(s) != "auto":
         return ""
     kind = vterm.detect_graphics()
-    if kind in ("kitty", "iterm2", "sixel"):
-        return ("\n\n🖼️ Graphics-capable terminal detected — the dish "
-                "renders as a real image by default. Disable anytime: "
-                "/vivarium images off")
-    return ""
+    if kind not in ("kitty", "iterm2", "sixel"):
+        return ""
+    offer = ("\n\n🖼️ Graphics-capable terminal detected — the dish "
+             "renders as a real image by default. Disable anytime: "
+             "/vivarium images off")
+    if directive:
+        offer += ("\n(vivarium: show the dish now — run "
+                  "/vivarium render --image as part of this turn)")
+    return offer
