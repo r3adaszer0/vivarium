@@ -176,15 +176,18 @@ class World:
     def to_dict(self) -> dict:
         return {
             "v": 1,
+            "seed": self.seed,   # VIV-12: the decision-hash root must persist
             "w": self.w, "h": self.h, "tick": self.tick,
-            "food": [[round(v, 3) for v in row] for row in self.food],
+            # full float precision: a snapshot must be EXACTLY the state
+            # (VIV-12 — quantized snapshots drifted on resume)
+            "food": [[float(v) for v in row] for row in self.food],
             "next_gid": self.next_gid,
             "born": self.born, "died": self.died,
             "peak": self.peak_population,
             "creatures": [
                 {
-                    "gid": c.gid, "g": {k: round(v, 4) for k, v in c.genome.items()},
-                    "x": c.x, "y": c.y, "e": round(c.energy, 3), "a": c.age,
+                    "gid": c.gid, "g": {k: float(v) for k, v in c.genome.items()},
+                    "x": c.x, "y": c.y, "e": float(c.energy), "a": c.age,
                     "l": c.lineage,
                 }
                 for c in self.creatures
@@ -206,7 +209,7 @@ class World:
             next_gid=d.get("next_gid", 1),
             born=d.get("born", 0),
             died=d.get("died", 0), peak_population=d.get("peak", len(creatures)),
-            seed=seed,
+            seed=d.get("seed", seed),
         )
 
 
@@ -214,6 +217,30 @@ class World:
 def _neighbours(x: int, y: int, w: int, h: int):
     for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
         yield (x + dx) % w, (y + dy) % h  # toroidal — no edges on a dish
+
+
+# ── hash-driven decisions (VIV-12) ───────────────────────────────────────────
+# The Four Rules demand "not random": every in-tick decision derives from a
+# state hash instead of an RNG stream. h(seed, tick, gid, purpose) is a pure
+# function of state — same state, same outcome, on any machine, forever.
+
+def _h(seed: int, tick: int, gid: int, purpose: bytes, salt: int = 0) -> bytes:
+    return hashlib.sha256(
+        seed.to_bytes(8, "big") + tick.to_bytes(8, "big")
+        + gid.to_bytes(8, "big") + purpose + salt.to_bytes(4, "big")).digest()
+
+
+def _u(seed: int, tick: int, gid: int, purpose: bytes,
+       salt: int = 0) -> float:
+    """Uniform float in [0,1) from the decision hash."""
+    return int.from_bytes(_h(seed, tick, gid, purpose, salt)[:4], "big") / 2**32
+
+
+def _gauss6(seed: int, tick: int, gid: int, purpose: bytes) -> float:
+    """Approximate standard normal via Irwin–Hall (6 uniforms − 3): variance
+    1/2 — multiply by sqrt(2) for unit variance. Pure function of state."""
+    s = sum(_u(seed, tick, gid, purpose, salt=i) for i in range(6)) - 3.0
+    return s * (2 ** 0.5)
 
 
 def _random_cell(rng: random.Random, w: int, h: int) -> Tuple[int, int]:
@@ -287,10 +314,12 @@ def _creature_tick(world: World, nutrients: float) -> None:
     Phase 2 (per cell): the cell's food goes to the strongest claimant —
     ``aggression * energy``, ties to the lower gid. A gene must matter or not
     exist: this is the rule that makes ``aggression`` real (cell contest).
-    Phase 3 (gid order): reproduction, stochastic chance per eligible parent.
+    Phase 3 (gid order): reproduction, chance per eligible parent — every
+    roll is a hash of (seed, tick, gid, purpose): no RNG anywhere in the
+    tick (VIV-12 de-randomization; Rule 1: not random, pure function of
+    state).
     """
     w, h = world.w, world.h
-    rng = world.rng
     food = world.food
     born_this_tick: List[Creature] = []
     population_after = len(world.creatures)  # cap check includes unborn children
@@ -330,10 +359,10 @@ def _creature_tick(world: World, nutrients: float) -> None:
             c.x = (c.x + (1 if step_x > 0 else -1 if step_x < 0 else 0)) % w
             c.y = (c.y + (1 if step_y > 0 else -1 if step_y < 0 else 0)) % h
             c.energy -= MOVE_COST
-        elif rng.random() < 0.3 * c.genome["forage"]:
-            # wander — exploration is an evolved trait
-            c.x = (c.x + rng.choice((-1, 0, 1))) % w
-            c.y = (c.y + rng.choice((-1, 0, 1))) % h
+        elif _u(world.seed, world.tick, c.gid, b"wander") < 0.3 * c.genome["forage"]:
+            # wander — exploration is an evolved trait (hash-driven: VIV-12)
+            c.x = (c.x + int(_u(world.seed, world.tick, c.gid, b"wdx") * 3) - 1) % w
+            c.y = (c.y + int(_u(world.seed, world.tick, c.gid, b"wdy") * 3) - 1) % h
             c.energy -= MOVE_COST * 0.5
 
     # -- phase 2: cell contests + eating ------------------------------------------
@@ -362,12 +391,15 @@ def _creature_tick(world: World, nutrients: float) -> None:
         # energy after the split is strictly less than before — births
         # consume the surplus instead of printing it (Rule 2).
         if (c.energy >= REPRODUCE_MIN and c.age >= MIN_MATURITY_AGE
-                and population_after < POP_CAP and rng.random() < REPRO_CHANCE):
+                and population_after < POP_CAP
+                and _u(world.seed, world.tick, c.gid, b"repro") < REPRO_CHANCE):
             half = c.energy * 0.5
             friction = REPRODUCE_COST * 0.5
             c.energy = max(0.05, half - friction)
             child_energy = max(0.05, half - friction)
-            child_genome = {k: max(0.05, v + rng.gauss(0.0, MUTATION_SCALE * c.genome["mutate"]))
+            child_genome = {k: max(0.05, v + _gauss6(
+                                world.seed, world.tick, c.gid, b"mut" + k.encode())
+                                * MUTATION_SCALE * c.genome["mutate"])
                             for k, v in c.genome.items()}
             born_this_tick.append(Creature(
                 gid=world.next_gid, genome=child_genome, x=c.x, y=c.y,
@@ -386,16 +418,18 @@ def _creature_tick(world: World, nutrients: float) -> None:
             food[c.y][c.x] = min(MAX_FOOD, food[c.y][c.x] + 0.3)
     world.creatures = survivors + born_this_tick
     world.peak_population = max(world.peak_population, len(world.creatures))
-    # nutrient drops from the user's real work land on a random cell
+    # nutrient drops from the user's real work land on a hash-picked cell
+    # (VIV-12: no RNG — the drop position is a pure function of state)
     if nutrients > 0:
-        rx, ry = _random_cell(world.rng, w, h)
+        rx = int(_u(world.seed, world.tick, 0, b"nutx") * w) % w
+        ry = int(_u(world.seed, world.tick, 0, b"nuty") * h) % h
         food[ry][rx] = min(MAX_FOOD, food[ry][rx] + nutrients)
 
 
 def tick_world(world: World, nutrients: float = 0.0) -> dict:
     """Advance the world one tick. Returns a tiny event summary for narration."""
     pre = len(world.creatures)
-    world.rng = world._roll_rng()   # per-tick dice: (seed, tick) => stream
+    world.rng = world._roll_rng()   # kept for genesis/compat consumers only
     _terrain_tick(world)
     _creature_tick(world, nutrients)
     world.tick += 1

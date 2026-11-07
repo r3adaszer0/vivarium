@@ -299,5 +299,38 @@ class DormantToolGating(unittest.TestCase):
         self.assertTrue(True)
 
 
+
+class TestDeterminismVIV12(unittest.TestCase):
+    """VIV-12: tick dynamics are hash-driven, not random — a snapshot
+    resumed mid-run must reproduce the continuous run EXACTLY."""
+
+    def test_snapshot_resume_bit_identical(self):
+        import world as W
+        w1 = W.new_world(seed=42)
+        for _ in range(120):
+            W.tick_world(w1, 0.3 if _ % 10 == 0 else 0.0)
+        w2 = W.World.from_dict(w1.to_dict())
+        w1b = W.new_world(seed=42)
+        for _ in range(120):
+            W.tick_world(w1b, 0.3 if _ % 10 == 0 else 0.0)
+        for t in range(120, 260):
+            W.tick_world(w1b, 0.3 if t % 10 == 0 else 0.0)
+            W.tick_world(w2, 0.3 if t % 10 == 0 else 0.0)
+        self.assertEqual(w1b.to_dict(), w2.to_dict())
+
+    def test_decision_hash_is_state_pure(self):
+        import world as W
+        self.assertEqual(W._u(7, 3, 11, b"repro"), W._u(7, 3, 11, b"repro"))
+        self.assertNotEqual(W._u(7, 3, 11, b"repro"), W._u(7, 4, 11, b"repro"))
+        self.assertNotEqual(W._u(7, 3, 11, b"repro"), W._u(7, 3, 12, b"repro"))
+
+    def test_no_rng_in_tick_dynamics(self):
+        import inspect
+        import world as W
+        for fn in (W._terrain_tick, W._creature_tick):
+            src = inspect.getsource(fn)
+            self.assertNotIn("rng.", src)
+            self.assertNotIn("random.", src)
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
