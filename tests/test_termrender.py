@@ -258,6 +258,27 @@ class TestImagePaintFlow(unittest.TestCase):
         self.assertNotIn("\n\n\n", text)
 
 
+class TestMediaOfferDefaultOn(unittest.TestCase):
+    """Graphics-capable terminals get images BY DEFAULT (user decision);
+    the offer tells them how to disable, not enable."""
+
+    def test_offer_says_disable_not_enable(self):
+        import tools
+        offer = tools._media_offer()
+        # only meaningful when a graphics terminal is detected; in tests
+        # detect returns none -> empty. Force-detect via env instead:
+        import termrender as T
+        real = T.detect_graphics
+        T.detect_graphics = lambda env=None: "kitty"
+        try:
+            offer = tools._media_offer()
+        finally:
+            T.detect_graphics = real
+        self.assertIn("by default", offer)
+        self.assertIn("images off", offer)
+        self.assertNotIn("images on", offer)
+
+
 class TestSlashPolish(unittest.TestCase):
     """User-paste fixes: no duplicate path line; --colour alias accepted."""
 

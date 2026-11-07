@@ -341,7 +341,7 @@ def _cmd(raw_args: str) -> str:
             "image": want_image,
             "color": ("color" in rest or "--color" in rest
                       or "colour" in rest or "--colour" in rest)}))
-        if want_image and out.get("media"):
+        if want_image and out.get("media") and media_pref() != "off":
             try:
                 from . import termrender as vterm
             except ImportError:  # pragma: no cover
@@ -365,13 +365,8 @@ def _cmd(raw_args: str) -> str:
             # trail = path + graphics note lines (after the reserved rows)
             trail = tail.lstrip("\n") if tail else ""
             trail_rows = trail.count("\n") + 1 if trail else 0
-            ascii_fallback = _tool_render({
-                "rich": "rich" in rest or "--rich" in rest})
-            import json as _json
-            ascii_map = (_json.loads(ascii_fallback).get("map") or "")
             out["graphics"] = vterm.paint_over(
-                path, res_rows, trail_rows,
-                ascii_fallback=ascii_map, delay=0.6)
+                path, res_rows, trail_rows, delay=0.6)
             return (summary + "\n\n" + spacer + "\n" + trail).rstrip() + "\n"
         return _render_text(out)
     if cmd == "serve":
@@ -488,9 +483,9 @@ def _media_offer() -> str:
     if kind == "none":
         return ""
     if kind in ("kitty", "iterm2", "sixel"):
-        return ("\n\n🖼️ Your terminal can show the dish as a real image — "
-                "enable with /vivarium images on (auto-detected, off by "
-                "default).")
+        return ("\n\n🖼️ Graphics-capable terminal detected — the dish "
+                "renders as a real image by default. Disable anytime: "
+                "/vivarium images off")
     return ""
 
 

@@ -345,13 +345,13 @@ CELL_W, CELL_H = 10, 15
 
 
 def paint_over(png_path: str, reserved_rows: int, trail_rows: int,
-               ascii_fallback: str = "", delay: float = 0.6,
-               env: Optional[dict] = None, extra_climb: int = 3) -> str:
+               delay: float = 0.6, env: Optional[dict] = None,
+               extra_climb: int = 3) -> str:
     """Deferred overlay paint: the TUI prints `reserved_rows` blank rows
     (part of the slash text, so its redraw engine owns/scrolls them);
     `delay` seconds later this paints the PNG on top of that rectangle
-    via /dev/tty. Falls back to writing `ascii_fallback` line-by-line
-    into the same rows if the graphics paint fails.
+    via /dev/tty. No fallback content: if the paint fails the rows stay
+    blank (whitespace is the fallback — clean and harmless).
 
     `trail_rows` = text lines printed AFTER the reserved rows (path +
     note) — the cursor-relative dance must climb over them too.
@@ -377,17 +377,7 @@ def paint_over(png_path: str, reserved_rows: int, trail_rows: int,
             os.write(fd, payload)
             return f"overlay painted ({size[0]}x{size[1]}px over {reserved_rows} rows)"
         except Exception:
-            if ascii_fallback:
-                try:
-                    lines = ascii_fallback.splitlines()[:reserved_rows]
-                    block = "".join(
-                        f"\x1b[{reserved_rows + trail_rows - i}A\r"
-                        f"\x1b[K{line}\x1b[0K"
-                        for i, line in enumerate(reversed(lines)))
-                    os.write(fd, block.encode("utf-8"))
-                except Exception:
-                    pass
-            return "fallback ascii written"
+            return "paint failed (rows stay blank)"
         finally:
             os.close(fd)
 
