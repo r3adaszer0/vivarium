@@ -212,8 +212,11 @@ class TestImagePaintFlow(unittest.TestCase):
             termrender.paint_over = real_paint
         lines = out.splitlines()
         self.assertIn("Tick", lines[0])
-        # spacer block present: at least one all-space row
-        self.assertTrue(any(l.strip() == "" and l != "" for l in lines[1:5]))
+        # spacer block sized to the PNG at the calibrated cell height:
+        # ceil(339/11) = 31 rows of spaces between summary and path
+        spacer_rows = [l for l in lines[1:] if l and not l.strip()]
+        self.assertGreaterEqual(len(spacer_rows), 25)
+        self.assertLessEqual(len(spacer_rows), 40)
         # path after the spacer
         self.assertIn("🖼️", out)
         self.assertEqual(len(scheduled), 1)
