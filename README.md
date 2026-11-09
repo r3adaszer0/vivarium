@@ -97,6 +97,18 @@ Zoom in anywhere, any time: the simulation is deterministic, so any past
 moment re-renders exactly. [Watch a bloom close-up](docs/assets/clip_bloom_zoom.mp4).
 
 
+
+## The first run: four acts
+
+Vivarium introduces itself the way a world should: one beat per turn, each tied to something you actually did.
+
+1. **Act 1, the dormant universe.** Your first conversation: the dish is empty and waiting. The first skill your agent learns lights it.
+2. **Act 2, the Big Bang.** That first skill seeds the world from every skill installed at that moment. The narration explains the dish, the food, the Hermi, and the loop: your work feeds them, your learning births species.
+3. **Act 3, the first Hermi by name.** The next skill births a species you meet properly: `/vivarium show Eidos_xxxxxx` for its face and genes, `/vivarium clip` for a short video of its world.
+4. **Act 4, multiplayer.** A third birth opens the competitive horizon: `/vivarium export` shares a sealed genome, `/vivarium race` runs a deterministic duel anyone can verify.
+
+Two beats fire on their own events: the **Codex introduces itself** at your first discovery, and an **extinction** gets its honest line. Story beats arrive in the same turn they happen, and never as a wall of text. `/vivarium narration off` keeps only bare birth lines (names and IDs).
+
 ## Where it lives: the experience by surface
 
 The same universe, seen differently depending on where you talk to your agent:
