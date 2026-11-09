@@ -433,19 +433,40 @@ def _arm_print() -> None:
                     live = {"tick": w.tick}
             path = ""
             rows = 23
+            dish_cols = 24
             if w is not None and not vstate.already_painted(w):
                 path = vart.render_dish_png(vstate.state(), w, f"live_{w.tick}")
                 if path:
                     size = vterm.png_size(path) or (342, 339)
                     rows = max(1, -(-int(size[1]) // max(1, vterm.CELL_H)))
+                    # Reserve generously: the dish is ~339px wide and a
+                    # narrow font cell is as little as 9px, so assume 9
+                    # and add one column of gutter. Wasting two columns
+                    # is invisible; overlapping the text is not.
+                    dish_cols = max(12, -(-int(size[0]) // 9) + 1)
             rendered = vcard.render(body, term_cols, vacts.DISH_MARKER,
                                     live=live, dish_rows=rows,
-                                    dish=bool(path))
+                                    dish=bool(path), dish_cols=dish_cols)
             out = rendered["text"]
 
             def _write(_out=out, _path=path, _climb=rendered["climb"]):
-                _sys.stdout.write(_out)
-                _sys.stdout.flush()
+                # Write the card straight to the terminal: prompt_toolkit's
+                # stdout proxy eats the ESC byte, so the SGR colours arrived
+                # as literal "[38;2;...m" text on screen.
+                wrote = False
+                try:
+                    import os as _os
+                    fd = _os.open("/dev/tty", _os.O_WRONLY)
+                    try:
+                        _os.write(fd, _out.encode("utf-8"))
+                        wrote = True
+                    finally:
+                        _os.close(fd)
+                except OSError:
+                    wrote = False
+                if not wrote:
+                    _sys.stdout.write(_out)
+                    _sys.stdout.flush()
                 # The paint MUST happen inside the same terminal callback
                 # as the text: run_in_terminal buffers the write until the
                 # renderer flushes, so a paint issued from the worker first

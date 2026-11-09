@@ -31,8 +31,8 @@ ITALIC = "\x1b[3m"
 RST = "\x1b[0m"
 
 _ANSI = re.compile(r"\x1b\[[0-9;]*m")
-DISH_COLS = 24          # columns reserved for the picture
-MIN_TWO_COL = DISH_COLS + 46
+DISH_COLS = 24          # fallback; the worker passes the real width
+MIN_GUTTER = 40
 MAX_COLS = 104
 LABEL = "vivarium"
 
@@ -107,7 +107,7 @@ def parse(body: str, marker: str) -> dict:
 def _head_block(facts: dict, cols: int, live: dict | None) -> list[str]:
     era = facts.get("era")
     left = f"{ITALIC}{DIM}era {era}{RST}" if era else ""
-    lines = [_rule(cols, "", f"era {era}" if era else "")]
+    lines = [_rule(cols, LABEL, f"era {era}" if era else "")]
     headline = f"{BOLD}{WHITE}Universe born{RST}"
     if era:
         headline += f"{BOLD}{ACCENT}  era {era}{RST}"
@@ -153,7 +153,8 @@ def _command_table(cols: int) -> list[str]:
 
 
 def render(body: str, cols: int, marker: str, live: dict | None = None,
-           dish_rows: int = 23, dish: bool = True) -> dict:
+           dish_rows: int = 23, dish: bool = True,
+           dish_cols: int = DISH_COLS) -> dict:
     """Render a beat.
 
     Returns {text, climb, has_dish, rows}. `climb` is how many rows up
@@ -180,10 +181,11 @@ def render(body: str, cols: int, marker: str, live: dict | None = None,
         lines.append("")
 
     tail_text = facts["tail"]
-    spacer_at = len(lines) if (dish and tail_text and cols >= MIN_TWO_COL) else None
+    two_col = dish and bool(tail_text) and cols >= dish_cols + MIN_GUTTER
+    spacer_at = len(lines) if two_col else None
 
     if spacer_at is not None:
-        right = cols - DISH_COLS - 4
+        right = cols - dish_cols - 4
         body_lines = wrap(tail_text, right)
         block = max(dish_rows, len(body_lines))
         # centre the text beside the dish instead of leaving it stranded
@@ -192,7 +194,7 @@ def render(body: str, cols: int, marker: str, live: dict | None = None,
         for i in range(block):
             j = i - top_pad
             t = body_lines[j] if 0 <= j < len(body_lines) else ""
-            lines.append(f"  {' ' * DISH_COLS}{SOFT}{t}{RST}" if t else "")
+            lines.append(f"  {' ' * dish_cols}{SOFT}{t}{RST}" if t else "")
         cap = _caption(live)
         if cap:
             lines.append(cap)
