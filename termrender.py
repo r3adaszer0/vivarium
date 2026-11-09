@@ -238,7 +238,13 @@ def emit_image_raw(png_path: str, env: Optional[dict] = None,
     try:
         h = png_size(png_path)[1]
         rows = max(1, -(-int(h) // max(1, CELL_H)))   # ceil
-        payload = payload + "\n" * rows
+        # Same idea as the /vivarium status overlay, in the one channel
+        # this tool owns: reserve the rectangle, then paint into it.
+        # ESC7 save, real newlines reserve the block (scrolling if at
+        # the bottom), ESC8 restore to the block's top, image, then move
+        # the cursor to the block's bottom so later text flows below.
+        payload = ("\x1b7" + "\n" * rows + "\x1b8"
+                   + payload + f"\x1b[{rows}B")
     except Exception:
         pass
     # Write to the RAW terminal device when possible: the Hermes TUI wraps

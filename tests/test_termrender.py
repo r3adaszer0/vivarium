@@ -134,12 +134,13 @@ class TestEscapes(unittest.TestCase):
         with contextlib.redirect_stdout(buf):
             out = T.emit_image_raw(self.path, env={"TERM": "xterm-kitty"})
         self.assertIn("kitty graphics emitted", out)
-        written = buf.getvalue().rstrip("\n")
+        written = buf.getvalue()
         self.assertIn("\x1b_Gf=100", written)
-        self.assertTrue(written.endswith("\x1b\\"))
-        # VIV-39: the image reserves its rows (trailing newlines) so the
-        # reply is not printed underneath the picture.
-        self.assertTrue(buf.getvalue().endswith("\n"))
+        # VIV-41: reserve the image rectangle, paint into it, leave the
+        # cursor at its bottom (so the reply flows below the picture).
+        self.assertTrue(written.startswith("\x1b7"))
+        self.assertIn("\x1b8", written)
+        self.assertRegex(written, r"\x1b\[\d+B$")
 
     def test_emit_image_raw_prefers_dev_tty(self):
         """With a /dev/tty, bytes go to the RAW terminal (bypassing the

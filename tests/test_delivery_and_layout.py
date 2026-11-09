@@ -91,10 +91,12 @@ class TestImageRowReservation(unittest.TestCase):
             os.close = orig_close
         self.assertIn("emitted", note)
         data = captured.get("data", b"")
-        self.assertTrue(data.startswith(b"\x1b_Gfake"))
-        rows = len(data) - len(b"\x1b_Gfake")
-        self.assertEqual(rows, 20)   # 300px / 15px per row
-        self.assertTrue(data.endswith(b"\n" * 20))
+        # Deterministic envelope: save cursor, reserve the block with real
+        # newlines, restore, paint the image into the block, move to its
+        # bottom so later text flows below the picture.
+        self.assertTrue(data.startswith(b"\x1b7" + b"\n" * 20 + b"\x1b8"))
+        self.assertIn(b"\x1b_Gfake", data)
+        self.assertTrue(data.endswith(b"\x1b[20B"))
 
 
 if __name__ == "__main__":
