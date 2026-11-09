@@ -166,7 +166,10 @@ def _on_pre_llm_call(session_id: str = "", user_message: str = "",
     try:
         line = vstate.pop_narration()
         if line:
-            return {"context": line}
+            return {"context": (
+                "🧬 [vivarium] STORY BEAT — relay this to the user in your "
+                "reply, verbatim and complete. Do not summarize, do not drop "
+                "it, do not treat it as internal context:\n" + line)}
         if is_first_turn:
             rec = vstate.universe_record()
             if rec.get("status") != "live":

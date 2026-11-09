@@ -462,7 +462,68 @@ def _cmd(raw_args: str) -> str:
         return _start_text()
     if cmd == "restart":
         return _do_restart()
+    if cmd == "doctor":
+        return _doctor_text()
     return f"Unknown subcommand: {cmd}\n\n{_HELP}"
+
+
+def _doctor_text() -> str:
+    """Ground-truth diagnostic: what build is running, what state exists,
+    what the narration queues hold, what the environment can do. The
+    first command to run when any delivery seems missing."""
+    lines = ["🩺 vivarium doctor"]
+    try:
+        from . import acts as vacts
+    except ImportError:  # pragma: no cover
+        import acts as vacts
+    try:
+        from . import termrender as vterm
+    except ImportError:  # pragma: no cover
+        import termrender as vterm
+    rec = vstate.universe_record()
+    lines.append(f"universe: status={rec.get('status')} era={rec.get('era')} "
+                 f"key_fp={rec.get('key_fp')}")
+    s = vstate.state()
+    mq = s.get("pending_narration_milestones", [])
+    rq = s.get("pending_narration", [])
+    if isinstance(mq, str): mq = [mq] if mq else []
+    if isinstance(rq, str): rq = [rq] if rq else []
+    lines.append(f"narration queues: milestones={len(mq)} routine={len(rq)}")
+    for i, m in enumerate(mq[:2]):
+        lines.append(f"  milestone[{i}]: {m[:90]}...")
+    for i, r in enumerate(rq[:2]):
+        lines.append(f"  routine[{i}]: {r[:90]}...")
+    lines.append(f"acts state: {rec.get('acts') or s.get('acts') or 'none fired'}")
+    w = None
+    try:
+        w = _world()
+    except Exception:
+        pass
+    if w is not None:
+        lines.append(f"world: tick={w.tick} creatures={len(w.creatures)} "
+                     f"peak={getattr(w, 'peak_population', '?')}")
+    else:
+        lines.append("world: none (dormant)")
+    lines.append(f"graphics: {vterm.detect_graphics()}")
+    lines.append(f"media_pref: {s.get('media_pref', 'auto')} "
+                 f"narration_pref: {s.get('narration_pref', 'on')}")
+    # feature fingerprint: which build is actually loaded
+    feats = []
+    import inspect as _insp
+    feats.append("show=" + str("_show_text" in globals()))
+    feats.append("clip=" + str("_clip_text" in globals()))
+    feats.append("milestone_queue=" + str(
+        getattr(vstate, "_NARRATION_MILESTONE_KEY", None)
+        == "pending_narration_milestones"))
+    try:
+        from . import hooks as vhooks
+    except ImportError:  # pragma: no cover
+        import hooks as vhooks
+    feats.append("relay_header=" + str(
+        "STORY BEAT" in _insp.getsource(vhooks._on_pre_llm_call)))
+    lines.append("build: " + " ".join(feats))
+    lines.append("(share this whole block if asking for help)")
+    return "\n".join(lines)
 
 
 def _serve_text(keep: bool) -> str:
