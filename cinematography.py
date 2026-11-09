@@ -107,3 +107,57 @@ def render_clip(world, path: str, tick_start: int = 0, tick_end: int = 120,
     finally:
         writer.close()
     return path
+
+
+def render_clip_ffmpeg(world, path: str, ticks: int = 120, fps: int = 12,
+                       cell_px: int = 8,
+                       region: Optional[Tuple[int, int, int]] = None,
+                       lineage_colors: Optional[dict] = None,
+                       highlight: Optional[str] = None,
+                       nutrients_per_tick: float = 0.0) -> str:
+    """Encode an MP4 of ``ticks`` frames via the ffmpeg rawvideo pipe.
+
+    PIL renders each frame (pure python; no numpy/imageio required —
+    Hermes runtime ships PIL, ffmpeg ships on PATH). When ``highlight``
+    names a lineage, all other creatures render dimmed so the target
+    species reads clearly in a mixed dish.
+    """
+    import os
+    import shutil
+    import subprocess
+    if shutil.which("ffmpeg") is None:
+        raise FileNotFoundError("ffmpeg not on PATH")
+    from PIL import Image
+    dim = (lineage_colors or {}).get("__dim__", (70, 74, 84))
+
+    def frame_bytes():
+        pix = render_frame(world, cell_px=cell_px, region=region,
+                           lineage_colors=lineage_colors)
+        h, w = len(pix), len(pix[0])
+        img = Image.new("RGB", (w, h))
+        img.putdata([tuple(p) for row in pix for p in row])
+        return img.tobytes(), w, h
+
+    first, wpx, hpx = frame_bytes()
+    proc = subprocess.Popen(
+        ["ffmpeg", "-y", "-loglevel", "error", "-f", "rawvideo",
+         "-pix_fmt", "rgb24", "-s", f"{wpx}x{hpx}", "-r", str(fps),
+         "-i", "-", "-c:v", "libx264", "-pix_fmt", "yuv420p", path],
+        stdin=subprocess.PIPE, stdout=subprocess.DEVNULL,
+        stderr=subprocess.PIPE)
+    try:
+        proc.stdin.write(first)
+        for _ in range(ticks - 1):
+            W.tick_world(world, nutrients=nutrients_per_tick)
+            data, _, _ = frame_bytes()
+            proc.stdin.write(data)
+        proc.stdin.close()
+    except BrokenPipeError:
+        pass
+    rc = proc.wait()
+    err = proc.stderr.read().decode("utf-8", errors="replace")
+    if rc != 0:
+        raise RuntimeError(f"ffmpeg clip encode failed: {err[:400]}")
+    if not os.path.exists(path):
+        raise RuntimeError("ffmpeg produced no output file")
+    return path

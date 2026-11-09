@@ -295,6 +295,7 @@ Subcommands:
   help                  this list (also: bare /vivarium)
   status                population, lineages, ages, and an ASCII map
   show [name|id]        meet one species up close: face, genes, story (--image: glyph)
+  clip [species] [ticks] [--zoom]   film the dish as a short MP4 (into the gallery)
   render [--rich] [--color] [--image]   the dish map (--rich: dense blocks; --color: colored creatures, terminal only; --image: true PNG when supported)
   serve [--keep]        open the gallery in your browser (localhost only)
   images on|off|auto    how imagery is delivered (auto = where supported)
@@ -407,6 +408,8 @@ def _cmd(raw_args: str) -> str:
         return _race_text(rest)
     if cmd == "show":
         return _show_text(rest)
+    if cmd == "clip":
+        return _clip_text(rest)
     if cmd == "staleness":
         return _staleness_text()
     if cmd == "start":
@@ -576,6 +579,91 @@ def _staleness_text() -> str:
         text += f"\n\nSuggestion: {st['suggestion']}\n" \
                 "(restarts are never automatic — your call, always)"
     return text
+
+
+def _clip_text(rest: list) -> str:
+    """VIV-33: /vivarium clip [species] [ticks] — the dish as an MP4.
+
+    Renders the dish tick-by-tick with the cinematography engine and
+    encodes MP4 via the ffmpeg rawvideo pipe (PIL frames; no numpy/
+    imageio dependency). A species argument highlights that lineage and
+    zooms to its centroid; plain clip films the whole dish.
+    The video lands in the media gallery (see /vivarium serve).
+    """
+    try:  # package mode / flat mode
+        from . import cinematography as vcin
+        from . import artifacts as vart
+    except ImportError:  # pragma: no cover
+        import cinematography as vcin
+        import artifacts as vart
+    if not _universe_live():
+        return _dormant_tool_result("clip")
+    ticks = 120
+    target = None
+    zoom = False
+    for a in rest:
+        if a.isdigit():
+            ticks = max(10, min(600, int(a)))
+        elif a in ("--zoom", "zoom"):
+            zoom = True
+        else:
+            target = a
+    w = _world()
+    # resolve the target species (Eidos id or skill-name fragment)
+    lineage = None
+    births = vstate.state().get("births", {})
+    if isinstance(births, dict) and target:
+        if target in births:
+            lineage = births[target].get("eidos")
+        else:
+            for n, rec in births.items():
+                if target.lower() in n.lower() or \
+                        str(rec.get("eidos", "")).lower() == target.lower():
+                    lineage = rec.get("eidos")
+                    break
+        if lineage is None:
+            return (f"Unknown species '{target}'. /vivarium show lists "
+                    f"the roster.")
+    if not w.creatures:
+        return "The dish is empty — nothing to film yet."
+    # zoom target: the lineage's centroid, else the dish center
+    region = None
+    if zoom or lineage:
+        members = [c for c in w.creatures
+                   if c.alive() and (lineage is None or c.lineage == lineage)]
+        if members:
+            cx = sum(c.x for c in members) // len(members)
+            cy = sum(c.y for c in members) // len(members)
+            region = (cx, cy, 12)
+    # lineage colors: highlight target, dim others
+    colors = {}
+    if lineage:
+        try:  # package mode / flat mode
+            from . import identity as vident
+        except ImportError:  # pragma: no cover
+            import identity as vident
+        g = (births or {}).get(target, {}).get("genome")
+        hue = g["hue"] if g else None
+        for c in w.creatures:
+            if c.lineage == lineage and hue is not None:
+                colors[c.lineage] = vident.color_for(hue)
+        colors.setdefault("__dim__", (70, 74, 84))
+    start_tick = w.tick
+    name = f"clip_{start_tick}_{lineage or 'dish'}.mp4"
+    path = f"{vart.media_dir(vstate.state())}/{name}"
+    try:
+        vcin.render_clip_ffmpeg(w, path, ticks=ticks, region=region,
+                                lineage_colors=colors or None,
+                                highlight=lineage)
+    except FileNotFoundError:
+        return ("ffmpeg is required to encode the clip but is not on "
+                "this machine's PATH. The dish still lives — install "
+                "ffmpeg and try again.")
+    return (f"🎥 Clip written: {path}\n"
+            f"  {ticks} ticks of the dish at tick {start_tick}"
+            f"{' — ' + lineage + ' highlighted' if lineage else ''}\n"
+            f"Watch it in the gallery: /vivarium serve "
+            f"(or open the file directly).")
 
 
 def _show_text(rest: list) -> str:
