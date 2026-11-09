@@ -331,7 +331,12 @@ def _arm_print() -> None:
         body = "\n\n".join(parts)
         try:
             import sys as _sys
-            from . import artifacts as vart
+            try:
+                from . import artifacts as vart
+                from . import termrender as vterm
+            except ImportError:  # pragma: no cover - flat-import mode
+                import artifacts as vart
+                import termrender as vterm
             w = vstate.load_world()
             if w is None or vstate.already_painted(w):
                 _sys.stdout.write("\n" + body + "\n")
