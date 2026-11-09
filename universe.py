@@ -144,6 +144,14 @@ def restart(s, load_world: Optional[Callable[[], Any]] = None,
             pass  # archiving is best-effort; the restart itself must not fail
     if clear_world is not None:
         clear_world()
+    # Old-era narrations must not cross the era boundary: a death beat
+    # from era N delivering in era N+1 confuses the story ("the
+    # Eidos_eaa037 lineage died out" right after the universe reset).
+    s.set("pending_narration", [])
+    s.set("pending_narration_milestones", [])
+    # Acts are per-UNIVERSE: era N+1 replays the walkthrough from act 2
+    # (the new Big Bang re-teaches the dish to whoever is watching).
+    s.set("acts", {})   # includes _births_since_bang (lives inside)
     new_rec = {
         "v": 1,
         "status": "dormant",
