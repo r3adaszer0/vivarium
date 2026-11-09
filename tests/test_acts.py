@@ -103,3 +103,27 @@ class TestActs(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+def test_big_bang_and_birth_narrations_are_milestones(self):
+    """0a1e4b8 follow-up: the two story beats (Big Bang onboard, birth
+    announcement) queue as MILESTONES — routine reports cannot clobber
+    them (the hows-the-cat silent-Big-Bang incident, 2026-11-09)."""
+    import state as vstate2
+    class _Store(dict):
+        def set(self, k, v): self[k] = v
+        def save(self): pass
+    class _Ctx:
+        def __init__(self, d): self.state = _Store(d)
+        def save_session(self, *a, **k): pass
+    s = {"universe": {"v": 1, "status": "dormant", "era": 3,
+                      "key_fp": "ab12cd34", "genesis": None}}
+    vstate2.bind(_Ctx(s))
+    vhooks._on_skill_lifecycle(skill_name="probe-skill", action="created")
+    rec = vstate2.universe_record()
+    self.assertEqual(rec.get("status"), "live")
+    # bury the queue under routine reports
+    for i in range(6):
+        vstate2.queue_narration(f"routine report {i}")
+    got = vstate2.pop_narration()
+    self.assertIsNotNone(got)
+    self.assertIn("This dish is your Vivarium universe", got)

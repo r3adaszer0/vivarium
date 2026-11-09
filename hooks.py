@@ -68,7 +68,8 @@ def _on_skill_lifecycle(skill_name: str = "", action: str = "",
                 vstate.state(), base, result, is_big_bang=False)
             vstate.queue_narration(
                 narrated
-                + vmp.media_offer(vstate.state(), directive=True))
+                + vmp.media_offer(vstate.state(), directive=True),
+                milestone=True)
     except Exception:
         logger.exception("vivarium on_skill_lifecycle failed (birth skipped)")
 
@@ -116,7 +117,8 @@ def _boot_from_dormant(rec: dict) -> None:
             is_big_bang=True)
         vstate.queue_narration(
             narrated
-            + vmp.media_offer(vstate.state(), directive=True))
+            + vmp.media_offer(vstate.state(), directive=True),
+            milestone=True)
 
 
 def _nutrients_for(tool_name: str) -> float:
