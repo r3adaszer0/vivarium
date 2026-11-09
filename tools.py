@@ -390,10 +390,8 @@ def _render_text(out: dict) -> str:
         text = f"Tick {out.get('tick')} — {out.get('population')} creatures"
     for m in out.get("media", []) or []:
         text += f"\n\n🖼️ {m}"
-    g = out.get("graphics") or ""
-    if g and not g.startswith("saved to") \
-            and not g.startswith("attached"):  # path already shown via 🖼️
-        text += f"\n({g})"
+    # paint diagnostics are never user-facing (VIV-36b): only a media
+    # path note may appear, and 🖼️ already shows it.
     return text
 
 

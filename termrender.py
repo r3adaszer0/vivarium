@@ -365,7 +365,7 @@ def paint_over(png_path: str, reserved_rows: int, trail_rows: int,
         try:
             fd = os.open("/dev/tty", os.O_WRONLY)
         except OSError:
-            return "no tty"
+            return ""   # silent: no tty -> whitespace fallback
         try:
             # The TUI adds rows after our text (blank line + prompt) that the
             # static count can't see — measured 2-3 on the live TUI. Climb
@@ -377,10 +377,10 @@ def paint_over(png_path: str, reserved_rows: int, trail_rows: int,
             os.write(fd, payload)
             return ""
         except Exception:
-            return "paint failed (rows stay blank)"
+            return ""   # silent: whitespace is the fallback
         finally:
             os.close(fd)
 
     t = threading.Thread(target=_work, daemon=True)
     t.start()
-    return "overlay scheduled"
+    return ""   # silent: diagnostics never print (VIV-36b)
