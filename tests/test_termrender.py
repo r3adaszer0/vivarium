@@ -278,7 +278,8 @@ class TestMediaOfferDefaultOn(unittest.TestCase):
             offer = tools._media_offer()
         finally:
             T.detect_graphics = real
-        self.assertIn("by default", offer)
+        self.assertIn("automatically", offer)
+        self.assertIn("/vivarium images off", offer)
         self.assertIn("images off", offer)
         self.assertNotIn("images on", offer)
 

@@ -41,9 +41,9 @@ def media_offer(s, *, directive: bool = False) -> str:
     kind = vterm.detect_graphics()
     if kind not in ("kitty", "iterm2", "sixel"):
         return ""
-    offer = ("\n\n🖼️ Graphics-capable terminal detected — the dish "
-             "renders as a real image by default. Disable anytime: "
-             "/vivarium images off")
+    offer = ("\n\n🖼️ Graphics-capable terminal detected — Vivarium "
+             "paints the dish here automatically (Big Bang, births, "
+             "status). Disable anytime: /vivarium images off")
     if directive:
         # VIV-42: on an interactive terminal the PLUGIN paints the dish
         # itself after the turn settles (see hooks._schedule_picture), so

@@ -184,6 +184,14 @@ def _tool_render(args: Dict[str, Any], **_) -> str:
                 and vterm.detect_graphics() in ("kitty", "iterm2", "sixel")
                 and media_pref() != "ascii"):
             try:
+                # Idempotency: the plugin itself paints after the turn.
+                # If this exact (era, tick) is already on screen, emit
+                # nothing — two callers must never produce two dishes.
+                if vstate.already_painted(w):
+                    out["map"] = ""
+                    out["legend"] = ""
+                    out["graphics"] = "already painted — nothing emitted"
+                    return tool_result(out)
                 try:
                     from . import artifacts as vart
                 except ImportError:  # pragma: no cover
@@ -191,6 +199,8 @@ def _tool_render(args: Dict[str, Any], **_) -> str:
                 path = vart.render_dish_png(vstate.state(), w, f"dish_{w.tick}")
                 if path:
                     note = vterm.emit_image_raw(path)
+                    rec = vstate.universe_record() or {}
+                    vstate.mark_painted(rec.get("era"), w.tick)
                     out["map"] = ""       # image shown; no ASCII underlay
                     out["legend"] = ""
                     out["graphics"] = f"painted inline ({note or 'ok'})"

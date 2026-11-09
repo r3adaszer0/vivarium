@@ -68,7 +68,8 @@ def _on_skill_lifecycle(skill_name: str = "", action: str = "",
                 vstate.state(), base, result, is_big_bang=False)
             vstate.queue_narration(
                 narrated
-                + vmp.media_offer(vstate.state(), directive=True),
+                + vmp.media_offer(vstate.state(), directive=True)
+                + _paint_note(),
                 milestone=True)
             _schedule_picture()
     except Exception:
@@ -118,7 +119,8 @@ def _boot_from_dormant(rec: dict) -> None:
             is_big_bang=True)
         vstate.queue_narration(
             narrated
-            + vmp.media_offer(vstate.state(), directive=True),
+            + vmp.media_offer(vstate.state(), directive=True)
+            + _paint_note(),
             milestone=True)
         _schedule_picture()
 
@@ -225,6 +227,27 @@ def _on_stream_end(**_):
         _PICTURE_PENDING["quiet_at"] = _t.time() + 1.0
 
 
+def _paint_note() -> str:
+    """Negative marker for beats the plugin will paint itself.
+
+    Without it the agent re-derives the old behaviour and calls
+    vivarium_render out of habit, producing a second dish (era-13 bug).
+    """
+    try:
+        import sys as _sys
+        if not getattr(_sys.stdout, "isatty", lambda: False)():
+            return ""
+        from . import termrender as vterm
+        if vterm.detect_graphics() not in ("kitty", "iterm2", "sixel"):
+            return ""
+        rec = vstate.universe_record() or {}
+        return (f"\n(vivarium: the dish is painted inline automatically for "
+                f"era {rec.get('era', '?')} after this turn — do NOT call "
+                f"vivarium_render this turn.)")
+    except Exception:
+        return ""
+
+
 def _schedule_picture() -> None:
     """VIV-42: paint the dish after the turn settles.
 
@@ -268,6 +291,8 @@ def _schedule_picture() -> None:
             w = vstate.load_world()
             if w is None:
                 return
+            if vstate.already_painted(w):
+                return          # the agent (or an earlier paint) got there first
             path = vart.render_dish_png(vstate.state(), w, f"live_{w.tick}")
             if not path:
                 return
@@ -278,6 +303,8 @@ def _schedule_picture() -> None:
             _sys.stdout.write("\n" + spacer + "\n")
             _sys.stdout.flush()
             vterm.paint_over(path, rows, 0, delay=0.35, extra_climb=0)
+            rec = vstate.universe_record() or {}
+            vstate.mark_painted(rec.get("era"), w.tick)
         except Exception:
             logger.debug("vivarium picture scheduling failed", exc_info=True)
 

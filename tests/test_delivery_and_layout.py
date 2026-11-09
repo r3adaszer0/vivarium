@@ -10,6 +10,11 @@ import hooks as vhooks  # noqa: E402
 import termrender as vterm  # noqa: E402
 
 
+class _C:
+    def __init__(self, st):
+        self.state = st
+
+
 class _Ctx:
     def __init__(self):
         self.hooks = {}
@@ -99,6 +104,56 @@ class TestImageRowReservation(unittest.TestCase):
         self.assertTrue(data.startswith(b"\x1b7" + b"\n" * 20 + b"\x1b8"))
         self.assertIn(b"\x1b_Gfake", data)
         self.assertTrue(data.endswith(b"\x1b[20B"))
+
+
+class TestPaintIdempotence(unittest.TestCase):
+    """Era-13 bug: the plugin auto-painted AND the agent called
+    vivarium_render out of habit -> two dishes for one Big Bang. One
+    dish per (era, tick): whoever paints first wins."""
+
+    def setUp(self):
+        import json
+        from test_birth import FakeState, make_live
+        import tools as T
+        import state as vstate
+        self.json = json
+        self.s = FakeState()
+        make_live(self.s)
+        T.vstate._ctx = _C(self.s)
+        self.T = T
+        self.vstate = vstate
+
+    def _fake_tty(self):
+        import sys
+        real = sys.stdout
+
+        class _FakeTty:
+            def isatty(self): return True
+            def write(self, b): return len(b)
+            def flush(self): pass
+        sys.stdout = _FakeTty()
+        return real
+
+    def test_second_render_of_same_state_emits_nothing(self):
+        import termrender as vterm
+        painted = []
+        old_detect, old_emit = vterm.detect_graphics, vterm.emit_image_raw
+        vterm.detect_graphics = lambda env=None: "kitty"
+        vterm.emit_image_raw = (lambda path, env=None, force=None:
+                                (painted.append(path), "kitty graphics emitted")[1])
+        real = self._fake_tty()
+        try:
+            first = self.json.loads(self.T._tool_render({"image": True}))
+            second = self.json.loads(self.T._tool_render({"image": True}))
+        finally:
+            import sys
+            sys.stdout = real
+            vterm.detect_graphics = old_detect
+            vterm.emit_image_raw = old_emit
+        self.assertEqual(len(painted), 1)
+        self.assertIn("painted inline", first.get("graphics", ""))
+        self.assertIn("already painted", second.get("graphics", ""))
+        self.assertEqual(second.get("map"), "")
 
 
 if __name__ == "__main__":

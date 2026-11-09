@@ -232,6 +232,29 @@ def queue_narration(line: str, milestone: bool = False) -> None:
     _state().set(key, q)
 
 
+_PAINTED_KEY = "painted_state"
+
+
+def painted_state():
+    """Last dish painted to this terminal: {"era": int, "tick": int}."""
+    d = _state().get(_PAINTED_KEY)
+    return d if isinstance(d, dict) else None
+
+
+def mark_painted(era, tick) -> None:
+    _state().set(_PAINTED_KEY, {"era": int(era or 0), "tick": int(tick or 0)})
+
+
+def already_painted(w) -> bool:
+    """True when this exact (era, tick) has already been painted."""
+    if w is None:
+        return False
+    rec = _state().get("universe") or {}
+    last = painted_state()
+    return bool(last and last.get("era") == int(rec.get("era") or 0)
+                and last.get("tick") == int(getattr(w, "tick", -1)))
+
+
 def narration_text() -> str:
     """All pending narrations as one string (tests / debug views)."""
     s = _state()
