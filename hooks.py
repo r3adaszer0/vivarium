@@ -230,9 +230,18 @@ def _on_stream_end(**_):
     missing hook never leaves the dish unpainted).
     """
     import time as _t
-    if _PICTURE_PENDING["armed"]:
+    _capture_pt_app()
+    if _PICTURE_PENDING.get("armed"):
         # a little slack: the TUI is still painting the final message
         _PICTURE_PENDING["quiet_at"] = _t.time() + 1.2
+        try:
+            try:
+                from . import delivery_trace as vtrace
+            except ImportError:  # pragma: no cover
+                import delivery_trace as vtrace
+            vtrace.log("turn_end", at=_t.time())
+        except Exception:
+            pass
 
 
 def _can_paint() -> bool:
@@ -248,6 +257,57 @@ def _can_paint() -> bool:
     except Exception:
         return False
 
+
+
+_PT_APP = None
+
+
+def _capture_pt_app() -> None:
+    """Remember the prompt_toolkit app while we are on its thread.
+
+    get_app() is thread-local: called from the printer's daemon thread it
+    returns nothing, which is why the beat fell back to a raw write and
+    landed under the input prompt. Capture it during post_llm_call, which
+    runs on the app's own thread.
+    """
+    global _PT_APP
+    try:
+        from prompt_toolkit.application import get_app
+        app = get_app()
+        if app is not None and getattr(app, "is_running", False):
+            _PT_APP = app
+    except Exception:
+        pass
+
+
+def _emit_via_terminal(write_fn) -> bool:
+    """Print through prompt_toolkit's run_in_terminal when the TUI owns the screen.
+
+    Raw writes from a daemon thread land in the middle of the prompt and
+    get erased by the next repaint: that is why the beat "printed" yet was
+    never visible. run_in_terminal is the TUI's own mechanism for output
+    from outside a turn (see hermes_cli/cli_modal_mixin.py): it clears the
+    prompt, prints, and redraws. It must be scheduled on the app loop.
+    """
+    try:
+        from prompt_toolkit.application import get_app, run_in_terminal
+    except Exception:
+        return False
+    app = _PT_APP
+    if app is None or not getattr(app, "is_running", False):
+        try:
+            app = get_app()
+        except Exception:
+            return False
+    if app is None or not getattr(app, "is_running", False):
+        return False
+    try:
+        import functools
+        app.loop.call_soon_threadsafe(
+            functools.partial(run_in_terminal, write_fn))
+        return True
+    except Exception:
+        return False
 
 def _beat_layout(text: str, rows: int, cols: int):
     """Split a beat around the dish marker.
@@ -306,21 +366,33 @@ def _deliver_beat(text: str) -> None:
 
 
 def _arm_print() -> None:
+    """Start the worker, but do NOT start the clock.
+
+    arming here used to set quiet_at = now + 1s, so any turn where the
+    model took longer than a second to compose its reply printed the beat
+    mid-turn (observed live: beat on screen while the TUI still showed
+    "reflecting..."). The clock starts only when the turn actually ends
+    (post_llm_call -> _on_stream_end). The cap is a safety net for turns
+    that never emit that hook.
+    """
     import time as _t
     _PICTURE_PENDING["armed"] = True
-    _PICTURE_PENDING["quiet_at"] = _t.time() + 1.0
+    _PICTURE_PENDING["quiet_at"] = None
+    _PICTURE_PENDING["cap_at"] = _t.time() + 120.0
     if _PICTURE_PENDING.get("worker"):
         return                      # one worker handles the burst
     _PICTURE_PENDING["worker"] = True
 
     def _work():
         import time as _t
-        hard_deadline = _t.time() + 45.0
-        while _t.time() < hard_deadline:
-            _t.sleep(0.2)
+        while True:
+            _t.sleep(0.15)
             if not _PICTURE_PENDING["armed"]:
                 return
-            if _t.time() >= _PICTURE_PENDING["quiet_at"]:
+            quiet_at = _PICTURE_PENDING.get("quiet_at")
+            if quiet_at is not None and _t.time() >= quiet_at:
+                break
+            if _t.time() >= _PICTURE_PENDING.get("cap_at", 0):
                 break
         _PICTURE_PENDING["armed"] = False
         _PICTURE_PENDING["worker"] = False
@@ -353,9 +425,21 @@ def _arm_print() -> None:
             rows = max(1, -(-int(size[1]) // max(1, vterm.CELL_H)))
             cols = max(20, -(-int(size[0]) // max(1, vterm.CELL_W)))
             out, trail = _beat_layout(body, rows, cols)
-            _sys.stdout.write(out)
-            _sys.stdout.flush()
-            vterm.paint_over(path, rows, trail, delay=0.35, extra_climb=0)
+
+            def _write(_out=out):
+                _sys.stdout.write(_out)
+                _sys.stdout.flush()
+                # The paint MUST happen inside the same terminal callback
+                # as the text: run_in_terminal buffers the write until the
+                # renderer flushes, so a paint issued from the worker first
+                # landed at the cursor BEFORE the beat text.
+                vterm.paint_over(path, rows, trail, delay=0.35, extra_climb=0)
+
+            via_pt = _emit_via_terminal(_write)
+            if not via_pt:
+                _write()
+            vtrace.log("emit", via="run_in_terminal" if via_pt else "raw_stdout",
+                       chars=len(out))
             rec = vstate.universe_record() or {}
             vstate.mark_painted(rec.get("era"), w.tick)
             vtrace.log("painted", tick=w.tick, rows=rows, trail=trail,
