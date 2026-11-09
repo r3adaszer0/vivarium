@@ -93,7 +93,7 @@ def set_media_pref(mode: str) -> str:
 
 
 # ── vivarium_status ──────────────────────────────────────────────────────────
-def _tool_status(args: Dict[str, Any], **_) -> str:
+def _tool_status(args: Dict[str, Any], directive: bool = True, **_) -> str:
     if not _universe_live():
         return _dormant_tool_result("status")
     w = _world()
@@ -137,7 +137,7 @@ def _tool_status(args: Dict[str, Any], **_) -> str:
         from . import termrender as vterm
     except ImportError:  # pragma: no cover
         import termrender as vterm
-    if media_pref() == "auto" and \
+    if directive and media_pref() == "auto" and \
             vterm.detect_graphics() in ("kitty", "iterm2", "sixel"):
         out = json.loads(res)
         out["summary"] += (
@@ -431,7 +431,10 @@ def _cmd(raw_args: str) -> str:
         return _HELP
     cmd, rest = argv[0], argv[1:]
     if cmd == "status":
-        out = json.loads(_tool_status({}))
+        # The slash path paints the dish itself when graphics allow, so
+        # the agent-facing "call vivarium_render" directive must not leak
+        # into the visible text (user saw it appended to /vivarium status).
+        out = json.loads(_tool_status({}, directive=False))
         text = out.get("summary", "")
         # VIV-37: graphics-capable terminal -> paint the dish inline
         # (same overlay path as render --image); no ASCII map needed.
