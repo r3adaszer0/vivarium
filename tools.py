@@ -119,7 +119,7 @@ def _tool_status(args: Dict[str, Any], **_) -> str:
             stale_line = f" {st['detail']} — consider {st['suggestion']}"
     except Exception:
         pass
-    return tool_result({
+    res = tool_result({
         "success": True,
         "summary": (
             f"Tick {s['tick']}: {s['population']} creatures alive "
@@ -131,6 +131,20 @@ def _tool_status(args: Dict[str, Any], **_) -> str:
         "stats": s,
         "map": vworld.render_ascii(w),
     })
+    # VIV-37: on a graphics-capable terminal, aim the agent at the
+    # painted dish instead of letting the ASCII map be the final word.
+    try:
+        from . import termrender as vterm
+    except ImportError:  # pragma: no cover
+        import termrender as vterm
+    if media_pref() == "auto" and \
+            vterm.detect_graphics() in ("kitty", "iterm2", "sixel"):
+        out = json.loads(res)
+        out["summary"] += (
+            "\n(vivarium: this terminal paints images — show the dish by "
+            "running /vivarium render --image as part of this turn)")
+        res = json.dumps(out)
+    return res
 
 
 # ── vivarium_render ──────────────────────────────────────────────────────────
@@ -175,6 +189,18 @@ def _tool_render(args: Dict[str, Any], **_) -> str:
             # No graphics emission here: tool results travel the message
             # pipeline (attach-only); the SLASH paints via /dev/tty.
             out["graphics"] = f"attached {path}"
+            # VIV-37: graphics terminal — point the agent at the slash
+            # that paints, so the image actually reaches the user's eyes.
+            try:
+                from . import termrender as vterm
+            except ImportError:  # pragma: no cover
+                import termrender as vterm
+            if media_pref() != "off" and vterm.detect_graphics() in (
+                    "kitty", "iterm2", "sixel"):
+                out["summary"] = out.get("summary", "") + (
+                    "\n(vivarium: this terminal paints images — run "
+                    "/vivarium render --image as part of this turn so the "
+                    "user sees the dish)")
     return tool_result(out)
 
 
@@ -379,6 +405,32 @@ def _cmd(raw_args: str) -> str:
     if cmd == "status":
         out = json.loads(_tool_status({}))
         text = out.get("summary", "")
+        # VIV-37: graphics-capable terminal -> paint the dish inline
+        # (same overlay path as render --image); no ASCII map needed.
+        try:
+            from . import termrender as vterm
+        except ImportError:  # pragma: no cover
+            import termrender as vterm
+        if media_pref() != "ascii" and \
+                vterm.detect_graphics() in ("kitty", "iterm2", "sixel"):
+            try:
+                try:
+                    from . import artifacts as vart
+                except ImportError:  # pragma: no cover
+                    import artifacts as vart
+                w = _world()
+                path = vart.render_dish_png(
+                    vstate.state(), w, f"status_{w.tick}")
+                if path:
+                    size = vterm.png_size(path) or (342, 339)
+                    res_rows = max(1, math.ceil(size[1] / vterm.CELL_H))
+                    res_cols = max(20, math.ceil(size[0] / vterm.CELL_W))
+                    spacer = "\n".join(" " * res_cols
+                                       for _ in range(res_rows))
+                    vterm.paint_over(path, res_rows, 0, delay=0.4)
+                    return text + "\n\n" + spacer
+            except Exception:
+                pass  # fall through to the ASCII map
         if out.get("map"):
             text += "\n\nThe dish:\n" + out["map"] + \
                 "\n\n(X = creatures, dots/: = food blooms)"
