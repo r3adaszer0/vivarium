@@ -206,6 +206,7 @@ def register_hooks(ctx) -> None:
     # is False and every beat waits for the next turn's pre_llm.
     ctx.register_hook("transform_tool_result", _on_transform_tool_result)
     ctx.register_hook("on_stream_end", _on_stream_end)
+    ctx.register_hook("post_llm_call", _on_stream_end)
 
 _PICTURE_PENDING = {"armed": False, "quiet_at": 0.0}
 
