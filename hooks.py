@@ -42,8 +42,15 @@ def _on_skill_lifecycle(skill_name: str = "", action: str = "",
     try:
         if action not in ("created", "installed", "restored"):
             return
+        try:
+            from . import delivery_trace as vtrace
+        except ImportError:  # pragma: no cover - flat-import mode
+            import delivery_trace as vtrace
+        vtrace.log("skill_event", skill=skill_name, action=action,
+                   voice=vstate.voice_mode())
         rec = vstate.universe_record()
         if rec.get("status") != "live":
+            vtrace.log("dormant_boot", era=rec.get("era"))
             _boot_from_dormant(rec)
             return
         content = vstate.skill_content(skill_name)
@@ -272,6 +279,13 @@ def _deliver_beat(text: str) -> None:
     stays in the queue and pre_llm relays it on the next turn. Nothing is
     injected into the agent's reasoning during a normal turn.
     """
+    try:
+        from . import delivery_trace as vtrace
+    except ImportError:  # pragma: no cover
+        import delivery_trace as vtrace
+    vtrace.log("beat", chars=len(text or ""), voice=vstate.voice_mode(),
+               can_paint=_can_paint(),
+               queue=len(vstate.narration_text() or ""))
     if _can_paint():
         vstate.queue_narration(text, milestone=True, kind="birth")
         _arm_print()
@@ -307,6 +321,11 @@ def _arm_print() -> None:
         _PICTURE_PENDING["armed"] = False
         _PICTURE_PENDING["worker"] = False
         parts = vstate.pop_all_narrations()
+        try:
+            from . import delivery_trace as vtrace
+        except ImportError:  # pragma: no cover
+            import delivery_trace as vtrace
+        vtrace.log("flush", parts=len(parts), chars=sum(len(p) for p in parts))
         if not parts:
             return
         body = "\n\n".join(parts)
@@ -330,7 +349,14 @@ def _arm_print() -> None:
             vterm.paint_over(path, rows, trail, delay=0.35, extra_climb=0)
             rec = vstate.universe_record() or {}
             vstate.mark_painted(rec.get("era"), w.tick)
-        except Exception:
+            vtrace.log("painted", tick=w.tick, rows=rows, trail=trail,
+                       tty=True)
+        except Exception as exc:
+            try:
+                from . import delivery_trace as vtrace
+            except ImportError:  # pragma: no cover
+                import delivery_trace as vtrace
+            vtrace.log("ERROR", where="worker", err=repr(exc)[:300])
             logger.debug("vivarium beat delivery failed", exc_info=True)
 
     import threading

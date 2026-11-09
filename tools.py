@@ -414,6 +414,7 @@ Subcommands:
   clip [species] [ticks] [--zoom]   film the dish as a short MP4 (into the gallery)
   explain               how your skills become living creatures (the hash story)
   narration MODE        how much the dish says: off|births|milestones|daily (default births)
+  trace [n]             last delivery events (debug: where a beat died)
   render [--rich] [--color] [--image]   the dish map (--rich: dense blocks; --color: colored creatures, terminal only; --image: true PNG when supported)
   serve [--keep]        open the gallery in your browser (localhost only)
   images on|off|auto    how imagery is delivered (auto = where supported)
@@ -563,6 +564,18 @@ def _cmd(raw_args: str) -> str:
         return _clip_text(rest)
     if cmd == "explain":
         return _EXPLAIN_TEXT
+    if cmd == "trace":
+        try:
+            from . import delivery_trace as vtrace
+        except ImportError:  # pragma: no cover
+            import delivery_trace as vtrace
+        n = 12
+        if rest:
+            try:
+                n = max(1, min(200, int(rest[0])))
+            except ValueError:
+                pass
+        return "📜 delivery trace (newest last):\n" + vtrace.tail(n)
     if cmd == "narration":
         return _narration_text(rest)
     if cmd == "staleness":
