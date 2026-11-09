@@ -227,6 +227,28 @@ def narration_text() -> str:
     return "\n".join(parts)
 
 
+def peek_milestone() -> Optional[str]:
+    """Head of the milestone queue WITHOUT popping (same-turn relay)."""
+    s = _state()
+    mq = s.get(_NARRATION_MILESTONE_KEY, [])
+    if isinstance(mq, str):
+        mq = [mq] if mq else []
+    return mq[0] if mq else None
+
+
+def pop_milestone() -> Optional[str]:
+    """Pop the head of the milestone queue (same-turn relay ownership)."""
+    s = _state()
+    mq = s.get(_NARRATION_MILESTONE_KEY, [])
+    if isinstance(mq, str):
+        mq = [mq] if mq else []
+    if not mq:
+        return None
+    line = mq.pop(0)
+    s.set(_NARRATION_MILESTONE_KEY, mq)
+    return line
+
+
 def pop_narration() -> Optional[str]:
     s = _state()
     mq = s.get(_NARRATION_MILESTONE_KEY, [])

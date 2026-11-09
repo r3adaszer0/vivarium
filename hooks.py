@@ -194,3 +194,29 @@ def register_hooks(ctx) -> None:
     ctx.register_hook("post_tool_call", _on_post_tool_call)
     ctx.register_hook("pre_llm_call", _on_pre_llm_call)
     ctx.register_hook("on_skill_lifecycle", _on_skill_lifecycle)
+
+def _on_transform_tool_result(tool_name: str = "", result=None, **_: Any):
+    """VIV-36b: same-turn story delivery.
+
+    Milestone narrations queued DURING a turn (Big Bang on skill
+    creation, births) would otherwise wait for the NEXT turn's pre_llm
+    pop — the user perceived this as "no narration". This hook appends
+    the head of the milestone queue to the tool result entering context
+    in the SAME turn, so the agent can relay the beat in its reply.
+
+    Restraint: only when a MILESTONE is pending (rare, story-grade);
+    routine reports never ride tool results.
+    """
+    try:
+        line = vstate.pop_milestone()
+        if not line:
+            return None
+        return (
+            f"{result if isinstance(result, str) else ''}\n\n"
+            "🧬 [vivarium] STORY BEAT — relay this to the user in your "
+            "reply, verbatim and complete. Do not summarize, do not drop "
+            "it:\n" + line
+        ) if isinstance(result, str) else None
+    except Exception:
+        logger.exception("vivarium transform_tool_result failed")
+        return None
