@@ -59,8 +59,15 @@ def _on_skill_lifecycle(skill_name: str = "", action: str = "",
                 from . import media_policy as vmp
             except ImportError:  # pragma: no cover
                 import media_policy as vmp
+            try:  # VIV-31: walkthrough acts (act 3/4 on 2nd/3rd birth)
+                from . import acts as vacts
+            except ImportError:  # pragma: no cover
+                import acts as vacts
+            base = vbirth.announcement(result)
+            narrated = vacts.birth_narration(
+                vstate.state(), base, result, is_big_bang=False)
             vstate.queue_narration(
-                vbirth.announcement(result)
+                narrated
                 + vmp.media_offer(vstate.state(), directive=True))
     except Exception:
         logger.exception("vivarium on_skill_lifecycle failed (birth skipped)")
@@ -98,8 +105,17 @@ def _boot_from_dormant(rec: dict) -> None:
             from . import media_policy as vmp
         except ImportError:  # pragma: no cover
             import media_policy as vmp
+        try:  # VIV-31: act 2 rides the Big Bang narration
+            from . import acts as vacts
+        except ImportError:  # pragma: no cover
+            import acts as vacts
+        base = vseeding.onboard_message(result)
+        narrated = vacts.birth_narration(
+            vstate.state(), base,
+            {"eidos": "", "name": "", "pod": 0, "tick": 0},
+            is_big_bang=True)
         vstate.queue_narration(
-            vseeding.onboard_message(result)
+            narrated
             + vmp.media_offer(vstate.state(), directive=True))
 
 

@@ -127,21 +127,48 @@ def advance(w: World, ticks: int = 1, nutrients: float = 0.0) -> List[dict]:
     pattern detectors — discoveries happen during normal use, not only when
     someone asks. New Codex entries are returned as narration lines.
     """
+    before_counts: Dict[str, int] = {}
+    for c in w.creatures:
+        if c.alive():
+            before_counts[c.lineage] = before_counts.get(c.lineage, 0) + 1
     summaries = vworld.run(w, ticks=ticks, nutrients_per_tick=nutrients)
     save_world(w)
+    # VIV-31 act-death: a lineage that was alive before and is gone now.
+    try:
+        from . import acts as vacts
+    except ImportError:  # pragma: no cover
+        import acts as vacts
+    if before_counts:
+        after: set = {c.lineage for c in w.creatures if c.alive()}
+        for lineage in before_counts:
+            if lineage not in after and lineage.startswith("Eidos_"):
+                line = (f"🪦 The {lineage} lineage has died out "
+                        f"(last seen tick {w.tick}).")
+                queue_narration(
+                    vacts.death_narration(_state(), line, lineage))
     try:
         from . import codex as vcodex
     except ImportError:  # pragma: no cover
         import codex as vcodex
     try:
+        from . import acts as vacts
+    except ImportError:  # pragma: no cover
+        import acts as vacts
+    try:
         for line in vcodex.observe(_state(), w, summaries):
-            queue_narration(line)
+            # VIV-31: first discovery carries the act-codex walkthrough
+            label = "pattern"
+            if "Codex entry:" in line:
+                seg = line.split("Codex entry:", 1)[1].split("confirmed", 1)[0]
+                label = seg.strip(" :") or label
+            queue_narration(vacts.codex_narration(_state(), line, label))
     except Exception:
         pass  # detection is best-effort; the dish must never stop ticking
     if summaries:
         s = vworld.stats(w)
         _append_event(f"tick {w.tick}: pop {s['population']} "
-                      f"({summaries[-1]['delta']:+d}), born {s['born']}, died {s['died']}")
+                      f"({summaries[-1]['delta']:+d}), born {s.get('born', 0)}, "
+                      f"died {s.get('died', 0)}")
     return summaries
 
 

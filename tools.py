@@ -337,6 +337,7 @@ Subcommands:
   show [name|id]        meet one species up close: face, genes, story (--image: glyph)
   clip [species] [ticks] [--zoom]   film the dish as a short MP4 (into the gallery)
   explain               how your skills become living creatures (the hash story)
+  narration on|off      the walkthrough story (off = bare birth lines only)
   render [--rich] [--color] [--image]   the dish map (--rich: dense blocks; --color: colored creatures, terminal only; --image: true PNG when supported)
   serve [--keep]        open the gallery in your browser (localhost only)
   images on|off|auto    how imagery is delivered (auto = where supported)
@@ -453,6 +454,8 @@ def _cmd(raw_args: str) -> str:
         return _clip_text(rest)
     if cmd == "explain":
         return _EXPLAIN_TEXT
+    if cmd == "narration":
+        return _narration_text(rest)
     if cmd == "staleness":
         return _staleness_text()
     if cmd == "start":
@@ -622,6 +625,36 @@ def _staleness_text() -> str:
         text += f"\n\nSuggestion: {st['suggestion']}\n" \
                 "(restarts are never automatic — your call, always)"
     return text
+
+
+def _narration_text(rest: list) -> str:
+    """VIV-31: /vivarium narration on|off — the advanced-user channel.
+
+    off: walkthrough acts are suppressed; bare birth lines (name + ID)
+    still fire and the dormant brief stays. on: the full story.
+    """
+    try:
+        from . import acts as vacts
+    except ImportError:  # pragma: no cover
+        import acts as vacts
+    s = vstate.state()
+    if not rest:
+        mode = "off" if not vacts.narration_on(s) else "on"
+        return (f"Walkthrough narration: {mode}.\n"
+                "Set with: /vivarium narration on|off "
+                "(off keeps bare birth lines and the dormant brief)")
+    mode = rest[0].lower()
+    if mode not in ("on", "off"):
+        return "Usage: /vivarium narration on|off"
+    vacts.set_narration(s, mode)
+    if mode == "off":
+        return ("Narration off. The dish keeps living quietly: birth "
+                "notices become bare name + ID lines and the dormant "
+                "brief stays. /vivarium narration on brings the story "
+                "back.")
+    return ("Narration on. The walkthrough acts will guide the journey: "
+            "the Big Bang tour, meeting your first Hermi, the Codex "
+            "introduction, extinctions, and the multiplayer ritual.")
 
 
 def _clip_text(rest: list) -> str:
