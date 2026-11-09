@@ -55,12 +55,19 @@ begins the day it's born.
 | Command | Effect |
 |---|---|
 | `/vivarium status` | population, lineages, age pyramid, ASCII map |
+| `/vivarium show <name\|id>` | a species up close: face, genes, founding skill |
+| `/vivarium clip [species] [ticks]` | your world as a short video |
+| `/vivarium explain` | how a hash becomes a living creature |
 | `/vivarium feed 0.5` | drop nutrients into the dish |
 | `/vivarium codex` | the Vivarium Codex: discoveries + artifacts |
 | `/vivarium release` | release fresh founders |
 | `/vivarium import <code>` | release a strain from a challenge code |
+| `/vivarium race <seed> <codes>` | a deterministic species duel, verifiable anywhere |
+| `/vivarium images on\|off\|auto` | inline dish painting in graphics terminals |
+| `/vivarium narration on\|off` | the walkthrough story beats |
+| `/vivarium start` | welcome briefing + the universe view |
 | `/vivarium staleness` | is the living world going stale? |
-| `/vivarium restart` | end the era; the next skill births a new universe |
+| `/vivarium restart` | end the era (with a farewell picture); the next skill births a new universe |
 
 Every species gets a **5×5 mirrored glyph** and a binomial name derived
 deterministically from its genome — the same genome grows the same face in any
@@ -88,6 +95,23 @@ speciation event: a newly learned skill landing in a saturated world.
 
 Zoom in anywhere, any time: the simulation is deterministic, so any past
 moment re-renders exactly. [Watch a bloom close-up](docs/assets/clip_bloom_zoom.mp4).
+
+
+## Where it lives: the experience by surface
+
+The same universe, seen differently depending on where you talk to your agent:
+
+| Surface | What you get | Status |
+|---|---|---|
+| **Terminal (kitty, ghostty, WezTerm, iTerm2)** | the full experience: the dish paints inline as a real image on births and `/vivarium render`, walkthrough narration, ASCII fallback everywhere | tested |
+| **Any other terminal** | the rich block-character map (░▒▓█), never bare dots | tested |
+| **Matrix (and other chat platforms)** | native dish photos in the room where a skill is born; `/vivarium start` gives the picture file + rich map | tested (Matrix) |
+| **Hermes Desktop** | the same agent, same plugin; dish images arrive as files/attachments | expected to work |
+| **Web UI** | a management dashboard, not a chat surface — not part of gameplay | n/a |
+
+On any surface, the walkthrough adapts: inline paint where the host can
+paint, native attachments where the gateway can attach, paths + the rich map
+everywhere else.
 
 ## How it works (short version)
 
@@ -134,7 +158,7 @@ Compendium, Part 15b.
 
 v0.1.0 — under active development for the
 [Nous Research Hermes Agent Plugin Hackathon](https://x.com/NousResearch)
-(Nov 2026). 82 tests green. Contributions and challenge-code duels welcome.
+(Nov 2026). 183 tests green. Contributions and challenge-code duels welcome.
 
 ## License
 
