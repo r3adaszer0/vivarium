@@ -148,8 +148,25 @@ def species_card(eidos: str, g: Dict[str, float], rgb: Tuple[int, int, int],
     return "\n".join(lines)
 
 
+def display_hue(hue: float) -> float:
+    """Genome hue (0..1) -> rendered hue, skipping the food palette.
+
+    Food renders as dark green; a green creature reads as food to the
+    eye. The display hue compresses the wheel into the 65% that excludes
+    the yellow-green/green family [0.15, 0.50): cyan-anchored, injective,
+    deterministic, pure function of the genome. The genome hue itself is
+    untouched (heritable) — only its RENDERING changes.
+    """
+    h = min(1.0, max(0.0, hue))
+    return (0.5 + h * 0.65) % 1.0
+
+
 def color_for(hue: float) -> Tuple[int, int, int]:
-    """Hue (0..1) -> bright RGB, same recipe the dish render uses."""
+    """Hue (0..1) -> bright RGB, same recipe the dish render uses.
+
+    Routes through display_hue so no species ever renders green (the
+    food palette's territory).
+    """
     import colorsys
-    r, gr, b = colorsys.hls_to_rgb(hue, 0.58, 0.8)
+    r, gr, b = colorsys.hls_to_rgb(display_hue(hue), 0.58, 0.8)
     return int(r * 255), int(gr * 255), int(b * 255)
