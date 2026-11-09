@@ -15,7 +15,7 @@ import unittest
 
 PLUGIN_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-MODULES = ["artifacts", "birth", "cinematography", "codex", "discovery",
+MODULES = ["acts", "artifacts", "birth", "cinematography", "codex", "discovery",
            "hooks", "identity", "scenario", "seeding", "state", "tools",
            "universe", "world"]
 
