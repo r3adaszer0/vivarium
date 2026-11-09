@@ -194,6 +194,11 @@ def _tool_render(args: Dict[str, Any], **_) -> str:
                     out["map"] = ""       # image shown; no ASCII underlay
                     out["legend"] = ""
                     out["graphics"] = f"painted inline ({note or 'ok'})"
+                    out["summary"] = (out.get("summary", "").strip() +
+                                      "\n(vivarium: the dish is now painted "
+                                      "inline immediately above; the rows are "
+                                      "reserved — continue your narration "
+                                      "below the picture.)").strip()
                     return tool_result(out)
             except Exception:
                 pass  # fall through to ASCII/attach below

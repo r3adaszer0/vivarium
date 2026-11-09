@@ -45,7 +45,9 @@ def media_offer(s, *, directive: bool = False) -> str:
              "renders as a real image by default. Disable anytime: "
              "/vivarium images off")
     if directive:
-        offer += ("\n(vivarium: show the dish now — call the vivarium_render "
-                  "tool with image=true as part of this turn; it paints the "
-                  "dish directly into this terminal)")
+        offer += ("\n(vivarium layout: relay the text above first, then call "
+                  "vivarium_render with image=true — it paints the dish "
+                  "inline in this terminal and reserves its rows — then "
+                  "continue your reply below the picture. Do not repeat the "
+                  "image as ASCII.)")
     return offer

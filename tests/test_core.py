@@ -168,7 +168,7 @@ class TestHookFlow(unittest.TestCase):
         self.ctx = _FakeCtx()
         vstate._ctx = None
         hooks.register_hooks(self.ctx)
-        self.assertEqual(len(self.ctx.hooks), 3)
+        self.assertEqual(len(self.ctx.hooks), 4)
 
     def test_tool_call_drops_nutrients_and_advances(self):
         import universe as U

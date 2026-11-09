@@ -230,6 +230,17 @@ def emit_image_raw(png_path: str, env: Optional[dict] = None,
             return f"saved to {png_path}"
     else:
         return f"saved to {png_path}"
+    # VIV-39: reserve the image's rows. Without this the terminal keeps
+    # printing (reasoning box, reply, tool-result line) on the cells the
+    # image covers -> the dish lands ON TOP of the text. Move the cursor
+    # down by the image height in text rows so everything after flows
+    # below the picture.
+    try:
+        h = png_size(png_path)[1]
+        rows = max(1, -(-int(h) // max(1, CELL_H)))   # ceil
+        payload = payload + "\n" * rows
+    except Exception:
+        pass
     # Write to the RAW terminal device when possible: the Hermes TUI wraps
     # stdout (prompt_toolkit patch_stdout -> rich), which re-encodes ANSI
     # and mangles APC into visible text (user's kitty paste). /dev/tty

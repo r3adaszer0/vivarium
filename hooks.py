@@ -198,6 +198,11 @@ def register_hooks(ctx) -> None:
     ctx.register_hook("post_tool_call", _on_post_tool_call)
     ctx.register_hook("pre_llm_call", _on_pre_llm_call)
     ctx.register_hook("on_skill_lifecycle", _on_skill_lifecycle)
+    # VIV-36b: same-turn story delivery. THE REGISTRATION IS THE FIX —
+    # the handler existing and plugin.yaml listing the hook is NOT
+    # enough; register_hooks() must actually register it or has_hook()
+    # is False and every beat waits for the next turn's pre_llm.
+    ctx.register_hook("transform_tool_result", _on_transform_tool_result)
 
 def _on_transform_tool_result(tool_name: str = "", result=None, **_: Any):
     """VIV-36b: same-turn story delivery.
