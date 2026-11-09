@@ -88,7 +88,7 @@ def set_media_pref(mode: str) -> str:
         "image": "Media: image — prefer real renders (kitty graphics, "
                  "attachments); falls back to ASCII elsewhere.",
         "ascii": "Media: ascii — text-only dish; images on demand via "
-                 "/vivarium render --image.",
+                 "the vivarium_render tool with image=true.",
     }[mode]
 
 
@@ -142,7 +142,7 @@ def _tool_status(args: Dict[str, Any], **_) -> str:
         out = json.loads(res)
         out["summary"] += (
             "\n(vivarium: this terminal paints images — show the dish by "
-            "running /vivarium render --image as part of this turn)")
+            "calling the vivarium_render tool with image=true in this turn)")
         res = json.dumps(out)
     return res
 
@@ -171,6 +171,32 @@ def _tool_render(args: Dict[str, Any], **_) -> str:
                    if rich else
                    "X = creatures, dots/: = food blooms"),
     }
+    # VIV-38: image=true in a tty-owning process paints the dish INLINE
+    # via the kitty/iTerm2/sixel escape (render at the source: no agent
+    # delegation, no slash needed). Gateway/chat: attach instead.
+    if args.get("image") or (media_pref() in ("image", "auto")):
+        import sys as _sys
+        try:
+            from . import termrender as vterm
+        except ImportError:  # pragma: no cover
+            import termrender as vterm
+        if (getattr(_sys.stdout, "isatty", lambda: False)()
+                and vterm.detect_graphics() in ("kitty", "iterm2", "sixel")
+                and media_pref() != "ascii"):
+            try:
+                try:
+                    from . import artifacts as vart
+                except ImportError:  # pragma: no cover
+                    import artifacts as vart
+                path = vart.render_dish_png(vstate.state(), w, f"dish_{w.tick}")
+                if path:
+                    note = vterm.emit_image_raw(path)
+                    out["map"] = ""       # image shown; no ASCII underlay
+                    out["legend"] = ""
+                    out["graphics"] = f"painted inline ({note or 'ok'})"
+                    return tool_result(out)
+            except Exception:
+                pass  # fall through to ASCII/attach below
     # honor the media preference: "ascii" means images ONLY on explicit
     # request (this call IS explicit when image=true, so it still renders);
     # the pref gates AUTOMATIC delivery elsewhere (narration, hooks)
@@ -199,7 +225,7 @@ def _tool_render(args: Dict[str, Any], **_) -> str:
                     "kitty", "iterm2", "sixel"):
                 out["summary"] = out.get("summary", "") + (
                     "\n(vivarium: this terminal paints images — run "
-                    "/vivarium render --image as part of this turn so the "
+                    "the vivarium_render tool with image=true in this turn so the "
                     "user sees the dish)")
     return tool_result(out)
 
@@ -1055,14 +1081,16 @@ def register_tools(ctx) -> None:
         name="vivarium_render", toolset="vivarium",
         schema={
             "description": (
-                "Draw the current Vivarium dish as an ASCII map — food blooms as "
-                "shading, creatures as X marks. Set rich=true for a denser "
-                "block-character view (needs a wide terminal). Use when the user "
-                "wants to *see* the living world."
+                "Show the current Vivarium dish. image=true renders the dish "
+                "as a REAL IMAGE painted directly into a graphics-capable "
+                "terminal (kitty/iTerm2/sixel) — the best view. Without it: "
+                "ASCII map (food as shading, creatures as X marks); rich=true "
+                "gives a denser block-character map."
             ),
             "parameters": {
                 "type": "object",
                 "properties": {
+                    "image": {"type": "boolean", "description": "paint the dish as a real image (graphics terminals)"},
                     "cols": {"type": "integer", "description": "map width (default 64, rich 96)"},
                     "rows": {"type": "integer", "description": "map height (default 24, rich 32)"},
                     "rich": {"type": "boolean", "description": "dense block-character view"},

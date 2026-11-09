@@ -158,7 +158,7 @@ class SkillBirth(unittest.TestCase):
         line = vstate.narration_text()
         self.assertIn("Universe born", line)
         self.assertIn("/vivarium images off", line)   # the offer rides along
-        self.assertIn("render --image", line)         # agent directive: paint NOW
+        self.assertIn("vivarium_render", line)  # agent paints via the tool
 
     def test_birth_narration_carries_media_offer_and_respects_off(self):
         """Birth announcement offers images when capable; never when off."""
@@ -175,7 +175,7 @@ class SkillBirth(unittest.TestCase):
             line = vstate.narration_text()
             self.assertIn("Eidos_", line)
             self.assertIn("/vivarium images off", line)
-            self.assertIn("render --image", line)     # agent directive
+            self.assertIn("vivarium_render", line)   # agent paints via the tool
             while vstate.pop_narration():             # drain for the next birth
                 pass
             # flip to off -> new birth, no offer

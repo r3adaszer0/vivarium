@@ -53,7 +53,7 @@ class TestGraphicsAim(unittest.TestCase):
             out = json.loads(T._tool_status({}))
         finally:
             vterm.detect_graphics = old
-        self.assertIn("render --image", out["summary"])
+        self.assertIn("image=true", out["summary"])
 
     def test_tool_render_image_carries_paint_directive(self):
         import termrender as vterm
@@ -63,8 +63,36 @@ class TestGraphicsAim(unittest.TestCase):
             out = json.loads(T._tool_render({"image": True}))
         finally:
             vterm.detect_graphics = old
-        self.assertIn("render --image", out["summary"])
+        self.assertIn("image=true", out["summary"])
         self.assertTrue(out.get("media"))
+
+
+def test_tool_render_image_paints_inline_on_tty(self):
+    """VIV-38: render image=true on a graphics-capable TTY paints the
+    dish via emit_image_raw — no ASCII map, no attach."""
+    import json as _json
+    import termrender as vterm
+    painted = []
+    old_detect = vterm.detect_graphics
+    old_emit = vterm.emit_image_raw
+    vterm.detect_graphics = lambda env=None: "kitty"
+    vterm.emit_image_raw = (lambda path, env=None, force=None:
+                            (painted.append(path), "kitty graphics emitted")[1])
+    real = sys.stdout
+    class _FakeTty:
+        def isatty(self): return True
+        def write(self, b): return len(b)
+        def flush(self): pass
+    sys.stdout = _FakeTty()
+    try:
+        out = _json.loads(T._tool_render({"image": True}))
+    finally:
+        sys.stdout = real
+        vterm.detect_graphics = old_detect
+        vterm.emit_image_raw = old_emit
+    self.assertEqual(len(painted), 1)
+    self.assertIn("painted inline", out.get("graphics", ""))
+    self.assertEqual(out.get("map"), "")
 
 
 if __name__ == "__main__":
