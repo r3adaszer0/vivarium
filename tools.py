@@ -294,6 +294,7 @@ _HELP = """\
 Subcommands:
   help                  this list (also: bare /vivarium)
   status                population, lineages, ages, and an ASCII map
+  show [name|id]        meet one species up close: face, genes, story (--image: glyph)
   render [--rich] [--color] [--image]   the dish map (--rich: dense blocks; --color: colored creatures, terminal only; --image: true PNG when supported)
   serve [--keep]        open the gallery in your browser (localhost only)
   images on|off|auto    how imagery is delivered (auto = where supported)
@@ -404,6 +405,8 @@ def _cmd(raw_args: str) -> str:
         return _export_text(rest)
     if cmd == "race":
         return _race_text(rest)
+    if cmd == "show":
+        return _show_text(rest)
     if cmd == "staleness":
         return _staleness_text()
     if cmd == "start":
@@ -573,6 +576,84 @@ def _staleness_text() -> str:
         text += f"\n\nSuggestion: {st['suggestion']}\n" \
                 "(restarts are never automatic — your call, always)"
     return text
+
+
+def _show_text(rest: list) -> str:
+    """VIV-32: /vivarium show [name|id] — meet one species up close.
+
+    Accepts an Eidos ID (Eidos_1a2b3c), a skill name, or a unique
+    fragment. Shows the species card (face, name, traits, population);
+    --image paints the species glyph via the overlay.
+    """
+    s = vstate.state()
+    births = s.get("births", {})
+    if isinstance(births, list):
+        births = {}
+    if not births:
+        return ("No species have been born yet. The Big Bang (first skill "
+                "learned) seeds the founding roster; every later skill "
+                "births one more.")
+    rec = None
+    name = None
+    if rest:
+        query = rest[0]
+        if query in births:
+            rec, name = births[query], query
+        else:
+            matches = [n for n in births
+                       if query.lower() in n.lower()
+                       or str(births[n].get("eidos", "")).lower()
+                       .endswith(query.lower())]
+            eidos_hits = [n for n in births
+                          if str(births[n].get("eidos", "")).lower()
+                          == query.lower()]
+            matches = eidos_hits or matches
+            if len(matches) == 1:
+                rec, name = births[matches[0]], matches[0]
+            elif len(matches) > 1:
+                return ("Ambiguous — matches: " + ", ".join(sorted(matches))
+                        + "\nUse a longer fragment or the full Eidos ID.")
+    if rec is None:
+        if rest:
+            return (f"Unknown species '{rest[0]}'. /vivarium show lists "
+                    f"every species.")
+        lines = ["Who would you like to meet? Species in this universe:"]
+        for n in sorted(births):
+            lines.append(f"  {births[n].get('eidos', '?')}  ({n})")
+        lines.append("Meet one: /vivarium show <Eidos ID or name>")
+        return "\n".join(lines)
+    eidos = rec.get("eidos", "?")
+    genome = rec.get("genome")
+    if not genome:
+        return (f"{eidos} was born before genome storage — its genes can "
+                f"no longer be re-derived. It lives on in the dish.")
+    w = _world()
+    count = sum(1 for c in w.creatures
+                if c.lineage == eidos and c.alive())
+    try:
+        from . import identity as vident
+    except ImportError:  # pragma: no cover
+        import identity as vident
+    card = vident.species_card(eidos, genome, vident.color_for(genome["hue"]),
+                               lineage_count=count,
+                               founding_skill=name or "")
+    if "--image" in rest or "image" in rest:
+        try:
+            from . import artifacts as vart
+            from . import termrender as vterm
+        except ImportError:  # pragma: no cover
+            import artifacts as vart
+            import termrender as vterm
+        path = vart.render_glyph_png(s, eidos, genome)
+        if path:
+            size = vterm.png_size(path) or (220, 220)
+            res_rows = max(1, math.ceil(size[1] / vterm.CELL_H))
+            res_cols = max(20, math.ceil(size[0] / vterm.CELL_W))
+            spacer = "\n".join(" " * res_cols for _ in range(res_rows))
+            graphics = vterm.paint_over(path, res_rows, 0, delay=0.4)
+            return card + "\n\n" + spacer + (
+                f"\n{graphics}" if graphics else "")
+    return card
 
 
 def _do_restart() -> str:
