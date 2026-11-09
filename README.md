@@ -5,7 +5,7 @@
 </p>
 
 Vivarium is a Hermes Agent plugin that hosts a **persistent artificial-life
-ecosystem**. A 48×48 cellular-automaton dish: food blooms and spreads like
+living world**. A 48×48 cellular-automaton dish: food blooms and spreads like
 weather, and genome-carrying creatures forage, reproduce, mutate, and go
 extinct on their own — even while you're away.
 
@@ -59,7 +59,7 @@ begins the day it's born.
 | `/vivarium codex` | the Vivarium Codex: discoveries + artifacts |
 | `/vivarium release` | release fresh founders |
 | `/vivarium import <code>` | release a strain from a challenge code |
-| `/vivarium staleness` | is the ecosystem going stale? |
+| `/vivarium staleness` | is the living world going stale? |
 | `/vivarium restart` | end the era; the next skill births a new universe |
 
 Every species gets a **5×5 mirrored glyph** and a binomial name derived

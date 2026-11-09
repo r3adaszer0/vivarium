@@ -153,5 +153,5 @@ def onboard_message(result: dict) -> str:
         lines.append(f"  • {len(ps)} private species — derived from YOUR skills, "
                      f"unlike anyone else's.")
     lines.append("  The Hadean die-off begins: only lineages that fit the "
-                 "ecology survive. I'll report at dawn.")
+                 "dish's living rules survive. I'll report at dawn.")
     return "\n".join(lines)

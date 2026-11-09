@@ -859,10 +859,10 @@ def register_tools(ctx) -> None:
         name="vivarium_status", toolset="vivarium",
         schema={
             "description": (
-                "Check the Vivarium: an artificial-life ecosystem living inside this "
+                "Check the Vivarium: an artificial-life world living inside this "
                 "agent. Returns population, lineage breakdown, averages and an ASCII "
                 "map of the dish. Use when the user asks about their creatures, the "
-                "dish, or the ecosystem."
+                "dish, or the living world."
             ),
             "parameters": {"type": "object", "properties": {}, "required": []},
         },
@@ -875,7 +875,7 @@ def register_tools(ctx) -> None:
                 "Draw the current Vivarium dish as an ASCII map — food blooms as "
                 "shading, creatures as X marks. Set rich=true for a denser "
                 "block-character view (needs a wide terminal). Use when the user "
-                "wants to *see* the ecosystem."
+                "wants to *see* the living world."
             ),
             "parameters": {
                 "type": "object",
@@ -896,7 +896,7 @@ def register_tools(ctx) -> None:
             "description": (
                 "Feed the Vivarium: drop nutrients into the dish, advancing it one "
                 "tick. Big feeds cause booms; starving worlds decline. Use when the "
-                "user wants to feed their creatures or nudge the ecosystem."
+                "user wants to feed their creatures or nudge the living world."
             ),
             "parameters": {
                 "type": "object",
@@ -950,7 +950,7 @@ def register_tools(ctx) -> None:
         schema={
             "description": (
                 "Show the Vivarium Codex: the patterns discovered in this user's "
-                "universe (ecological events like still lifes and pulses), with "
+                "universe (living-world events like still lifes and pulses), with "
                 "evidence and rendered artifact images. Use action='export' to "
                 "write a shareable codex.md + media gallery."
             ),
