@@ -119,6 +119,28 @@ class TestGraphicsAim(unittest.TestCase):
             vterm.detect_graphics = old
         self.assertIn("this terminal paints images", out["summary"])
 
+    def test_status_leaves_an_empty_line_before_the_picture(self):
+        import termrender as vterm
+        old = vterm.detect_graphics
+        vterm.detect_graphics = lambda: "kitty"
+        try:
+            out = T._cmd("status")
+        finally:
+            vterm.detect_graphics = old
+        self.assertIn("\n\n\n", out)
+
+    def test_restart_does_not_print_the_graphics_offer(self):
+        """The farewell picture is painted by restart itself; the
+        'Graphics-capable terminal detected' line would be noise."""
+        import termrender as vterm
+        old = vterm.detect_graphics
+        vterm.detect_graphics = lambda: "kitty"
+        try:
+            out = T._do_restart()
+        finally:
+            vterm.detect_graphics = old
+        self.assertNotIn("Graphics-capable terminal detected", out)
+
 
 if __name__ == "__main__":
     unittest.main()

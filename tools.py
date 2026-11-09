@@ -459,7 +459,9 @@ def _cmd(raw_args: str) -> str:
                     spacer = "\n".join(" " * res_cols
                                        for _ in range(res_rows))
                     vterm.paint_over(path, res_rows, 0, delay=0.4)
-                    return text + "\n\n" + spacer
+                    # One empty line between the census and the picture
+                    # (the overlay climbs to the second blank row).
+                    return text + "\n\n\n" + spacer
             except Exception:
                 pass  # fall through to the ASCII map
         if out.get("map"):
@@ -1029,12 +1031,19 @@ def _do_restart() -> str:
         farewell_png = None
     rec = vuniverse.restart(s, load_world=_world, clear_world=_clear_world,
                             reason="user restart via /vivarium restart")
+    # The offer line only makes sense where no picture is painted; the
+    # graphics branch below paints the farewell dish itself.
+    try:
+        from . import termrender as vterm
+    except ImportError:  # pragma: no cover
+        import termrender as vterm
+    _gfx = vterm.detect_graphics() in ("kitty", "iterm2", "sixel")
     text = (
         f"🌌 Era {old_era} ended (universe {old_fp}). Champions archived as "
         f"fossils; they can be re-released into any future dish.\n\n"
         f"The next skill this agent learns births a brand-new world, derived "
         f"with a fresh key. Your Codex and species roster carry over."
-        f"{_media_offer()}"
+        + ("" if _gfx else _media_offer())
     )
     if farewell_png:
         try:
