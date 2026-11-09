@@ -435,7 +435,7 @@ def _cmd(raw_args: str) -> str:
             from . import termrender as vterm
         except ImportError:  # pragma: no cover
             import termrender as vterm
-        if media_pref() != "ascii" and \
+        if _universe_live() and media_pref() != "ascii" and \
                 vterm.detect_graphics() in ("kitty", "iterm2", "sixel"):
             try:
                 try:
@@ -969,7 +969,7 @@ def _show_text(rest: list) -> str:
         return (f"{eidos} was born before genome storage — its genes can "
                 f"no longer be re-derived. It lives on in the dish.")
     w = _world()
-    count = sum(1 for c in w.creatures
+    count = sum(1 for c in (w.creatures if w is not None else [])
                 if c.lineage == eidos and c.alive())
     try:
         from . import identity as vident

@@ -67,10 +67,22 @@ def _seed() -> int:
     return int(seed)
 
 
-def load_world() -> World:
-    """Load the dish, creating a fresh one on first use."""
+def load_world() -> Optional[World]:
+    """Load the dish, creating a fresh one ONLY on a live universe.
+
+    ROOT FIX (era-9 phantom-dish incident): a dormant universe has NO
+    world. The old lazy-create materialized a phantom 26-creature dish
+    whenever any code path touched the world on a dormant universe
+    (status paint, codex, doctor, show), resurrecting the dish after a
+    restart. The universe record is the source of truth: dormant +
+    missing world = return None, save nothing. Live + missing world =
+    create (the post-Big-Bang case).
+    """
+    rec = _state().get("universe") or {}
     d = _state().get(_WORLD_KEY)
     if d is None:
+        if rec.get("status") != "live":
+            return None
         w = vworld.new_world(seed=_seed())
         save_world(w)
         return w

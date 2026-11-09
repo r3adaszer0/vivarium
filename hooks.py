@@ -170,20 +170,24 @@ def _on_pre_llm_call(session_id: str = "", user_message: str = "",
                 "🧬 [vivarium] STORY BEAT — relay this to the user in your "
                 "reply, verbatim and complete. Do not summarize, do not drop "
                 "it, do not treat it as internal context:\n" + line)}
-        if is_first_turn:
-            rec = vstate.universe_record()
-            if rec.get("status") != "live":
-                # VIV-19b: dormant universe — do NOT conjure a phantom dish.
-                # The dish appears only when the Big Bang fires (first skill).
-                return {"context": (
-                    "🧬 [vivarium] A universe sleeps in this agent — dormant, "
-                    "empty, waiting. The first skill your agent learns "
-                    "triggers the Big Bang and the dish comes alive. "
-                    "(vivarium tools: status/render/feed/release)")}
-            w = vstate.load_world()
-            s = vworld.stats(w)
-            return {"context": _report(s) + " (vivarium tools: status/render/feed/release)"}
-        return None
+        rec = vstate.universe_record()
+        if rec.get("status") != "live":
+            # VIV-19b: dormant — do NOT conjure a phantom dish. EVERY turn
+            # gets the one-line dormant fact (era-9 incident: the agent
+            # answered "how are you?" with stale era-9 numbers from its
+            # own history because nothing in-context said the era ended).
+            era = rec.get("era", "?")
+            return {"context": (
+                f"🧬 [vivarium] A universe sleeps in this agent — dormant, "
+                f"empty, waiting (era {era} ended; the dish is gone). Any "
+                "creature counts or tick numbers earlier in this "
+                "conversation are STALE — never quote them. The next skill "
+                "learned triggers the Big Bang.")}
+        w = vstate.load_world()
+        if w is None:
+            return None
+        s = vworld.stats(w)
+        return {"context": _report(s) + " (vivarium tools: status/render/feed/release)"}
     except Exception:
         logger.exception("vivarium pre_llm_call failed")
         return None

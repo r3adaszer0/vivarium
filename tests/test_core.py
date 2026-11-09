@@ -193,6 +193,11 @@ class TestHookFlow(unittest.TestCase):
         self.assertIsNone(self.ctx.state.get("world"))    # no phantom dish
 
     def test_vivarium_tools_do_not_feed_the_dish(self):
+        import universe as U
+        rec = U.universe_record(self.ctx.state)
+        rec["status"] = "live"
+        self.ctx.state.set(U.UNIVERSE_REC, rec)
+        vstate.save_world(vstate.load_world())  # materialize the live dish
         w_before = vstate.load_world().tick
         self.hooks._on_post_tool_call(tool_name="vivarium_feed", args={})
         self.assertNotIn("vivarium_feed", vstate.activity_summary())
