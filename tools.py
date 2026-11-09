@@ -905,7 +905,12 @@ def _do_restart() -> str:
             res_rows = max(1, math.ceil(size[1] / vterm.CELL_H))
             res_cols = max(20, math.ceil(size[0] / vterm.CELL_W))
             spacer = "\n".join(" " * res_cols for _ in range(res_rows))
-            graphics = vterm.paint_over(farewell_png, res_rows, 0, delay=0.4)
+            # trail = every text row printed AFTER the reserved rows (the
+            # era-ended briefing + offer). The overlay must climb over
+            # them or the picture lands low (user-measured ~6 rows).
+            trail_rows = text.count("\n") + 1 if text else 0
+            graphics = vterm.paint_over(
+                farewell_png, res_rows, trail_rows, delay=0.4)
             text = (f"The last picture of era {old_era}:\n\n" + spacer
                     + (f"\n{graphics}" if graphics else "")
                     + "\n\n" + text)
