@@ -450,29 +450,33 @@ def _arm_print() -> None:
             out = rendered["text"]
 
             def _write(_out=out, _path=path, _climb=rendered["climb"]):
-                # Write the card straight to the terminal: prompt_toolkit's
-                # stdout proxy eats the ESC byte, so the SGR colours arrived
-                # as literal "[38;2;...m" text on screen.
+                # One write for text and picture. prompt_toolkit's stdout
+                # proxy eats ESC, so the card goes to /dev/tty; and because
+                # the renderer never learns these rows exist, the picture
+                # must ride in the same bytes — a later deferred paint is
+                # measured against a cursor it no longer controls.
+                payload = _out.encode("utf-8")
+                if _path and _climb:
+                    payload += vterm.overlay_bytes(_path, _climb)
                 wrote = False
                 try:
                     import os as _os
                     fd = _os.open("/dev/tty", _os.O_WRONLY)
                     try:
-                        _os.write(fd, _out.encode("utf-8"))
+                        _os.write(fd, payload)
                         wrote = True
                     finally:
                         _os.close(fd)
                 except OSError:
                     wrote = False
                 if not wrote:
-                    _sys.stdout.write(_out)
-                    _sys.stdout.flush()
-                # The paint MUST happen inside the same terminal callback
-                # as the text: run_in_terminal buffers the write until the
-                # renderer flushes, so a paint issued from the worker first
-                # landed at the cursor BEFORE the beat text.
-                if _path and _climb:
-                    vterm.paint_over(_path, _climb, 0, delay=0.35, extra_climb=2)
+                    buf = getattr(_sys.stdout, "buffer", None)
+                    if buf is not None:
+                        buf.write(payload)
+                        buf.flush()
+                    else:
+                        _sys.stdout.write(payload.decode("utf-8", "replace"))
+                        _sys.stdout.flush()
 
             via_pt = _emit_via_terminal(_write)
             if not via_pt:

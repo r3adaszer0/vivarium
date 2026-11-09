@@ -78,6 +78,34 @@ def _kitty_escape(png: bytes, img_id: int = 1) -> bytes:
     return b"".join(out)
 
 
+def overlay_bytes(png_path: str, climb: int, env: Optional[dict] = None) -> bytes:
+    """Save cursor, climb, emit the picture, restore — as one byte string.
+
+    Used when the text and the picture must leave in a single write. The
+    deferred paint_over path cannot be used there: writing the card to
+    /dev/tty means prompt_toolkit never learns those rows exist, so a
+    later paint measured against the cursor lands wherever the renderer
+    left it — which is how the dish went missing.
+    """
+    kind = detect_graphics(env)
+    try:
+        with open(png_path, "rb") as fh:
+            data = fh.read()
+    except OSError:
+        return b""
+    if kind == "kitty":
+        esc = _kitty_escape(data)
+    elif kind == "iterm2":
+        esc = _iterm2_escape(data)
+    elif kind == "sixel":
+        esc = _sixel_escape(data)
+    else:
+        return b""
+    up = max(0, int(climb))
+    move = f"\x1b[{up}A".encode() if up else b""
+    return b"\x1b7" + move + esc + b"\x1b8"
+
+
 def _iterm2_escape(png: bytes, name: str = "vivarium.png") -> bytes:
     """PNG → iTerm2 OSC 1337 (single-shot; inline=1 displays it)."""
     b64 = base64.b64encode(png).decode()
