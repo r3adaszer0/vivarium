@@ -96,7 +96,7 @@ class TestActs(unittest.TestCase):
         w.next_gid = 2
         self.s.set("world", w.to_dict())
         vstate.advance(w, ticks=3, nutrients=0.0)
-        pend = self.s.d.get("pending_narration", "")
+        pend = vstate.narration_text()
         self.assertIn("Eidos_doom", pend)
         self.assertIn("how this world selects", pend)
 

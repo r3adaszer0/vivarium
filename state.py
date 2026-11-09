@@ -192,15 +192,58 @@ def activity_summary() -> dict:
 
 
 # ── narration queue (hooks → next LLM turn) ──────────────────────────────────
-def queue_narration(line: str) -> None:
-    _state().set(_NARRATION_KEY, line)
+# VIV-31 lesson (user machine, 2026-11-09): the slot used to be a single
+# string, so a routine tick report queued one tool call later OVERWROTE
+# the Big Bang narration before any turn popped it — the milestone story
+# silently vanished. Now: a bounded two-tier queue. Milestones (Big Bang,
+# births, acts, Codex, deaths) are never dropped and always deliver
+# before routine reports; routine reports are capped (older ones drop).
+_NARRATION_MILESTONE_KEY = "pending_narration_milestones"
+_ROUTINE_CAP = 2
+
+
+def queue_narration(line: str, milestone: bool = False) -> None:
+    if not line:
+        return
+    key = _NARRATION_MILESTONE_KEY if milestone else _NARRATION_KEY
+    q = _state().get(key, [])
+    if isinstance(q, str):        # pre-upgrade shape: migrate
+        q = [q] if q else []
+    q.append(line)
+    if not milestone:
+        q = q[-_ROUTINE_CAP:]     # routine noise never accumulates
+    _state().set(key, q)
+
+
+def narration_text() -> str:
+    """All pending narrations as one string (tests / debug views)."""
+    s = _state()
+    parts = []
+    for key in (_NARRATION_MILESTONE_KEY, _NARRATION_KEY):
+        q = s.get(key, [])
+        if isinstance(q, str):
+            q = [q] if q else []
+        parts.extend(q)
+    return "\n".join(parts)
 
 
 def pop_narration() -> Optional[str]:
-    line = _state().get(_NARRATION_KEY)
-    if line:
-        _state().set(_NARRATION_KEY, "")
-    return line or None
+    s = _state()
+    mq = s.get(_NARRATION_MILESTONE_KEY, [])
+    if isinstance(mq, str):
+        mq = [mq] if mq else []
+    if mq:                        # milestones first, one per turn
+        line = mq.pop(0)
+        s.set(_NARRATION_MILESTONE_KEY, mq)
+        return line
+    q = s.get(_NARRATION_KEY, [])
+    if isinstance(q, str):
+        q = [q] if q else []
+    if q:
+        line = q.pop(0)
+        s.set(_NARRATION_KEY, q)
+        return line
+    return None
 
 
 # ── challenge codes ──────────────────────────────────────────────────────────

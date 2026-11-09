@@ -9,6 +9,7 @@ try:
 except ImportError:
     import hooks, birth as vbirth, world as W
     import universe as U
+import state as vstate  # noqa: E402
 
 
 class FakeState:
@@ -75,7 +76,7 @@ class SkillBirth(unittest.TestCase):
         with TempSkills("proof-skill", "Completely unique body content xyzzy."):
             ctx._hooks["on_skill_lifecycle"](
                 skill_name="proof-skill", action="created")
-        line = s.d.get("pending_narration") or ""
+        line = vstate.narration_text()
         self.assertIn("Eidos_", line)
         self.assertIn("proof-skill", line)
         self.assertIn("crawled out of the dish", line)
@@ -133,7 +134,7 @@ class SkillBirth(unittest.TestCase):
         self.assertEqual(len(births), 2)                  # BOTH skills seeded
         self.assertIn("boot-alpha", births)
         self.assertIn("boot-beta", births)
-        line = s.d.get("pending_narration") or ""
+        line = vstate.narration_text()
         self.assertIn("Universe born", line)              # onboarding narration
 
     def test_big_bang_narration_carries_media_offer(self):
@@ -154,7 +155,7 @@ class SkillBirth(unittest.TestCase):
                 skill_name="boot-alpha", action="created")
         finally:
             vhooks._discover_skills, vmp.vterm.detect_graphics = old, oldg
-        line = s.d.get("pending_narration") or ""
+        line = vstate.narration_text()
         self.assertIn("Universe born", line)
         self.assertIn("/vivarium images off", line)   # the offer rides along
         self.assertIn("render --image", line)         # agent directive: paint NOW
@@ -171,16 +172,18 @@ class SkillBirth(unittest.TestCase):
             with TempSkills("offer-skill", "Offer test body content zzz."):
                 ctx._hooks["on_skill_lifecycle"](
                     skill_name="offer-skill", action="created")
-            line = s.d.get("pending_narration") or ""
+            line = vstate.narration_text()
             self.assertIn("Eidos_", line)
             self.assertIn("/vivarium images off", line)
             self.assertIn("render --image", line)     # agent directive
+            while vstate.pop_narration():             # drain for the next birth
+                pass
             # flip to off -> new birth, no offer
             s.set("media_pref", "ascii")
             with TempSkills("offer-skill-2", "Different body content qqq."):
                 ctx._hooks["on_skill_lifecycle"](
                     skill_name="offer-skill-2", action="created")
-            line2 = s.d.get("pending_narration") or ""
+            line2 = vstate.narration_text()
             self.assertIn("Eidos_", line2)
             self.assertNotIn("/vivarium images off", line2)
         finally:
@@ -198,7 +201,7 @@ class SkillBirth(unittest.TestCase):
         finally:
             vhooks._discover_skills = old
         self.assertEqual(U.universe_record(s)["status"], "dormant")
-        self.assertIn("waiting", s.d.get("pending_narration", ""))
+        self.assertIn("waiting", vstate.narration_text())
 
     def test_unknown_skill_is_silent(self):
         ctx = self._wired()

@@ -97,7 +97,7 @@ def _boot_from_dormant(rec: dict) -> None:
     if not skills:
         vstate.queue_narration(
             "🌌 A universe sleeps in this agent, waiting for its first "
-            "skill. Learn one and the Big Bang fires.")
+            "skill. Learn one and the Big Bang fires.", milestone=True)
         return
     result = vseeding.seed(vstate.state(), skills, save_world=vstate.save_world)
     if result:
