@@ -43,6 +43,14 @@ class TestPhantomDishLaw(unittest.TestCase):
         self.assertIn("STALE", out["context"])
         self.assertIn("sleeps", out["context"])
 
+    def test_load_world_purges_a_saved_phantom(self):
+        """A world file saved by pre-law code on a dormant universe is
+        purged on first read (self-healing)."""
+        import world as W
+        self.s.set("world", W.new_world(seed=7).to_dict())
+        self.assertIsNone(vstate.load_world())
+        self.assertIsNone(self.s.get("world"))
+
 
 if __name__ == "__main__":
     unittest.main()

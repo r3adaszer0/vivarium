@@ -86,6 +86,11 @@ def load_world() -> Optional[World]:
         w = vworld.new_world(seed=_seed())
         save_world(w)
         return w
+    if rec.get("status") != "live":
+        # Self-heal: a world file on a DORMANT universe is a phantom
+        # left by pre-law code. Purge it and report none.
+        _state().set(_WORLD_KEY, None)
+        return None
     return World.from_dict(d, seed=_seed())
 
 
