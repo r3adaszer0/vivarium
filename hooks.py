@@ -433,7 +433,7 @@ def _arm_print() -> None:
                 # as the text: run_in_terminal buffers the write until the
                 # renderer flushes, so a paint issued from the worker first
                 # landed at the cursor BEFORE the beat text.
-                vterm.paint_over(path, rows, trail, delay=0.35, extra_climb=0)
+                vterm.paint_over(path, rows, trail, delay=0.35, extra_climb=2)
 
             via_pt = _emit_via_terminal(_write)
             if not via_pt:
