@@ -46,6 +46,8 @@ MUTATION_SCALE = 0.12      # genome jitter per generation
 MAX_AGE = 900              # ticks; die of old age around here
 START_CREATURES = 26
 FOOD_ENERGY = 1.0          # energy gained per food unit eaten
+FLEDGE_AGE = 120           # ticks a newborn pod is shielded (grace window)
+FLEDGE_BURST = 8           # extra reproduction headroom RESERVED for fledgling parents
 POP_CAP = 200               # emergency brake only (K is the real limiter);
                             # at 4x founders it pinned the dish and killed the Pulse
 
@@ -161,6 +163,7 @@ class World:
     died: int = 0
     peak_population: int = 0
     seed: int = 0  # RNG root: per-tick reseeding makes snapshots resumable
+    fledge: Dict[str, int] = field(default_factory=dict)  # lineage -> landed tick (fledge grace)
 
     def _roll_rng(self) -> random.Random:
         """Deterministic dice for THIS tick: seed + tick -> fresh stream.
@@ -183,6 +186,7 @@ class World:
             "food": [[float(v) for v in row] for row in self.food],
             "next_gid": self.next_gid,
             "born": self.born, "died": self.died,
+            "fledge": dict(self.fledge),
             "peak": self.peak_population,
             "creatures": [
                 {
@@ -209,6 +213,7 @@ class World:
             next_gid=d.get("next_gid", 1),
             born=d.get("born", 0),
             died=d.get("died", 0), peak_population=d.get("peak", len(creatures)),
+            fledge=dict(d.get("fledge", {})),
             seed=d.get("seed", seed),
         )
 
@@ -307,6 +312,27 @@ def _terrain_tick(world: World) -> None:
     world.food = new
 
 
+def _is_fledgling(world: World, c: Creature) -> bool:
+    """True while c's lineage is inside its fledge grace window.
+
+    The grace starts at the lineage's landing tick (world.fledge registry,
+    written at pod release) and lasts FLEDGE_AGE of the creature's own
+    age — so CHILDREN BORN during the window are fledglings too until
+    they age past FLEDGE_AGE themselves.
+    """
+    landed = world.fledge.get(c.lineage)
+    if landed is None:
+        return False
+    return c.age < FLEDGE_AGE
+
+
+def _prune_fledge(world: World) -> None:
+    """Drop fledge entries whose window is long past (bounded state)."""
+    if world.fledge:
+        world.fledge = {ln: t for ln, t in world.fledge.items()
+                        if world.tick - t < FLEDGE_AGE * 4}
+
+
 def _creature_tick(world: World, nutrients: float) -> None:
     """One tick of creature life, in three deterministic phases.
 
@@ -314,6 +340,9 @@ def _creature_tick(world: World, nutrients: float) -> None:
     Phase 2 (per cell): the cell's food goes to the strongest claimant —
     ``aggression * energy``, ties to the lower gid. A gene must matter or not
     exist: this is the rule that makes ``aggression`` real (cell contest).
+    FLEDGE WINDOW (VIV-31): a newborn pod's lineage is 'fledging' for
+    FLEDGE_AGE ticks — fledglings never contest adult-held cells, and
+    fledgling parents get reserved reproduction headroom above the cap.
     Phase 3 (gid order): reproduction, chance per eligible parent — every
     roll is a hash of (seed, tick, gid, purpose): no RNG anywhere in the
     tick (VIV-12 de-randomization; Rule 1: not random, pure function of
@@ -365,6 +394,34 @@ def _creature_tick(world: World, nutrients: float) -> None:
             c.y = (c.y + int(_u(world.seed, world.tick, c.gid, b"wdy") * 3) - 1) % h
             c.energy -= MOVE_COST * 0.5
 
+    # -- fledge displacement: a fledgling sharing a cell with an adult
+    # steps aside to the richest adjacent adult-free cell (hash-picked
+    # among ties). Measured: standing there = skipped meals = death
+    # spiral; stepping aside to open food = establishment chance.
+    if world.fledge:
+        fled = [c for c in living if c.alive() and _is_fledgling(world, c)]
+        occupied = {}
+        for c in living:
+            if c.alive():
+                occupied.setdefault((c.x, c.y), []).append(c)
+        for c in fled:
+            mates = occupied.get((c.x, c.y), [])
+            if not any(not _is_fledgling(world, o) for o in mates if o is not c):
+                continue
+            best, best_v = None, -1.0
+            for i, (dx, dy) in enumerate(((1, 0), (-1, 0), (0, 1), (0, -1),
+                                          (1, 1), (-1, -1), (1, -1), (-1, 1))):
+                x, y = (c.x + dx) % w, (c.y + dy) % h
+                if any(o.x == x and o.y == y for o in living if o.alive()):
+                    continue
+                v = food[y][x] + _u(world.seed, world.tick, c.gid,
+                                    b"fledge", salt=i) * 0.01
+                if v > best_v:
+                    best_v, best = v, (x, y)
+            if best is not None:
+                c.x, c.y = best
+                occupied.setdefault(best, []).append(c)
+
     # -- phase 2: cell contests + eating ------------------------------------------
     at: Dict[Tuple[int, int], List[Creature]] = {}
     for c in living:
@@ -374,6 +431,13 @@ def _creature_tick(world: World, nutrients: float) -> None:
         if len(group) == 1:
             winner = group[0]
         else:
+            # FLEDGE GRACE (VIV-31): a fledgling never contests a cell an
+            # adult holds — it yields the cell entirely this tick. Honest
+            # disturbance dynamics: newcomers establish in open space,
+            # not by beating the canopy. Deterministic, state-only.
+            adults = [c for c in group if not _is_fledgling(world, c)]
+            if adults and len(adults) < len(group):
+                group = adults
             winner = max(group, key=lambda c: (c.genome["aggression"] * c.energy, -c.gid))
         cell = food[cy][cx]
         eaten = min(cell, EAT_RATE * min(1.0, winner.genome["forage"]))
@@ -390,8 +454,15 @@ def _creature_tick(world: World, nutrients: float) -> None:
         # pay friction (REPRODUCE_COST total, split between them). Total
         # energy after the split is strictly less than before — births
         # consume the surplus instead of printing it (Rule 2).
+        # FLEDGE BURST: a fledgling parent gets RESERVED headroom above
+        # the cap (adults stay capped at POP_CAP). Without this, at a
+        # saturated dish no pod can ever reproduce: incumbents' repro
+        # rolls consume any shared headroom first (pods sit last in gid
+        # order). Reserved = not a race; the burst belongs to the pod.
+        _headroom = (POP_CAP + FLEDGE_BURST if _is_fledgling(world, c)
+                     else POP_CAP)
         if (c.energy >= REPRODUCE_MIN and c.age >= MIN_MATURITY_AGE
-                and population_after < POP_CAP
+                and population_after < _headroom
                 and _u(world.seed, world.tick, c.gid, b"repro") < REPRO_CHANCE):
             half = c.energy * 0.5
             friction = REPRODUCE_COST * 0.5
@@ -418,6 +489,7 @@ def _creature_tick(world: World, nutrients: float) -> None:
             food[c.y][c.x] = min(MAX_FOOD, food[c.y][c.x] + 0.3)
     world.creatures = survivors + born_this_tick
     world.peak_population = max(world.peak_population, len(world.creatures))
+    _prune_fledge(world)
     # nutrient drops from the user's real work land on a hash-picked cell
     # (VIV-12: no RNG — the drop position is a pure function of state)
     if nutrients > 0:

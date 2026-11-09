@@ -36,16 +36,19 @@ def eidos_id(digest: bytes) -> str:
 
 
 def _release_pod(w, digest: bytes, lineage: str, bs) -> List:
+    """Release one species pod with a VIV-31 fledge grace + refuge landing."""
     made = []
-    for _ in range(POD_SIZE):
+    for i in range(POD_SIZE):
+        x, y = bs.uint(2, w.w), bs.uint(2, w.h)
         made.append(W.Creature(
             gid=w.next_gid, genome=genome_of_digest(digest),
-            x=bs.uint(2, w.w), y=bs.uint(2, w.h),
+            x=x, y=y,
             energy=EIDOS_RANGE[0] + (EIDOS_RANGE[1] - EIDOS_RANGE[0])
             * bs.uint(2, 65536) / 65536,
             lineage=lineage))
         w.next_gid += 1
     w.creatures.extend(made)
+    w.fledge[lineage] = w.tick
     return made
 
 

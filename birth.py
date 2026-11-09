@@ -52,14 +52,21 @@ def birth_species(s, name: str, content: str,
     digest = U.skill_digest(s, content)
     eidos = "Eidos_" + digest[:3].hex()
     genome = W.genome_from_bytes(digest[:24])
-    # Landing: the digest picks among the dish's most fertile cells (top 8
-    # by food value, ties in scan order) and the pod SPREADS — each member
-    # gets its own fertile cell (i-th of the top cells, digest-ordered), so
-    # the landing party doesn't contest itself into starvation. Deterministic,
-    # digest-driven, and a birth always lands where life can take hold.
+    # Landing (VIV-31 fledge): the digest picks among the dish's most
+    # fertile cells (top 16 by food, ties in scan order), each pod member
+    # on its OWN cell, ties broken toward the LEAST occupied cell — a
+    # refuge landing. Newborns should not drop into an incumbent's dining
+    # room; the fledge window gives them the rest.
     cells = sorted(((w.food[y][x], x, y) for y in range(w.h) for x in range(w.w)),
                    key=lambda t: -t[0])
-    top = cells[:min(8, len(cells))]
+    top = cells[:min(64, len(cells))]
+    occ: dict = {}
+    for c in w.creatures:
+        occ[(c.x, c.y)] = occ.get((c.x, c.y), 0) + 1
+    # refuge score: food per creature-pressure — cells rich in food AND
+    # free of incumbents rank first (a cell with food but zero creatures
+    # beats a richer cell that an adult works)
+    top.sort(key=lambda t: (-(t[0] / (1.0 + occ.get((t[1], t[2]), 0))),))
     pod = []
     for i in range(POD_SIZE):
         _, x, y = top[int.from_bytes(digest[24 + i:26 + i], "big") % len(top)]
@@ -70,6 +77,7 @@ def birth_species(s, name: str, content: str,
         ))
         w.next_gid += 1
     w.creatures.extend(pod)
+    w.fledge[eidos] = w.tick   # the fledge grace starts now
     if advance:
         W.run(w, advance)
 
