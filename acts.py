@@ -67,6 +67,11 @@ def set_narration(s, mode: str) -> str:
 
 
 # ── act copy ─────────────────────────────────────────────────────────────────
+# Placeholder where the dish picture belongs. The plugin's own printer
+# splits the narration on it (headline above the image, the explanation
+# below); surfaces that cannot paint strip it.
+DISH_MARKER = "\n\n[[vivarium:dish]]\n\n"
+
 ACT2_TEXT = (
     "\n\nThis dish is your Vivarium universe. The green shades are food: "
     "rich patches, poor patches. The colored squares are your Hermi, living "
@@ -167,7 +172,7 @@ def birth_narration(s, base: str, result: dict, is_big_bang: bool) -> str:
             _fire(ACT2)
         _save()
         if fresh_act2 and narration_on(s):
-            return base + act2_for(result)
+            return base + DISH_MARKER + act2_for(result)
         return base
     if not narration_on(s):
         acts["_births_since_bang"] = after_bang + 1

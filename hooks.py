@@ -66,12 +66,7 @@ def _on_skill_lifecycle(skill_name: str = "", action: str = "",
             base = vbirth.announcement(result)
             narrated = vacts.birth_narration(
                 vstate.state(), base, result, is_big_bang=False)
-            vstate.queue_narration(
-                narrated
-                + vmp.media_offer(vstate.state(), directive=True)
-                + _paint_note(),
-                milestone=True)
-            _schedule_picture()
+            _deliver_beat(narrated)
     except Exception:
         logger.exception("vivarium on_skill_lifecycle failed (birth skipped)")
 
@@ -117,12 +112,7 @@ def _boot_from_dormant(rec: dict) -> None:
             vstate.state(), base,
             {"eidos": "", "name": "", "pod": 0, "tick": 0},
             is_big_bang=True)
-        vstate.queue_narration(
-            narrated
-            + vmp.media_offer(vstate.state(), directive=True)
-            + _paint_note(),
-            milestone=True)
-        _schedule_picture()
+        _deliver_beat(narrated)
 
 
 def _nutrients_for(tool_name: str) -> float:
@@ -210,7 +200,7 @@ def register_hooks(ctx) -> None:
     ctx.register_hook("on_stream_end", _on_stream_end)
     ctx.register_hook("post_llm_call", _on_stream_end)
 
-_PICTURE_PENDING = {"armed": False, "quiet_at": 0.0}
+_PICTURE_PENDING = {"armed": False, "quiet_at": 0.0, "text": ""}
 
 
 def _on_stream_end(**_):
@@ -227,58 +217,81 @@ def _on_stream_end(**_):
         _PICTURE_PENDING["quiet_at"] = _t.time() + 1.0
 
 
-def _paint_note() -> str:
-    """Negative marker for beats the plugin will paint itself.
-
-    Without it the agent re-derives the old behaviour and calls
-    vivarium_render out of habit, producing a second dish (era-13 bug).
-    """
+def _can_paint() -> bool:
     try:
         import sys as _sys
         if not getattr(_sys.stdout, "isatty", lambda: False)():
-            return ""
+            return False
         from . import termrender as vterm
         if vterm.detect_graphics() not in ("kitty", "iterm2", "sixel"):
-            return ""
-        rec = vstate.universe_record() or {}
-        return (f"\n(vivarium: the dish is painted inline automatically for "
-                f"era {rec.get('era', '?')} after this turn — do NOT call "
-                f"vivarium_render this turn.)")
-    except Exception:
-        return ""
-
-
-def _schedule_picture() -> None:
-    """VIV-42: paint the dish after the turn settles.
-
-    Painting from inside a tool call loses a race with the TUI: the
-    reply, the reasoning box, the status bar and the prompt are printed
-    by prompt_toolkit *after* the tool returns, straight over the image.
-    The slash overlay works because its text prints as one block and the
-    paint happens when the TUI is idle. This waits for the turn's last
-    stream to end (on_stream_end), prints a blank spacer through the
-    patched stdout (patch_stdout routes it above the prompt), then paints
-    the dish over that reserved block.
-    """
-    try:
-        import sys as _sys
-        if not getattr(_sys.stdout, "isatty", lambda: False)():
-            return
-        from . import termrender as vterm
-        if vterm.detect_graphics() not in ("kitty", "iterm2", "sixel"):
-            return
+            return False
         from . import media_policy as vmp
-        if vmp.media_pref(vstate.state()) != "auto":
-            return
+        return vmp.media_pref(vstate.state()) == "auto"
     except Exception:
+        return False
+
+
+def _beat_layout(text: str, rows: int, cols: int):
+    """Split a beat around the dish marker.
+
+    Returns (printed_text, trail_rows): the headline, a blank spacer for
+    the picture, then the explanation; trail_rows is how many lines are
+    printed AFTER the spacer, which is exactly what paint_over must climb
+    over to land the dish between the two halves.
+    """
+    try:
+        from . import acts as vacts
+    except ImportError:  # pragma: no cover
+        import acts as vacts
+    spacer = "\n".join(" " * cols for _ in range(rows))
+    if vacts.DISH_MARKER in text:
+        head, _, tail = text.partition(vacts.DISH_MARKER)
+        tail = ("\n\n" + tail.strip()) if tail.strip() else ""
+    else:
+        head, tail = text, ""
+    out = "\n" + head.strip() + "\n\n" + spacer + tail + "\n"
+    # The final "\n" in `out` moves one row; the spacer itself ends one
+    # row short of its height. Net: the cursor sits rows + len(tail
+    # newlines) below the spacer's top, so that is exactly the climb.
+    trail = tail.count("\n") if tail else 0
+    return out, trail
+
+
+def _deliver_beat(text: str) -> None:
+    """VIV-44: the plugin delivers story beats on interactive terminals.
+
+    The beat belongs to Vivarium, not to the agent. On a graphics
+    terminal the plugin prints the WHOLE narration itself, in the order
+    the copy was written: headline, the dish picture, the explanation.
+    The agent just answers the user about the skill. On chat surfaces
+    (no tty) the beat is queued for the agent as before, with the dish
+    marker stripped.
+
+    The print happens after the turn's last stream ends (on_stream_end /
+    post_llm_call feed the quiet clock), so nothing is racing the TUI.
+    """
+    try:
+        from . import acts as vacts
+    except ImportError:  # pragma: no cover
+        import acts as vacts
+    if not _can_paint():
+        try:
+            from . import media_policy as vmp
+        except ImportError:  # pragma: no cover
+            import media_policy as vmp
+        vstate.queue_narration(
+            text.replace(vacts.DISH_MARKER, "\n\n")
+            + vmp.media_offer(vstate.state(), directive=True),
+            milestone=True)
         return
     import time as _t
     _PICTURE_PENDING["armed"] = True
+    _PICTURE_PENDING["text"] = text
     _PICTURE_PENDING["quiet_at"] = _t.time() + 1.0
 
     def _work():
         import time as _t
-        hard_deadline = _t.time() + 45.0    # never wait forever
+        hard_deadline = _t.time() + 45.0
         while _t.time() < hard_deadline:
             _t.sleep(0.2)
             if not _PICTURE_PENDING["armed"]:
@@ -286,27 +299,29 @@ def _schedule_picture() -> None:
             if _t.time() >= _PICTURE_PENDING["quiet_at"]:
                 break
         _PICTURE_PENDING["armed"] = False
+        body = _PICTURE_PENDING.get("text") or ""
         try:
+            import sys as _sys
             from . import artifacts as vart
             w = vstate.load_world()
             if w is None:
+                _sys.stdout.write("\n" + body.replace(vacts.DISH_MARKER, "\n\n") + "\n")
+                _sys.stdout.flush()
                 return
-            if vstate.already_painted(w):
-                return          # the agent (or an earlier paint) got there first
             path = vart.render_dish_png(vstate.state(), w, f"live_{w.tick}")
             if not path:
                 return
             size = vterm.png_size(path) or (342, 339)
             rows = max(1, -(-int(size[1]) // max(1, vterm.CELL_H)))
             cols = max(20, -(-int(size[0]) // max(1, vterm.CELL_W)))
-            spacer = "\n".join(" " * cols for _ in range(rows))
-            _sys.stdout.write("\n" + spacer + "\n")
+            out, trail = _beat_layout(body, rows, cols)
+            _sys.stdout.write(out)
             _sys.stdout.flush()
-            vterm.paint_over(path, rows, 0, delay=0.35, extra_climb=0)
+            vterm.paint_over(path, rows, trail, delay=0.35, extra_climb=0)
             rec = vstate.universe_record() or {}
             vstate.mark_painted(rec.get("era"), w.tick)
         except Exception:
-            logger.debug("vivarium picture scheduling failed", exc_info=True)
+            logger.debug("vivarium beat delivery failed", exc_info=True)
 
     import threading
     threading.Thread(target=_work, daemon=True).start()

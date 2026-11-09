@@ -156,5 +156,27 @@ class TestPaintIdempotence(unittest.TestCase):
         self.assertEqual(second.get("map"), "")
 
 
+class TestBeatLayout(unittest.TestCase):
+    """VIV-44: the plugin prints the beat itself, in the order the copy
+    was written: headline, the dish, the explanation."""
+
+    def test_marker_splits_headline_and_explanation(self):
+        import hooks as vhooks
+        import acts as vacts
+        text = "HEADLINE\n  bullet" + vacts.DISH_MARKER + "EXPLANATION line 1\nline 2"
+        out, trail = vhooks._beat_layout(text, 3, 20)
+        head_part, spacer_part = out.split("\n\n" + (" " * 20), 1)
+        self.assertIn("HEADLINE", head_part)
+        self.assertIn("EXPLANATION line 1", out)
+        self.assertLess(out.index("HEADLINE"), out.index("EXPLANATION"))
+        self.assertEqual(trail, 3)   # blank line + 2 explanation lines
+
+    def test_beat_without_marker_puts_the_picture_last(self):
+        import hooks as vhooks
+        out, trail = vhooks._beat_layout("BIRTH TEXT", 2, 10)
+        self.assertIn("BIRTH TEXT", out)
+        self.assertEqual(trail, 0)   # nothing after the spacer
+
+
 if __name__ == "__main__":
     unittest.main()
