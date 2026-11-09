@@ -288,6 +288,46 @@ def _tool_codex(args: Dict[str, Any], **_) -> str:
 
 
 # ── slash command: /vivarium ─────────────────────────────────────────────────
+_EXPLAIN_TEXT = """How your skills become living creatures
+
+Every skill your agent learns is written down as text. Vivarium takes
+that text and computes its SHA-256 hash: a fixed fingerprint that is
+the same for the same text and completely different for any other.
+
+That fingerprint becomes the creature's genome: six numbers (forage,
+aggression, metabolism, sense, mutation rate, hue) read out of the
+hash bytes. Change one word of the skill and the fingerprint changes
+completely, so every skill makes a species nobody has ever seen.
+
+Three properties make this the heart of Vivarium:
+
+1. Deterministic. The same skill always produces the same species —
+   in your dish, in a friend's dish, a hundred years from now. No
+   random number generator anywhere; the creature's body is a pure
+   function of the words you taught your agent. This is why a race
+   between two species can be re-run bit-for-bit anywhere.
+
+2. One-way. The genome is a hash of your skill's text: from the
+   creature you cannot read the skill, and Vivarium never stores the
+   text either — only the species ID (a short prefix of the hash).
+   Your skills stay yours; what leaves your machine for a race is the
+   six genome numbers, nothing else.
+
+3. Bounded. Six numbers sit inside fixed ranges (a gene cannot be
+   infinite). Children inherit their parent's numbers with small
+   hash-driven drift, so lineages evolve — but no skill can conjure
+   an unbeatable god-creature; the physics stays fair.
+
+Why a hash and not, say, the skill's name? Names are chosen, hashes
+are earned: a name is a label anyone can pick, while the hash binds
+the creature to the exact bytes of what your agent actually learned.
+The species is literally your skill's fingerprint, walking around
+eating food in a dish.
+
+See it yourself: /vivarium show <Eidos ID> prints a species card; its
+Eidos_ ID is the first bytes of its skill's hash."""
+
+
 _HELP = """\
 /vivarium — the living dish
 
@@ -296,6 +336,7 @@ Subcommands:
   status                population, lineages, ages, and an ASCII map
   show [name|id]        meet one species up close: face, genes, story (--image: glyph)
   clip [species] [ticks] [--zoom]   film the dish as a short MP4 (into the gallery)
+  explain               how your skills become living creatures (the hash story)
   render [--rich] [--color] [--image]   the dish map (--rich: dense blocks; --color: colored creatures, terminal only; --image: true PNG when supported)
   serve [--keep]        open the gallery in your browser (localhost only)
   images on|off|auto    how imagery is delivered (auto = where supported)
@@ -410,6 +451,8 @@ def _cmd(raw_args: str) -> str:
         return _show_text(rest)
     if cmd == "clip":
         return _clip_text(rest)
+    if cmd == "explain":
+        return _EXPLAIN_TEXT
     if cmd == "staleness":
         return _staleness_text()
     if cmd == "start":
