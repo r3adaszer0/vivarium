@@ -43,7 +43,10 @@ class TestDeliveryRegistration(unittest.TestCase):
         self.assertIn("on_skill_lifecycle", ctx.hooks)
         self.assertIn("pre_llm_call", ctx.hooks)
         self.assertIn("post_tool_call", ctx.hooks)
-        self.assertIn("on_stream_end", ctx.hooks)
+        # VIV-49: post_llm_call (once per turn) is the print trigger.
+        # on_stream_end fires per assistant message and printed early.
+        self.assertIn("post_llm_call", ctx.hooks)
+        self.assertNotIn("on_stream_end", ctx.hooks)
         self.assertIn("post_llm_call", ctx.hooks)
 
 

@@ -211,14 +211,17 @@ def register_hooks(ctx) -> None:
     ctx.register_hook("on_skill_lifecycle", _on_skill_lifecycle)
     # VIV-46: beats never ride tool results any more — the agent's reply
     # belongs to the user. The plugin prints events itself after the turn.
-    ctx.register_hook("on_stream_end", _on_stream_end)
+    # VIV-49: post_llm_call fires ONCE PER TURN, after the tool loop
+    # (agent/turn_finalizer._apply_output_hooks). on_stream_end fires per
+    # assistant message — arming on it printed the beat between the
+    # skill call and the reply.
     ctx.register_hook("post_llm_call", _on_stream_end)
 
 _PICTURE_PENDING = {"armed": False, "quiet_at": 0.0, "worker": False}
 
 
 def _on_stream_end(**_):
-    """VIV-42: every finished assistant stream updates the quiet clock.
+    """VIV-49: end-of-TURN signal (post_llm_call) for the quiet clock.
 
     The picture must be painted when the TURN is over, not when the skill
     hook fires — the model still has reasoning and a reply to print. Each
@@ -228,7 +231,8 @@ def _on_stream_end(**_):
     """
     import time as _t
     if _PICTURE_PENDING["armed"]:
-        _PICTURE_PENDING["quiet_at"] = _t.time() + 1.0
+        # a little slack: the TUI is still painting the final message
+        _PICTURE_PENDING["quiet_at"] = _t.time() + 1.2
 
 
 def _can_paint() -> bool:
