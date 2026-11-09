@@ -413,37 +413,56 @@ def _arm_print() -> None:
             except ImportError:  # pragma: no cover - flat-import mode
                 import artifacts as vart
                 import termrender as vterm
+            try:
+                from . import card as vcard
+                from . import acts as vacts
+            except ImportError:  # pragma: no cover - flat-import mode
+                import card as vcard
+                import acts as vacts
+            import shutil as _shutil
+            term_cols = _shutil.get_terminal_size((100, 40)).columns
             w = vstate.load_world()
-            if w is None or vstate.already_painted(w):
-                _sys.stdout.write("\n" + body + "\n")
-                _sys.stdout.flush()
-                return
-            path = vart.render_dish_png(vstate.state(), w, f"live_{w.tick}")
-            if not path:
-                return
-            size = vterm.png_size(path) or (342, 339)
-            rows = max(1, -(-int(size[1]) // max(1, vterm.CELL_H)))
-            cols = max(20, -(-int(size[0]) // max(1, vterm.CELL_W)))
-            out, trail = _beat_layout(body, rows, cols)
+            live = None
+            if w is not None:
+                try:
+                    st = vworld.stats(w)
+                    live = {"tick": w.tick,
+                            "alive": st.get("population", 0),
+                            "lineages": len(st.get("lineages") or [])}
+                except Exception:
+                    live = {"tick": w.tick}
+            path = ""
+            rows = 23
+            if w is not None and not vstate.already_painted(w):
+                path = vart.render_dish_png(vstate.state(), w, f"live_{w.tick}")
+                if path:
+                    size = vterm.png_size(path) or (342, 339)
+                    rows = max(1, -(-int(size[1]) // max(1, vterm.CELL_H)))
+            rendered = vcard.render(body, term_cols, vacts.DISH_MARKER,
+                                    live=live, dish_rows=rows,
+                                    dish=bool(path))
+            out = rendered["text"]
 
-            def _write(_out=out):
+            def _write(_out=out, _path=path, _climb=rendered["climb"]):
                 _sys.stdout.write(_out)
                 _sys.stdout.flush()
                 # The paint MUST happen inside the same terminal callback
                 # as the text: run_in_terminal buffers the write until the
                 # renderer flushes, so a paint issued from the worker first
                 # landed at the cursor BEFORE the beat text.
-                vterm.paint_over(path, rows, trail, delay=0.35, extra_climb=2)
+                if _path and _climb:
+                    vterm.paint_over(_path, _climb, 0, delay=0.35, extra_climb=2)
 
             via_pt = _emit_via_terminal(_write)
             if not via_pt:
                 _write()
             vtrace.log("emit", via="run_in_terminal" if via_pt else "raw_stdout",
-                       chars=len(out))
-            rec = vstate.universe_record() or {}
-            vstate.mark_painted(rec.get("era"), w.tick)
-            vtrace.log("painted", tick=w.tick, rows=rows, trail=trail,
-                       tty=True)
+                       chars=len(out), dish=bool(path))
+            if path:
+                rec = vstate.universe_record() or {}
+                vstate.mark_painted(rec.get("era"), w.tick)
+                vtrace.log("painted", tick=w.tick, rows=rows,
+                           climb=rendered["climb"], tty=True)
         except Exception as exc:
             try:
                 from . import delivery_trace as vtrace

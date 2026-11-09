@@ -45,7 +45,7 @@ class TestPrinterIntegration(unittest.TestCase):
         buf = _Tty()
         vhooks._can_paint = lambda: True
         vterm.paint_over = lambda path, rows, trail, delay=0.35, extra_climb=0: painted.append(
-            {"rows": rows, "trail": trail})
+            {"climb": rows, "trail": trail})
         sys.stdout = buf
         try:
             vhooks._deliver_beat(
@@ -65,8 +65,9 @@ class TestPrinterIntegration(unittest.TestCase):
         self.assertIn("EXPLANATION here", out)
         self.assertLess(out.index("HEADLINE here"), out.index("EXPLANATION here"))
         self.assertEqual(len(painted), 1, "exactly one dish")
-        self.assertGreater(painted[0]["rows"], 0)
-        self.assertEqual(painted[0]["trail"], 2)   # blank line + one explanation line
+        # the card climbs over the reserved block plus everything printed
+        # below it (caption, command table, rules)
+        self.assertGreaterEqual(painted[0]["climb"], 23)
         # the queue is drained: nothing left for a later turn
         self.assertEqual(vstate.pop_all_narrations(), [])
 
