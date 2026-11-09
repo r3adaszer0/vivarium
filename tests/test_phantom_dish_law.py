@@ -37,11 +37,13 @@ class TestPhantomDishLaw(unittest.TestCase):
         self.assertNotIn("X = creatures", out)
         self.assertIsNone(self.s.get("world"))  # no phantom world born
 
-    def test_pre_llm_dormant_warns_against_stale_numbers(self):
+    def test_dormant_turn_injects_nothing(self):
+        """VIV-46: dormant is internal state, never conversation."""
         import hooks as vhooks
-        out = vhooks._on_pre_llm_call(session_id="s", is_first_turn=True)
-        self.assertIn("STALE", out["context"])
-        self.assertIn("sleeps", out["context"])
+        out = vhooks._on_pre_llm_call(
+            session_id="s", is_first_turn=True, user_message="hey")
+        self.assertIsNone(out)
+        self.assertIsNone(self.s.get("world"))
 
     def test_load_world_purges_a_saved_phantom(self):
         """A world file saved by pre-law code on a dormant universe is

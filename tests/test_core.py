@@ -168,7 +168,7 @@ class TestHookFlow(unittest.TestCase):
         self.ctx = _FakeCtx()
         vstate._ctx = None
         hooks.register_hooks(self.ctx)
-        self.assertEqual(len(self.ctx.hooks), 6)
+        self.assertEqual(len(self.ctx.hooks), 5)
 
     def test_tool_call_drops_nutrients_and_advances(self):
         import universe as U
@@ -203,33 +203,38 @@ class TestHookFlow(unittest.TestCase):
         self.assertNotIn("vivarium_feed", vstate.activity_summary())
         self.assertEqual(vstate.load_world().tick, w_before)
 
-    def test_pre_llm_call_injects_report(self):
-        import universe as U
-        rec = U.universe_record(self.ctx.state)
-        rec["status"] = "live"  # narration is an ecology report of a live dish
-        self.ctx.state.set(U.UNIVERSE_REC, rec)
-        self.hooks._on_post_tool_call(tool_name="write_file", args={})
-        out = self.hooks._on_pre_llm_call(session_id="s1")
-        self.assertIsInstance(out, dict)
-        self.assertIn("context", out)
-        self.assertIn("vivarium", out["context"].lower())
-
-    def test_pre_llm_call_first_turn_report(self):
-        # live universe -> ecology report
+    def test_pre_llm_call_stays_silent_without_a_beat(self):
+        """VIV-46: a normal turn injects nothing about the dish."""
         import universe as U
         rec = U.universe_record(self.ctx.state)
         rec["status"] = "live"
         self.ctx.state.set(U.UNIVERSE_REC, rec)
-        out = self.hooks._on_pre_llm_call(session_id="s2", is_first_turn=True)
-        self.assertIsInstance(out, dict)
-        self.assertIn("context", out)
+        self.hooks._on_post_tool_call(tool_name="write_file", args={})
+        self.assertIsNone(self.hooks._on_pre_llm_call(session_id="s1"))
 
-    def test_pre_llm_call_first_turn_dormant_waiting(self):
-        """VIV-19b: dormant first turn narrates the waiting universe."""
+    def test_pre_llm_call_relays_a_pending_beat(self):
+        import universe as U
+        rec = U.universe_record(self.ctx.state)
+        rec["status"] = "live"
+        self.ctx.state.set(U.UNIVERSE_REC, rec)
+        vstate.queue_narration("🌌 test beat", milestone=True, kind="birth")
+        out = self.hooks._on_pre_llm_call(session_id="s2")
+        self.assertIn("test beat", out["context"])
+
+    def test_pre_llm_call_first_turn_is_silent_too(self):
+        import universe as U
+        rec = U.universe_record(self.ctx.state)
+        rec["status"] = "live"
+        self.ctx.state.set(U.UNIVERSE_REC, rec)
+        self.assertIsNone(self.hooks._on_pre_llm_call(
+            session_id="s2", is_first_turn=True))
+
+    def test_first_turn_dormant_is_silent(self):
+        """VIV-46: no dormant bulletin — "hey" gets "hey", not a status."""
         import universe as U
         U.universe_record(self.ctx.state)   # dormant
-        out = self.hooks._on_pre_llm_call(session_id="s3", is_first_turn=True)
-        self.assertIn("sleeps", out["context"])
+        self.assertIsNone(self.hooks._on_pre_llm_call(
+            session_id="s3", is_first_turn=True, user_message="hey"))
         self.assertIsNone(self.ctx.state.get("world"))    # no phantom dish
 
 

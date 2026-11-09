@@ -50,6 +50,13 @@ def birth_species(s, name: str, content: str,
         return None
 
     digest = U.skill_digest(s, content)
+    # VIV-46: identity is the CONTENT, not the skill name. Learning the
+    # same thing under another name must not spawn a twin — the species
+    # already exists in this universe.
+    fp = digest[:8].hex()
+    for known in births.values():
+        if isinstance(known, dict) and known.get("digest_fp") == fp:
+            return None
     eidos = "Eidos_" + digest[:3].hex()
     genome = W.genome_from_bytes(digest[:24])
     # Landing (VIV-31 fledge): the digest picks among the dish's most

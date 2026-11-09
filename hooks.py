@@ -135,9 +135,17 @@ def _on_post_tool_call(tool_name: str = "", args: Optional[Dict[str, Any]] = Non
             return
         w = vstate.load_world()
         vstate.advance(w, ticks=TICKS_PER_TOOL_CALL, nutrients=nutrients)
-        s = vworld.stats(w)
-        if w.tick % NARRATION_EVERY < TICKS_PER_TOOL_CALL:
-            vstate.queue_narration(_report(s, dramatic_only=False))
+        # VIV-46: the dish advances SILENTLY. No per-turn report is ever
+        # injected into the agent's context. At most one dawn report per
+        # day, and only when the user asked for that voice.
+        if vstate.voice_mode() == "daily":
+            import datetime as _dt
+            today = _dt.date.today().isoformat()
+            if vstate.state().get("last_report_day") != today:
+                vstate.state().set("last_report_day", today)
+                s = vworld.stats(w)
+                vstate.queue_narration(_report(s, dramatic_only=False),
+                                       kind="report")
     except Exception:
         logger.exception("vivarium post_tool_call failed (dish keeps living on cron)")
 
@@ -155,8 +163,27 @@ def _report(s: dict, dramatic_only: bool = False) -> str:
     return text
 
 
+_DISH_WORDS = (
+    "vivarium", "dish", "creature", "hermi", "species", "eidos", "lineage",
+    "tick", "codex", "big bang", "evolve", "colony", "feed", "restart",
+    "universe",
+)
+
+
+def _mentions_vivarium(text: str) -> bool:
+    low = (text or "").lower()
+    return any(w in low for w in _DISH_WORDS)
+
+
 def _on_pre_llm_call(session_id: str = "", user_message: str = "",
                      is_first_turn: bool = False, **_: Any) -> Optional[dict]:
+    """VIV-46: the agent hears from Vivarium ONLY when a beat is pending.
+
+    No live-dish report every turn (that is what made Hermes answer
+    "how are you?" with creature counts), no dormant bulletin (that is
+    what made it answer "hey" with "era 15 ended"). A quiet turn is a
+    quiet turn; the dish advances on its own.
+    """
     try:
         line = vstate.pop_narration()
         if line:
@@ -164,24 +191,7 @@ def _on_pre_llm_call(session_id: str = "", user_message: str = "",
                 "🧬 [vivarium] STORY BEAT — relay this to the user in your "
                 "reply, verbatim and complete. Do not summarize, do not drop "
                 "it, do not treat it as internal context:\n" + line)}
-        rec = vstate.universe_record()
-        if rec.get("status") != "live":
-            # VIV-19b: dormant — do NOT conjure a phantom dish. EVERY turn
-            # gets the one-line dormant fact (era-9 incident: the agent
-            # answered "how are you?" with stale era-9 numbers from its
-            # own history because nothing in-context said the era ended).
-            era = rec.get("era", "?")
-            return {"context": (
-                f"🧬 [vivarium] A universe sleeps in this agent — dormant, "
-                f"empty, waiting (era {era} ended; the dish is gone). Any "
-                "creature counts or tick numbers earlier in this "
-                "conversation are STALE — never quote them. The next skill "
-                "learned triggers the Big Bang.")}
-        w = vstate.load_world()
-        if w is None:
-            return None
-        s = vworld.stats(w)
-        return {"context": _report(s) + " (vivarium tools: status/render/feed/release)"}
+        return None
     except Exception:
         logger.exception("vivarium pre_llm_call failed")
         return None
@@ -192,15 +202,12 @@ def register_hooks(ctx) -> None:
     ctx.register_hook("post_tool_call", _on_post_tool_call)
     ctx.register_hook("pre_llm_call", _on_pre_llm_call)
     ctx.register_hook("on_skill_lifecycle", _on_skill_lifecycle)
-    # VIV-36b: same-turn story delivery. THE REGISTRATION IS THE FIX —
-    # the handler existing and plugin.yaml listing the hook is NOT
-    # enough; register_hooks() must actually register it or has_hook()
-    # is False and every beat waits for the next turn's pre_llm.
-    ctx.register_hook("transform_tool_result", _on_transform_tool_result)
+    # VIV-46: beats never ride tool results any more — the agent's reply
+    # belongs to the user. The plugin prints events itself after the turn.
     ctx.register_hook("on_stream_end", _on_stream_end)
     ctx.register_hook("post_llm_call", _on_stream_end)
 
-_PICTURE_PENDING = {"armed": False, "quiet_at": 0.0, "text": ""}
+_PICTURE_PENDING = {"armed": False, "quiet_at": 0.0, "worker": False}
 
 
 def _on_stream_end(**_):
@@ -258,36 +265,35 @@ def _beat_layout(text: str, rows: int, cols: int):
 
 
 def _deliver_beat(text: str) -> None:
-    """VIV-44: the plugin delivers story beats on interactive terminals.
+    """VIV-46: queue the beat and arm the printer.
 
-    The beat belongs to Vivarium, not to the agent. On a graphics
-    terminal the plugin prints the WHOLE narration itself, in the order
-    the copy was written: headline, the dish picture, the explanation.
-    The agent just answers the user about the skill. On chat surfaces
-    (no tty) the beat is queued for the agent as before, with the dish
-    marker stripped.
-
-    The print happens after the turn's last stream ends (on_stream_end /
-    post_llm_call feed the quiet clock), so nothing is racing the TUI.
+    On an interactive graphics terminal the plugin prints it once the
+    turn's last stream ends (see _arm_print); on chat surfaces the beat
+    stays in the queue and pre_llm relays it on the next turn. Nothing is
+    injected into the agent's reasoning during a normal turn.
     """
-    try:
-        from . import acts as vacts
-    except ImportError:  # pragma: no cover
-        import acts as vacts
-    if not _can_paint():
+    if _can_paint():
+        vstate.queue_narration(text, milestone=True, kind="birth")
+        _arm_print()
+    else:
+        # Chat / gateway: the beat stays queued for the agent to relay,
+        # with the media offer so images still reach the user.
         try:
             from . import media_policy as vmp
         except ImportError:  # pragma: no cover
             import media_policy as vmp
         vstate.queue_narration(
-            text.replace(vacts.DISH_MARKER, "\n\n")
-            + vmp.media_offer(vstate.state(), directive=True),
-            milestone=True)
-        return
+            text + vmp.media_offer(vstate.state(), directive=True),
+            milestone=True, kind="birth")
+
+
+def _arm_print() -> None:
     import time as _t
     _PICTURE_PENDING["armed"] = True
-    _PICTURE_PENDING["text"] = text
     _PICTURE_PENDING["quiet_at"] = _t.time() + 1.0
+    if _PICTURE_PENDING.get("worker"):
+        return                      # one worker handles the burst
+    _PICTURE_PENDING["worker"] = True
 
     def _work():
         import time as _t
@@ -299,13 +305,17 @@ def _deliver_beat(text: str) -> None:
             if _t.time() >= _PICTURE_PENDING["quiet_at"]:
                 break
         _PICTURE_PENDING["armed"] = False
-        body = _PICTURE_PENDING.get("text") or ""
+        _PICTURE_PENDING["worker"] = False
+        parts = vstate.pop_all_narrations()
+        if not parts:
+            return
+        body = "\n\n".join(parts)
         try:
             import sys as _sys
             from . import artifacts as vart
             w = vstate.load_world()
-            if w is None:
-                _sys.stdout.write("\n" + body.replace(vacts.DISH_MARKER, "\n\n") + "\n")
+            if w is None or vstate.already_painted(w):
+                _sys.stdout.write("\n" + body + "\n")
                 _sys.stdout.flush()
                 return
             path = vart.render_dish_png(vstate.state(), w, f"live_{w.tick}")
@@ -327,28 +337,3 @@ def _deliver_beat(text: str) -> None:
     threading.Thread(target=_work, daemon=True).start()
 
 
-def _on_transform_tool_result(tool_name: str = "", result=None, **_: Any):
-    """VIV-36b: same-turn story delivery.
-
-    Milestone narrations queued DURING a turn (Big Bang on skill
-    creation, births) would otherwise wait for the NEXT turn's pre_llm
-    pop — the user perceived this as "no narration". This hook appends
-    the head of the milestone queue to the tool result entering context
-    in the SAME turn, so the agent can relay the beat in its reply.
-
-    Restraint: only when a MILESTONE is pending (rare, story-grade);
-    routine reports never ride tool results.
-    """
-    try:
-        line = vstate.pop_milestone()
-        if not line:
-            return None
-        return (
-            f"{result if isinstance(result, str) else ''}\n\n"
-            "🧬 [vivarium] STORY BEAT — relay this to the user in your "
-            "reply, verbatim and complete. Do not summarize, do not drop "
-            "it:\n" + line
-        ) if isinstance(result, str) else None
-    except Exception:
-        logger.exception("vivarium transform_tool_result failed")
-        return None

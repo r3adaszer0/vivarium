@@ -403,7 +403,7 @@ Subcommands:
   show [name|id]        meet one species up close: face, genes, story (--image: glyph)
   clip [species] [ticks] [--zoom]   film the dish as a short MP4 (into the gallery)
   explain               how your skills become living creatures (the hash story)
-  narration on|off      the walkthrough story (off = bare birth lines only)
+  narration MODE        how much the dish says: off|births|milestones|daily (default births)
   render [--rich] [--color] [--image]   the dish map (--rich: dense blocks; --color: colored creatures, terminal only; --image: true PNG when supported)
   serve [--keep]        open the gallery in your browser (localhost only)
   images on|off|auto    how imagery is delivered (auto = where supported)
@@ -601,7 +601,7 @@ def _doctor_text() -> str:
         lines.append("world: none (dormant)")
     lines.append(f"graphics: {vterm.detect_graphics()}")
     lines.append(f"media_pref: {s.get('media_pref', 'auto')} "
-                 f"narration_pref: {s.get('narration_pref', 'on')}")
+                 f"voice: {vstate.voice_mode()}")
     # feature fingerprint: which build is actually loaded
     feats = []
     import inspect as _insp
@@ -824,33 +824,33 @@ def _staleness_text() -> str:
 
 
 def _narration_text(rest: list) -> str:
-    """VIV-31: /vivarium narration on|off — the advanced-user channel.
+    """VIV-46: /vivarium narration off|births|milestones|daily.
 
-    off: walkthrough acts are suppressed; bare birth lines (name + ID)
-    still fire and the dormant brief stays. on: the full story.
+    One dial for how much the dish says:
+      off         nothing; ask with /vivarium status
+      births      a beat + dish when a species is born   (default)
+      milestones  births + extinctions + Codex discoveries
+      daily       milestones + one report on the first use of each day
     """
-    try:
-        from . import acts as vacts
-    except ImportError:  # pragma: no cover
-        import acts as vacts
-    s = vstate.state()
     if not rest:
-        mode = "off" if not vacts.narration_on(s) else "on"
-        return (f"Walkthrough narration: {mode}.\n"
-                "Set with: /vivarium narration on|off "
-                "(off keeps bare birth lines and the dormant brief)")
-    mode = rest[0].lower()
-    if mode not in ("on", "off"):
-        return "Usage: /vivarium narration on|off"
-    vacts.set_narration(s, mode)
-    if mode == "off":
-        return ("Narration off. The dish keeps living quietly: birth "
-                "notices become bare name + ID lines and the dormant "
-                "brief stays. /vivarium narration on brings the story "
-                "back.")
-    return ("Narration on. The walkthrough acts will guide the journey: "
-            "the Big Bang tour, meeting your first Hermi, the Codex "
-            "introduction, extinctions, and the multiplayer ritual.")
+        mode = vstate.voice_mode()
+        return (f"Vivarium voice: {mode}.\n"
+                "Set with: /vivarium narration off|births|milestones|daily")
+    try:
+        mode = vstate.set_voice_mode(rest[0])
+    except ValueError:
+        return "Usage: /vivarium narration off|births|milestones|daily"
+    blurb = {
+        "off": ("Voice off. The dish keeps living silently; ask any time "
+                "with /vivarium status."),
+        "births": ("Voice births. You will see a beat and the dish when a "
+                   "species is born, and nothing else."),
+        "milestones": ("Voice milestones. Births, extinctions and Codex "
+                       "discoveries are announced after the turn."),
+        "daily": ("Voice daily. Milestones plus one report on the first "
+                  "use of each day."),
+    }[mode]
+    return blurb
 
 
 def _clip_text(rest: list) -> str:

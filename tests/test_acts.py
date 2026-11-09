@@ -95,10 +95,26 @@ class TestActs(unittest.TestCase):
                                   x=5, y=5, energy=0.01, lineage="Eidos_doom")]
         w.next_gid = 2
         self.s.set("world", w.to_dict())
+        vstate.set_voice_mode("milestones")   # deaths are a milestone event
         vstate.advance(w, ticks=3, nutrients=0.0)
         pend = vstate.narration_text()
         self.assertIn("Eidos_doom", pend)
         self.assertIn("how this world selects", pend)
+
+    def test_extinction_is_silent_in_births_voice(self):
+        """Default voice: births only. Deaths do not interrupt."""
+        ctx = _C(self.s)
+        vstate.bind(ctx)
+        make_live(self.s)
+        w = W.World.from_dict(self.s.d["world"], seed=self.s.get("seed", 0))
+        genome = W.genome_from_bytes(bytes(range(24)))
+        w.creatures = [W.Creature(gid=1, genome=dict(genome),
+                                  x=5, y=5, energy=0.01, lineage="Eidos_doom")]
+        w.next_gid = 2
+        self.s.set("world", w.to_dict())
+        self.assertEqual(vstate.voice_mode(), "births")
+        vstate.advance(w, ticks=3, nutrients=0.0)
+        self.assertNotIn("Eidos_doom", vstate.narration_text())
 
 
 if __name__ == "__main__":

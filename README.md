@@ -98,6 +98,22 @@ moment re-renders exactly. [Watch a bloom close-up](docs/assets/clip_bloom_zoom.
 
 
 
+## Voice: the dish speaks only when it has something to say
+
+Vivarium never talks over your agent. Hermes answers you; the dish keeps
+living quietly in the background, advancing as you use it. It speaks only
+after the turn is over, and only about events:
+
+- **off** no announcements; ask any time with `/vivarium status`
+- **births** (default) a beat and the dish when a species is born
+- **milestones** births, extinctions and Codex discoveries
+- **daily** milestones plus one report on the first use of each day
+
+`/vivarium narration off|births|milestones|daily`
+
+A species is its content: learning the same thing under another name
+does not spawn a twin. Several births in one turn arrive as one message.
+
 ## The first run: four acts
 
 Vivarium introduces itself the way a world should: one beat per turn, each tied to something you actually did.

@@ -36,10 +36,10 @@ class TestDeliveryRegistration(unittest.TestCase):
     story beat waited for the next turn's pre_llm (the exact bug the
     user hit twice). The registration is the fix; this test pins it."""
 
-    def test_register_hooks_registers_transform_tool_result(self):
+    def test_register_hooks_registers_the_quiet_set(self):
         ctx = _Ctx()
         vhooks.register_hooks(ctx)
-        self.assertIn("transform_tool_result", ctx.hooks)
+        self.assertNotIn("transform_tool_result", ctx.hooks)
         self.assertIn("on_skill_lifecycle", ctx.hooks)
         self.assertIn("pre_llm_call", ctx.hooks)
         self.assertIn("post_tool_call", ctx.hooks)

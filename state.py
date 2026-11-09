@@ -162,7 +162,8 @@ def advance(w: World, ticks: int = 1, nutrients: float = 0.0) -> List[dict]:
                 line = (f"🪦 The {lineage} lineage has died out "
                         f"(last seen tick {w.tick}).")
                 queue_narration(
-                    vacts.death_narration(_state(), line, lineage))
+                    vacts.death_narration(_state(), line, lineage),
+                    kind="death")
     try:
         from . import codex as vcodex
     except ImportError:  # pragma: no cover
@@ -178,7 +179,8 @@ def advance(w: World, ticks: int = 1, nutrients: float = 0.0) -> List[dict]:
             if "Codex entry:" in line:
                 seg = line.split("Codex entry:", 1)[1].split("confirmed", 1)[0]
                 label = seg.strip(" :") or label
-            queue_narration(vacts.codex_narration(_state(), line, label))
+            queue_narration(vacts.codex_narration(_state(), line, label),
+                            kind="codex")
     except Exception:
         pass  # detection is best-effort; the dish must never stop ticking
     if summaries:
@@ -218,9 +220,53 @@ def activity_summary() -> dict:
 _NARRATION_MILESTONE_KEY = "pending_narration_milestones"
 _ROUTINE_CAP = 2
 
+# ── voice: how much the dish says ───────────────────────────────────────────
+# off        nothing (on-demand only: /vivarium status)
+# births     a beat + dish when a species is born          (DEFAULT)
+# milestones births + extinctions + Codex discoveries
+# daily      milestones + one report on the first use of each day
+VOICE_MODES = ("off", "births", "milestones", "daily")
+_VOICE_KEY = "voice_mode"
+_VOICE_DEFAULT = "births"
+_LEGACY_VOICE = {"on": "milestones", "off": "off", "": _VOICE_DEFAULT}
 
-def queue_narration(line: str, milestone: bool = False) -> None:
+
+def voice_mode() -> str:
+    m = _state().get(_VOICE_KEY, _VOICE_DEFAULT)
+    m = _LEGACY_VOICE.get(m, m)
+    return m if m in VOICE_MODES else _VOICE_DEFAULT
+
+
+def set_voice_mode(mode: str) -> str:
+    mode = (mode or "").strip().lower()
+    mode = _LEGACY_VOICE.get(mode, mode)
+    if mode not in VOICE_MODES:
+        raise ValueError("voice must be one of: " + ", ".join(VOICE_MODES))
+    _state().set(_VOICE_KEY, mode)
+    return mode
+
+
+def voice_allows(kind: str) -> bool:
+    """kind: birth | death | codex | report."""
+    m = voice_mode()
+    if m == "off":
+        return False
+    if kind == "birth":
+        return True
+    if m == "births":
+        return False
+    if kind in ("death", "codex"):
+        return True
+    if kind == "report":
+        return m == "daily"
+    return False
+
+
+def queue_narration(line: str, milestone: bool = False,
+                    kind: str = "birth") -> None:
     if not line:
+        return
+    if not voice_allows(kind):
         return
     key = _NARRATION_MILESTONE_KEY if milestone else _NARRATION_KEY
     q = _state().get(key, [])
@@ -287,6 +333,19 @@ def pop_milestone() -> Optional[str]:
     line = mq.pop(0)
     s.set(_NARRATION_MILESTONE_KEY, mq)
     return line
+
+
+def pop_all_narrations() -> list:
+    """Drain both queues (milestones first) for one batched print."""
+    s = _state()
+    out = []
+    for key in (_NARRATION_MILESTONE_KEY, _NARRATION_KEY):
+        q = s.get(key, [])
+        if isinstance(q, str):
+            q = [q] if q else []
+        out.extend([str(x) for x in q if x])
+        s.set(key, [])
+    return out
 
 
 def pop_narration() -> Optional[str]:

@@ -56,13 +56,24 @@ def _mark(s, act: str) -> None:
 
 
 def narration_on(s) -> bool:
-    return s.get(NARRATION_KEY2, "on") != "off"
+    """True unless the voice is off, read from the state passed in."""
+    try:
+        from . import state as vstate
+    except ImportError:  # pragma: no cover
+        import state as vstate
+    raw = s.get(vstate._VOICE_KEY, vstate._VOICE_DEFAULT)
+    raw = vstate._LEGACY_VOICE.get(raw, raw)
+    return raw != "off"
 
 
 def set_narration(s, mode: str) -> str:
-    if mode not in ("on", "off"):
-        raise ValueError("narration must be on|off")
-    s.set(NARRATION_KEY2, mode)
+    """Legacy shim: write the voice mode on the state passed in."""
+    try:
+        from . import state as vstate
+    except ImportError:  # pragma: no cover
+        import state as vstate
+    mode = "milestones" if mode == "on" else mode
+    s.set(vstate._VOICE_KEY, mode)
     return mode
 
 
