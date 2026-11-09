@@ -348,9 +348,9 @@ Subcommands:
   codex export          write codex.md + the media gallery for sharing
   export [name]         your species as VIV1 challenge codes (shareable)
   race <code> | <seed> [codes]   run a scenario duel (shareable, deterministic)
-  start                 welcome/briefing (any time — shows the dormant promise)
+  start                 welcome/briefing + the universe view (graphics when possible)
   staleness             is this universe going stale? (evidence-based)
-  restart               end this era; the next skill triggers a new Big Bang
+  restart               end this era (farewell picture of the old dish); next skill births a new one
 """
 
 
@@ -596,13 +596,54 @@ def _media_offer() -> str:
     return vmp.media_offer(vstate.state())
 
 
+def _universe_view_text(header: str) -> str:
+    """VIV-35: start/restart deliver the universe VISUALLY, best-effort.
+
+    Graphics-capable terminal: paint the dish inline (same overlay path
+    as /vivarium render --image). Chat platforms / plain terminals: save
+    the PNG, point at it, and fall back to the rich ASCII map so nobody
+    leaves empty-handed.
+    """
+    if not _universe_live():
+        return header
+    w = _world()
+    try:
+        from . import artifacts as vart
+    except ImportError:  # pragma: no cover
+        import artifacts as vart
+    path = vart.render_dish_png(vstate.state(), w, f"universe_{w.tick}")
+    text = header
+    try:
+        from . import termrender as vterm
+    except ImportError:  # pragma: no cover
+        import termrender as vterm
+    kind = vterm.detect_graphics()
+    if path and kind in ("kitty", "iterm2", "sixel"):
+        size = vterm.png_size(path) or (342, 339)
+        res_rows = max(1, math.ceil(size[1] / vterm.CELL_H))
+        res_cols = max(20, math.ceil(size[0] / vterm.CELL_W))
+        spacer = "\n".join(" " * res_cols for _ in range(res_rows))
+        graphics = vterm.paint_over(path, res_rows, 0, delay=0.4)
+        return (text + "\n\n" + spacer
+                + (f"\n{graphics}" if graphics else ""))
+    # No inline graphics: hand over the image + rich ASCII
+    rich = vworld.render_ascii_rich(w, cols=80, rows=26)
+    tail = ("\n\nA live picture of your universe is saved at:\n  " + path
+            if path else "")
+    tail += ("\n\nFor the full experience, open Vivarium from a graphics "
+             "capable terminal (kitty, WezTerm, iTerm2) — the dish paints "
+             "as a real image there. More info: "
+             "https://github.com/r3adaszer0/vivarium")
+    return text + "\n\n" + rich + tail
+
+
 def _start_text() -> str:
-    """VIV-26: the welcome/briefing — the same text the dormant narration
-    gives on a fresh chat, available on demand in ANY session age."""
+    """VIV-26/VIV-35: the welcome/briefing + the universe view."""
     offer = _media_offer()
     if _universe_live():
-        return ("🌌 The Vivarium is alive. Use /vivarium status to see the "
-                "dish, /vivarium codex for discoveries.\n" + _HELP + offer)
+        return _universe_view_text(
+            "🌌 The Vivarium is alive. Here it is "
+            "(/vivarium status for numbers):") + "\n" + _HELP + offer
     return _DORMANT_BRIEF + offer
 
 
@@ -834,15 +875,44 @@ def _do_restart() -> str:
     s = vstate.state()
     old = vuniverse.universe_record(s)
     old_era, old_fp = old.get("era", 1), old.get("key_fp", "?")
+    # VIV-35: capture the era's LAST dish before it clears — the farewell
+    # picture. Rendered from the pre-restart world, delivered after.
+    farewell_png = None
+    try:
+        w_old = _world()
+        from . import artifacts as vart
+        farewell_png = vart.render_dish_png(
+            s, w_old, f"era{old_era}_final_{w_old.tick}")
+    except Exception:
+        farewell_png = None
     rec = vuniverse.restart(s, load_world=_world, clear_world=_clear_world,
                             reason="user restart via /vivarium restart")
-    return (
+    text = (
         f"🌌 Era {old_era} ended (universe {old_fp}). Champions archived as "
         f"fossils; they can be re-released into any future dish.\n\n"
         f"The next skill this agent learns births a brand-new world, derived "
         f"with a fresh key. Your Codex and species roster carry over."
         f"{_media_offer()}"
     )
+    if farewell_png:
+        try:
+            from . import termrender as vterm
+        except ImportError:  # pragma: no cover
+            import termrender as vterm
+        kind = vterm.detect_graphics()
+        if kind in ("kitty", "iterm2", "sixel"):
+            size = vterm.png_size(farewell_png) or (342, 339)
+            res_rows = max(1, math.ceil(size[1] / vterm.CELL_H))
+            res_cols = max(20, math.ceil(size[0] / vterm.CELL_W))
+            spacer = "\n".join(" " * res_cols for _ in range(res_rows))
+            graphics = vterm.paint_over(farewell_png, res_rows, 0, delay=0.4)
+            text = (f"The last picture of era {old_era}:\n\n" + spacer
+                    + (f"\n{graphics}" if graphics else "")
+                    + "\n\n" + text)
+        else:
+            text = (f"The last picture of era {old_era} is saved at:\n  "
+                    f"{farewell_png}\n\n" + text)
+    return text
 
 
 def _clear_world() -> None:
