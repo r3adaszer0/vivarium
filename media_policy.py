@@ -45,9 +45,15 @@ def media_offer(s, *, directive: bool = False) -> str:
              "renders as a real image by default. Disable anytime: "
              "/vivarium images off")
     if directive:
-        offer += ("\n(vivarium layout: relay the text above first, then call "
-                  "vivarium_render with image=true — it paints the dish "
-                  "inline in this terminal and reserves its rows — then "
-                  "continue your reply below the picture. Do not repeat the "
-                  "image as ASCII.)")
+        # VIV-42: on an interactive terminal the PLUGIN paints the dish
+        # itself after the turn settles (see hooks._schedule_picture), so
+        # the agent is told nothing about painting. Only surfaces that
+        # cannot paint (chat/gateway: no tty) get the tool directive, and
+        # there the tool attaches the PNG.
+        import sys as _sys
+        interactive = getattr(_sys.stdout, "isatty", lambda: False)()
+        if not interactive:
+            offer += ("\n(vivarium layout: relay the text above first, then "
+                      "call vivarium_render with image=true so the picture "
+                      "is attached; the terminal paints for the user.)")
     return offer

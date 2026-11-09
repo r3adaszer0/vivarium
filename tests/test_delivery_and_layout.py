@@ -38,6 +38,7 @@ class TestDeliveryRegistration(unittest.TestCase):
         self.assertIn("on_skill_lifecycle", ctx.hooks)
         self.assertIn("pre_llm_call", ctx.hooks)
         self.assertIn("post_tool_call", ctx.hooks)
+        self.assertIn("on_stream_end", ctx.hooks)
 
 
 class TestImageRowReservation(unittest.TestCase):

@@ -20,3 +20,4 @@ provides_hooks:
   - pre_llm_call
   - on_skill_lifecycle
   - transform_tool_result
+  - on_stream_end

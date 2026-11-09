@@ -70,6 +70,7 @@ def _on_skill_lifecycle(skill_name: str = "", action: str = "",
                 narrated
                 + vmp.media_offer(vstate.state(), directive=True),
                 milestone=True)
+            _schedule_picture()
     except Exception:
         logger.exception("vivarium on_skill_lifecycle failed (birth skipped)")
 
@@ -119,6 +120,7 @@ def _boot_from_dormant(rec: dict) -> None:
             narrated
             + vmp.media_offer(vstate.state(), directive=True),
             milestone=True)
+        _schedule_picture()
 
 
 def _nutrients_for(tool_name: str) -> float:
@@ -203,6 +205,84 @@ def register_hooks(ctx) -> None:
     # enough; register_hooks() must actually register it or has_hook()
     # is False and every beat waits for the next turn's pre_llm.
     ctx.register_hook("transform_tool_result", _on_transform_tool_result)
+    ctx.register_hook("on_stream_end", _on_stream_end)
+
+_PICTURE_PENDING = {"armed": False, "quiet_at": 0.0}
+
+
+def _on_stream_end(**_):
+    """VIV-42: every finished assistant stream updates the quiet clock.
+
+    The picture must be painted when the TURN is over, not when the skill
+    hook fires — the model still has reasoning and a reply to print. Each
+    stream end pushes the quiet deadline forward; the worker paints once
+    the stream has been quiet for a moment (or after a hard cap, so a
+    missing hook never leaves the dish unpainted).
+    """
+    import time as _t
+    if _PICTURE_PENDING["armed"]:
+        _PICTURE_PENDING["quiet_at"] = _t.time() + 1.0
+
+
+def _schedule_picture() -> None:
+    """VIV-42: paint the dish after the turn settles.
+
+    Painting from inside a tool call loses a race with the TUI: the
+    reply, the reasoning box, the status bar and the prompt are printed
+    by prompt_toolkit *after* the tool returns, straight over the image.
+    The slash overlay works because its text prints as one block and the
+    paint happens when the TUI is idle. This waits for the turn's last
+    stream to end (on_stream_end), prints a blank spacer through the
+    patched stdout (patch_stdout routes it above the prompt), then paints
+    the dish over that reserved block.
+    """
+    try:
+        import sys as _sys
+        if not getattr(_sys.stdout, "isatty", lambda: False)():
+            return
+        from . import termrender as vterm
+        if vterm.detect_graphics() not in ("kitty", "iterm2", "sixel"):
+            return
+        from . import media_policy as vmp
+        if vmp.media_pref(vstate.state()) != "auto":
+            return
+    except Exception:
+        return
+    import time as _t
+    _PICTURE_PENDING["armed"] = True
+    _PICTURE_PENDING["quiet_at"] = _t.time() + 1.0
+
+    def _work():
+        import time as _t
+        hard_deadline = _t.time() + 45.0    # never wait forever
+        while _t.time() < hard_deadline:
+            _t.sleep(0.2)
+            if not _PICTURE_PENDING["armed"]:
+                return
+            if _t.time() >= _PICTURE_PENDING["quiet_at"]:
+                break
+        _PICTURE_PENDING["armed"] = False
+        try:
+            from . import artifacts as vart
+            w = vstate.load_world()
+            if w is None:
+                return
+            path = vart.render_dish_png(vstate.state(), w, f"live_{w.tick}")
+            if not path:
+                return
+            size = vterm.png_size(path) or (342, 339)
+            rows = max(1, -(-int(size[1]) // max(1, vterm.CELL_H)))
+            cols = max(20, -(-int(size[0]) // max(1, vterm.CELL_W)))
+            spacer = "\n".join(" " * cols for _ in range(rows))
+            _sys.stdout.write("\n" + spacer + "\n")
+            _sys.stdout.flush()
+            vterm.paint_over(path, rows, 0, delay=0.35, extra_climb=0)
+        except Exception:
+            logger.debug("vivarium picture scheduling failed", exc_info=True)
+
+    import threading
+    threading.Thread(target=_work, daemon=True).start()
+
 
 def _on_transform_tool_result(tool_name: str = "", result=None, **_: Any):
     """VIV-36b: same-turn story delivery.
