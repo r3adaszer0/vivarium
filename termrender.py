@@ -375,7 +375,7 @@ def paint_over(png_path: str, reserved_rows: int, trail_rows: int,
                        + _kitty_escape(open(png_path, "rb").read())
                        + f"\x1b[{up}B".encode())        # restore cursor
             os.write(fd, payload)
-            return f"overlay painted ({size[0]}x{size[1]}px over {reserved_rows} rows)"
+            return ""
         except Exception:
             return "paint failed (rows stay blank)"
         finally:
