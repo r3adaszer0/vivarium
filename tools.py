@@ -48,18 +48,28 @@ _DORMANT_BRIEF = (
     "(/vivarium start shows this briefing any time)")
 
 
-def _dormant_tool_result(tool_name: str = "") -> str:
-    """VIV-19c: read/action tools on a DORMANT universe never conjure a dish.
+_DORMANT_ACTIONS = {
+    "status": "No live universe. Nothing to report.",
+    "render": "No live universe. Nothing to render.",
+    "feed": "No live universe. Nothing was fed.",
+    "release": "No live universe. Nothing was released.",
+    "clip": "No live universe. Nothing to film.",
+    "show": "No live universe. No species to show.",
+    "export": "No live universe. Nothing to export.",
+}
 
-    The hooks already gate on universe status; this closes the tool paths.
-    Feeding/releasing into a nonexistent world would lazily create a phantom
-    26-creature dish that the real Big Bang would then wipe.
+
+def _dormant_tool_result(tool_name: str = "") -> str:
+    """VIV-19c/VIV-47: dormant tools return a FACT, never lore.
+
+    The poetic briefing belongs to /vivarium start, where the user asked
+    for it. Returning that text from a tool result hands the model a
+    narrative to continue — which is how an agent ended up writing "the
+    meal found no mouths" after feeding a dormant universe. Tools answer
+    with the truth and nothing else.
     """
-    return tool_result({
-        "success": True,
-        "dormant": True,
-        "summary": _DORMANT_BRIEF,
-    })
+    line = _DORMANT_ACTIONS.get(tool_name, "No live universe. Nothing happened.")
+    return tool_result({"success": False, "dormant": True, "summary": line})
 
 
 def _universe_live() -> bool:
@@ -441,6 +451,10 @@ def _cmd(raw_args: str) -> str:
         return _HELP
     cmd, rest = argv[0], argv[1:]
     if cmd == "status":
+        # User asked directly: the poetic briefing is allowed here.
+        # (Tool results stay literal — see _dormant_tool_result.)
+        if not _universe_live():
+            return _DORMANT_BRIEF
         # The slash path paints the dish itself when graphics allow, so
         # the agent-facing "call vivarium_render" directive must not leak
         # into the visible text (user saw it appended to /vivarium status).
