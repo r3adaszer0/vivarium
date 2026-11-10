@@ -1,6 +1,6 @@
 """Species identity: glyph + name, both derived deterministically (VIV-8).
 
-Every species gets a stable visual face (5x5 glyph, 4 shades, mirrored
+Every species gets a stable visual face (7x7 glyph, 4 shades, mirrored
 left-right) and a binomial name, both pure functions of its genome — no RNG,
 no lookup tables keyed by anything but the genome itself. Two renderers with
 this module produce identical species art: the spec is the genome.
@@ -20,19 +20,21 @@ try:  # package context (Hermes plugin) or flat import (tests)
 except ImportError:  # pragma: no cover
     import world as W
 
-GLYPH_SIZE = 5
+GLYPH_SIZE = 7
 SHADES = " .o@"          # darkest -> brightest (matches dish render shading)
 SHADE_LEVELS = 4
 
-# Fixed bit-allocation: 2 bits per pixel-cell, 15 cells (left half + center
-# column of a 5x5 grid, mirrored) = 30 bits consumed from the genome stream.
-# Pixel order: center column top->bottom, then column pairs outward.
+# Fixed bit-allocation: 2 bits per cell, 28 independent cells (center column
+# plus three mirror pairs of a 7x7 grid) = 56 bits from the genome stream.
+# 56 bits is 65,536 times the old 5x5 face; it costs two rows of height and
+# nothing in width once the portrait draws two characters per cell.
+# Cell order: center column top->bottom, then column pairs outward.
 _CELL_ORDER: Tuple[Tuple[int, int], ...] = tuple(
-    (y, 2) for y in range(5)
+    (y, 3) for y in range(GLYPH_SIZE)
 ) + tuple(
     (y, x)
-    for x in (1, 0)          # mirror pair columns, inner pair first
-    for y in range(5)
+    for x in (2, 1, 0)       # mirror pair columns, inner pair first
+    for y in range(GLYPH_SIZE)
 )
 
 # ── glyph ─────────────────────────────────────────────────────────────────────
@@ -45,7 +47,7 @@ def _genome_stream(g: Dict[str, float]) -> bytes:
 
 
 def glyph_cells(g: Dict[str, float]) -> List[List[int]]:
-    """Genome -> 5x5 shade matrix (0..3), mirrored left-right."""
+    """Genome -> 7x7 shade matrix (0..3), mirrored left-right."""
     import hashlib
     stream = hashlib.sha256(_genome_stream(g)).digest()
     cells = [[0] * GLYPH_SIZE for _ in range(GLYPH_SIZE)]
@@ -58,7 +60,7 @@ def glyph_cells(g: Dict[str, float]) -> List[List[int]]:
 
 
 def glyph_ascii(g: Dict[str, float]) -> str:
-    """The glyph as 5 lines of shade characters."""
+    """The glyph as GLYPH_SIZE lines of shade characters."""
     cells = glyph_cells(g)
     return "\n".join("".join(SHADES[v] for v in row) for row in cells)
 

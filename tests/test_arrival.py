@@ -30,14 +30,14 @@ class Portrait(unittest.TestCase):
     def test_portrait_is_the_show_glyph_widened(self):
         import identity as I
         cells = I.glyph_cells(self.g)
-        lines = portrait.sprite_lines(genome=self.g, scale=3)
+        lines = portrait.sprite_lines(genome=self.g)  # 2 chars per cell
         self.assertEqual(len(lines), len(cells))
         import re as _re
         for row, line in zip(cells, lines):
             plain = _re.sub(r"\x1b\[[0-9;]*m", "", line)
-            self.assertEqual(len(plain), 15)
+            self.assertEqual(len(plain), 2 * len(cells))
             for i, v in enumerate(row):
-                block = plain[i * 3:(i + 1) * 3]
+                block = plain[i * 2:(i + 1) * 2]
                 self.assertEqual(len(set(block)), 1)
                 self.assertEqual(block[0] == " ", v == 0)
 

@@ -8,7 +8,7 @@ and encodes an MP4 via imageio+ffmpeg. Purely additive; no engine changes.
 
 Zoom: region=(cx, cy, half) renders the 2*half x 2*half cell window centered
 on (cx, cy), toroidal. At cell_px=8 each creature is an 8x8 block painted
-with its species' 5x5 glyph (4 shades, species color) — the family face.
+with its species' 7x7 glyph (4 shades, species color) — the family face.
 
 Rendering is pixel-space end to end: a frame is `px` rows of `px` RGB tuples;
 food paints each cell block first, then creature glyphs overwrite their own

@@ -52,12 +52,15 @@ def _fallback_genome(eidos: str) -> dict:
     return out
 
 
-def sprite_lines(genome=None, eidos: str = "", scale: int = 3):
+def sprite_lines(genome=None, eidos: str = "", scale: int = 2):
     """The face as terminal lines: the glyph matrix, shaded by brightness.
 
     Every lit cell is a solid block; the glyph's 0..3 level chooses the
     tint, from a dim 42% of the species colour up to full. Solid cells keep
     the silhouette crisp, the tint keeps the relief.
+
+    Two characters per cell: a 7x7 face is 14 columns, one narrower than
+    the old 5x5 at three, with four times the cells.
     """
     if genome is None:
         genome = _fallback_genome(eidos or "Eidos_000000")

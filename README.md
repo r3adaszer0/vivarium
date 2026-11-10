@@ -69,7 +69,7 @@ begins the day it's born.
 | `/vivarium staleness` | is the living world going stale? |
 | `/vivarium restart` | end the era (with a farewell picture); the next skill births a new universe |
 
-Every species gets a **5×5 mirrored glyph** and a binomial name derived
+Every species gets a **7×7 mirrored glyph** and a binomial name derived
 deterministically from its genome — the same genome grows the same face in any
 renderer:
 

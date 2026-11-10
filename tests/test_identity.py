@@ -16,9 +16,9 @@ G3 = dict(G1, sense=2.87, metabolism_mult=1.14, hue=0.13)
 class GlyphSpec(unittest.TestCase):
     def test_shape_and_shades(self):
         cells = I.glyph_cells(G1)
-        self.assertEqual(len(cells), 5)
+        self.assertEqual(len(cells), 7)
         for row in cells:
-            self.assertEqual(len(row), 5)
+            self.assertEqual(len(row), 7)
             for v in row:
                 self.assertIn(v, (0, 1, 2, 3))
 

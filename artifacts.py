@@ -71,11 +71,11 @@ def food_rgb(f: float):
 
 
 def render_glyph_png(s, eidos: str, genome: Dict[str, float]) -> Optional[str]:
-    """One species face at 40x scale (5x5 -> 200x200), tinted by its hue."""
+    """One species face (7x7 -> 210px), tinted by its hue."""
     name = f"glyph_{eidos[6:]}.png"
     path = f"{media_dir(s)}/{name}"
-    SCALE, PAD = 40, 10
-    size = 5 * SCALE + 2 * PAD
+    SCALE, PAD = int(210 / I.GLYPH_SIZE), 10
+    size = I.GLYPH_SIZE * SCALE + 2 * PAD
     rgb = I.glyph_rgb_cells(genome, I.color_for(genome["hue"]))
     pixels = [[rgb[(py - PAD) // SCALE][(px - PAD) // SCALE]
                if PAD <= py < size - PAD and PAD <= px < size - PAD
