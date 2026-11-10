@@ -773,32 +773,44 @@ def _race_text(rest: list) -> str:
     except ImportError:  # pragma: no cover
         import scenario as vscen
     if not rest:
-        return ("Usage: /vivarium race <seed-word> <code> [<code> …]"
-                "\n\n"
-                "A race is a small duel between species in a sealed jar: "
-                "same start, same rules, same result every time - anyone "
-                "can re-run it and get the same scoreboard.\n"
-                "\n"
-                "How to run one:\n"
-                "  1. Pick contestants. /vivarium export lists your "
-                "species as challenge codes (a code IS its genome - six "
-                "numbers, nothing private).\n"
-                "  2. Choose a seed word. Any word works: it fixes the "
-                "arena - terrain, food, start positions - so the same "
-                "seed always builds the same jar.\n"
-                "  3. Race.\n"
-                "     /vivarium race titanic <code>          your species, "
-                "solo, vs the jar's baseline\n"
+        return ("Usage: /vivarium race <seed-world> <code> [<code> …]"
+                "\n" + "─" * 62
+                + "\n"
+                "A race drops your species into a sealed jar: same start, "
+                "same rules, same scoreboard every time. Anyone can re-run "
+                "it and get the exact same result.\n"
+                + "\n" + "─" * 62
+                + "\n"
+                "How to run one\n"
+                "  1 · Copy a code        /vivarium export lists your "
+                "species as challenge codes\n"
+                "                        (a code IS the genome - six numbers, "
+                "nothing private).\n"
+                "  2 · Pick a seed world  the word builds the arena: terrain, "
+                "food, start\n"
+                "                        positions. Same word, same jar, "
+                "forever.\n"
+                "  3 · Race\n"
+                "     /vivarium race titanic <code>           your species "
+                "solo, against the jar\n"
                 "     /vivarium race titanic <codeA> <codeB>  head-to-head\n"
-                "     /vivarium race SCEN1…                  re-run a race "
-                "someone shared with you\n"
-                "  4. The result prints a scoreboard and a share code. "
-                "Send that code to a friend (or post it): they can replay "
-                "the exact same race and check the score.\n"
+                "     /vivarium race SCEN1…                   re-run a race "
+                "someone shared\n"
+                "  4 · Share              the scoreboard prints a SCEN1 "
+                "code - anyone who\n"
+                "                        runs it replays your exact race.\n"
+                + "\n" + "─" * 62
+                + "\n"
+                "Seed worlds (each word builds its own fixed arena)\n"
+                "  titanic      the classic - open terrain, mixed food\n"
+                "  garden       gentler starts; see who balloons\n"
+                "  crucible     harsh starts; see who survives anyway\n"
+                "  archipelago  scattered starts; watch dispersal work\n"
                 "\n"
-                "Codes come from /vivarium export, or from other agents' "
-                "challenge codes. No skill content ever leaves your "
-                "machine - only the genome numbers.")
+                "Any word works - a word nobody used yet is a brand-new "
+                "world nobody has raced in. "
+                "Codes come from /vivarium export or from other agents; "
+                "no skill content ever leaves your machine.")
     if rest[0].startswith("SCEN1"):
         spec = vscen.decode_scenario(rest[0])
         if spec is None:
@@ -893,8 +905,8 @@ def _export_text(rest: list) -> str:
         lines.append("")
         lines.append(f"{len(births)} species exist; these are the dish's "
                      f"top {len(picked)}. Everything: /vivarium export all")
-        lines.append("Race them: /vivarium race <seed-word> <code> "
-                     "[<code> …]")
+        lines.append("To race them, copy a species' challenge code, then "
+                     "type /vivarium race")
         return "\n".join(lines)
     lines = ["Your species — challenge codes (share freely, genome only):"]
     for name in sorted(births):
@@ -908,7 +920,8 @@ def _export_text(rest: list) -> str:
             lines.append(f"  {eidos:<14} {name:<28} (code unavailable — "
                          f"born pre-VIV-13, skill no longer installed)")
     lines.append("")
-    lines.append("Race them: /vivarium race <seed-word> <code> [<code> …]")
+    lines.append("To race them, copy a species' challenge code, then "
+                 "type /vivarium race")
     return "\n".join(lines)
 
 
