@@ -19,6 +19,7 @@ import unittest
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import birth as vbirth  # noqa: E402
+import birth  # noqa: E402
 import state as vstate  # noqa: E402
 import world as W  # noqa: E402
 from collections import Counter  # noqa: E402
@@ -140,3 +141,26 @@ class OldCodesStillDecode(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ANameIsGivenOnce(unittest.TestCase):
+    def test_stored_name_beats_a_recomputed_one(self):
+        import birth
+
+        g = W.genome_from_bytes(bytes(range(W.GENOME_BYTES)))
+        res = {"eidos": "Eidos_0badc0de", "name": "demo", "genome": g,
+               "species": "Oculata robusta", "common": "the watcher"}
+        line = birth.announcement(res)
+        self.assertIn("Oculata robusta", line)
+        self.assertNotIn(birth._name_species(g)[0], line)
+
+    def test_a_new_gene_does_not_rename_the_roster(self):
+        g = W.genome_from_bytes(bytes(range(W.GENOME_BYTES)))
+        before = birth._name_species(g)[0]
+        g2 = dict(g)
+        g2["dispersal"] = 0.93          # as if a later gene changed the profile
+        # `name_of` reads genes that did not exist when this species was
+        # named, so its verdict can drift; the record is what wins.
+        res = {"eidos": "Eidos_0badc0de", "genome": g2, "name": "demo",
+               "species": before}
+        self.assertIn(before, birth.announcement(res))

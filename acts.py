@@ -163,8 +163,10 @@ def act3_for(result: dict) -> str:
         import identity as vident
     genome = result.get("genome") or {}
     title = ""
-    if all(k in genome for k in ("forage", "sense", "metabolism_mult",
-                                 "aggression", "mutate", "hue")):
+    if result.get("species"):
+        title = f"{result['species']}, {result.get('common', '')}. ".replace(", .", ". ")
+    elif all(k in genome for k in ("forage", "sense", "metabolism_mult",
+                                   "aggression", "mutate")):
         genus, epithet, common = vident.name_of(genome)
         title = f"{genus} {epithet}, {common}. "
     return (

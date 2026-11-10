@@ -99,8 +99,11 @@ def birth_species(s, name: str, content: str,
         W.run(w, advance)
 
     from datetime import date
+    genre = _name_species(genome)
     births[name] = {
         "eidos": eidos,
+        "species": genre[0],
+        "common": genre[1],
         "day": date.today().isoformat(),
         "tick": w.tick,
         "pod": POD_SIZE,
@@ -112,8 +115,19 @@ def birth_species(s, name: str, content: str,
     save_world(w)
     return {
         "eidos": eidos, "name": name, "genome": genome,
+        "species": genre[0], "common": genre[1],
         "tick": w.tick, "pod": POD_SIZE,
     }
+
+
+def _name_species(genome: dict):
+    """Genus + epithet + common name, computed once and then frozen."""
+    try:
+        from . import identity as vident
+    except ImportError:  # pragma: no cover
+        import identity as vident
+    genus, epithet, common = vident.name_of(genome)
+    return f"{genus} {epithet}", common
 
 
 def announcement(result: dict) -> str:
@@ -127,7 +141,14 @@ def announcement(result: dict) -> str:
         from . import identity as vident
     except ImportError:  # pragma: no cover
         import identity as vident
-    genus, epithet, _common = vident.name_of(g)
+    # A species is NAMED ONCE, at birth. Adding a gene later must not rename
+    # a creature somebody already met (dispersal turned Oculata robusta into
+    # Oculata pinguis for every species born before it existed).
+    named = result.get("species")
+    if named:
+        genus, epithet = named.split(" ", 1)
+    else:
+        genus, epithet = _name_species(g)[0].split(" ", 1)
     # The id is the one token a reader has to copy, so it gets its own
     # colour instead of disappearing into the white headline. Fixed accent,
     # not the species hue: a red species would otherwise print a red id.
