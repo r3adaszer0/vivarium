@@ -220,7 +220,7 @@ class SkillBirth(unittest.TestCase):
                                  save_world=lambda w: s.set("world", w.to_dict()),
                                  load_world=lambda: W.World.from_dict(s.d["world"]),
                                  advance=0)
-        self.assertEqual(r["eidos"], "Eidos_" + d1[:3].hex())
+        self.assertEqual(r["eidos"], "Eidos_" + d1[:4].hex())
 
 
 if __name__ == "__main__":

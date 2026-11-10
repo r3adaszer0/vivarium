@@ -1014,7 +1014,7 @@ def _clip_text(rest: list) -> str:
 def _show_text(rest: list) -> str:
     """VIV-32: /vivarium show [name|id] — meet one species up close.
 
-    Accepts an Eidos ID (Eidos_1a2b3c), a skill name, or a unique
+    Accepts an Eidos ID (Eidos_1a2b3c4d), a skill name, or a unique
     fragment. Shows the species card (face, name, traits, population);
     --image paints the species glyph via the overlay.
     """

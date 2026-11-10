@@ -32,7 +32,7 @@ def genome_of_digest(digest: bytes) -> dict:
 
 
 def eidos_id(digest: bytes) -> str:
-    return "Eidos_" + digest[:3].hex()
+    return "Eidos_" + digest[:4].hex()  # 32 bits, 4.3B ids
 
 
 def _release_pod(w, digest: bytes, lineage: str, bs) -> List:

@@ -57,7 +57,7 @@ def birth_species(s, name: str, content: str,
     for known in births.values():
         if isinstance(known, dict) and known.get("digest_fp") == fp:
             return None
-    eidos = "Eidos_" + digest[:3].hex()
+    eidos = "Eidos_" + digest[:4].hex()  # 32 bits, 4.3B ids
     genome = W.genome_from_bytes(digest[:24])
     # Landing (VIV-31 fledge): the digest picks among the dish's most
     # fertile cells (top 16 by food, ties in scan order), each pod member

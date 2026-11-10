@@ -22,7 +22,7 @@ def derive(skill_text: str, skill_name: str):
     for i, (trait, (lo, hi)) in enumerate(RANGES.items()):
         v = int.from_bytes(digest[i*4:i*4+4], "big") / 2**32
         genome[trait] = round(lo + (hi - lo) * v, 3)
-    eid = "Eidos_" + digest[:3].hex()          # 6 hex chars
+    eid = "Eidos_" + digest[:4].hex()          # 8 hex chars, 32 bits
     glyph = glyph_of(genome)
     genus, epithet, common = name_of(genome, skill_name)
     return digest, genome, eid, glyph, genus, epithet, common
