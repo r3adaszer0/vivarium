@@ -152,7 +152,8 @@ def act4_text() -> str:
     return (
         "\n\nYour dish has been running for a while now. Some lineages "
         "thrived, some are gone. Survival was the filter; what remains is "
-        "strong.\n"
+        "strong."
+        "\n\n" + DISH_MARKER + "\n\n"
         "Time to meet the neighbors. /vivarium export turns any species "
         "into a challenge code: a sealed capsule carrying its genome, never "
         "your skills (those stay yours). Send a code to a friend running "

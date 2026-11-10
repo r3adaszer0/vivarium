@@ -14,7 +14,14 @@ from __future__ import annotations
 
 import hashlib
 
-from identity import color_for, glyph_cells
+# Package import when loaded as a plugin, flat import when run from the
+# repo root. Getting this wrong is invisible until the hook fires live:
+# a flat-only import raised ModuleNotFoundError inside art_block and the
+# whole act-3 beat was swallowed by the lifecycle handler.
+try:
+    from .identity import color_for, glyph_cells
+except ImportError:  # pragma: no cover - flat-import mode
+    from identity import color_for, glyph_cells
 
 RST = "\x1b[0m"
 
@@ -31,7 +38,10 @@ def _fallback_genome(eidos: str) -> dict:
     glyph_cells needs every GENOME_KEY, so a partial dict is not an option:
     fill them from the digest, which keeps the face stable per id.
     """
-    import world as W
+    try:
+        from . import world as W
+    except ImportError:  # pragma: no cover - flat-import mode
+        import world as W
     digest = hashlib.sha256(eidos.encode()).digest()
     out = {}
     for i, key in enumerate(W.GENOME_KEYS):
