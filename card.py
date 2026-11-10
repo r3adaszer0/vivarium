@@ -193,8 +193,16 @@ def _caption(live: dict | None, note: str = "") -> str:
     if not live:
         return ""
     bits = [f"tick {live['tick']}", f"{live['alive']} alive"]
-    if live.get("lineages"):
-        bits.append(f"{live['lineages']} lineages")
+    total = live.get("lineages_total") or live.get("lineages") or 0
+    if total:
+        grey = live.get("grey") or 0
+        if grey > 0:
+            # The dish colours the top-8 and greys the rest; say so here,
+            # so a grey dish reads as a census fact, not a rendering bug.
+            bits.append(f"{live.get('coloured') or 0} in {total} lineages"
+                        f" · {grey} dim (not yet dominant)")
+        else:
+            bits.append(f"{total} lineages")
     if note:
         bits.append(note)
     return f"{ITALIC}{DIM}  " + "  ·  ".join(bits) + f"{RST}"

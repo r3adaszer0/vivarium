@@ -659,14 +659,27 @@ def tick_world(world: World, nutrients: float = 0.0) -> dict:
 
 
 def stats(world: World) -> dict:
-    """Population snapshot + top lineages by count + age structure."""
+    """Population snapshot + lineage census + age structure.
+
+    The census counts EVERYTHING alive and reports the true number of
+    distinct lineages; the top-8 slice that the dish paints is a display
+    rule, not the population. A card that said "5 lineages" over a dish
+    showing 85% grey was the same lie the hue drift told, from the other
+    side: a summarised number contradicting the visible truth.
+    """
     if not world.creatures:
         return {"tick": world.tick, "population": 0, "peak": world.peak_population,
-                "lineages": [], "ages": empty_age_stats()}
+                "lineages": [], "lineages_total": 0, "coloured": 0, "grey": 0,
+                "ages": empty_age_stats()}
     counts: Dict[str, int] = {}
     for c in world.creatures:
         counts[c.lineage] = counts.get(c.lineage, 0) + 1
-    lineages = sorted(counts.items(), key=lambda kv: -kv[1])[:5]
+    top = sorted(counts.items(), key=lambda kv: -kv[1])[:8]
+    lineages = top[:5]
+    n_total = len(counts)
+    # the dish's own rule (artifacts.py paints top-8, greys the rest)
+    coloured = sum(n for _, n in top)
+    grey = len(world.creatures) - coloured
     avg = lambda key: round(sum(c.genome.get(key, GENOME_RANGES[key][0])
                                 for c in world.creatures) / len(world.creatures), 3)
     return {
@@ -677,6 +690,7 @@ def stats(world: World) -> dict:
         "avg_energy": round(sum(c.energy for c in world.creatures) / len(world.creatures), 3),
         "avg_genome": {k: avg(k) for k in GENOME_KEYS},
         "lineages": lineages,
+        "lineages_total": n_total, "coloured": coloured, "grey": grey,
         "ages": age_stats(world),
     }
 

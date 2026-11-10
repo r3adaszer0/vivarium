@@ -134,7 +134,11 @@ def _tool_status(args: Dict[str, Any], directive: bool = True, **_) -> str:
         "summary": (
             f"Tick {s['tick']}: {s['population']} creatures alive "
             f"(peak {s.get('peak', '?')}, {s['born']} born, {s['died']} died). "
-            + ("Lineages: " + ", ".join(f"{n}×{c}" for n, c in s["lineages"])
+            + (("· " + ", ".join(f"{n}×{c}" for n, c in s["lineages"])
+                + (f" of {s['lineages_total']} lineages"
+                   if s.get("lineages_total", 0) > len(s["lineages"]) else "")
+                + (" · " + str(s["grey"]) + " dim on the dish"
+                   if s.get("grey") else ""))
                if s["lineages"] else "The dish is empty — release something!")
             + age_line + stale_line
         ),

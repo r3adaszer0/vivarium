@@ -459,7 +459,10 @@ def _arm_print() -> None:
                     st = vworld.stats(w)
                     live = {"tick": w.tick,
                             "alive": st.get("population", 0),
-                            "lineages": len(st.get("lineages") or [])}
+                            "lineages": len(st.get("lineages") or []),
+                            "lineages_total": st.get("lineages_total", 0),
+                            "coloured": st.get("coloured", 0),
+                            "grey": st.get("grey", 0)}
                 except Exception:
                     live = {"tick": w.tick}
             path = ""
