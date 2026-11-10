@@ -51,6 +51,25 @@ def media_dir(s) -> str:
 
 
 # ── artifacts ─────────────────────────────────────────────────────────────────
+# ── food colour ──────────────────────────────────────────────────────────────
+# The scale used to be linear with a near-black floor: at 6% of saturation a
+# cell drew four steps from invisible, so a grazed dish looked like a hole and
+# a fed one like a light switch. Two changes fix the read without touching the
+# data: lift the floor and compress the top with a gamma, and paint bare cells
+# as poor soil rather than leaving them as background.
+FOOD_EMPTY = (28, 37, 30)
+FOOD_FLOOR_G, FOOD_TOP_G, FOOD_GAMMA = 40, 165, 0.42
+
+
+def food_rgb(f: float):
+    """Green for a food value: 0 is poor soil, MAX_FOOD is rich."""
+    if f <= 0.0:
+        return FOOD_EMPTY
+    t = min(1.0, f / W.MAX_FOOD) ** FOOD_GAMMA
+    return (30, int(FOOD_FLOOR_G + (FOOD_TOP_G - FOOD_FLOOR_G) * t), 40)
+
+
+
 def render_glyph_png(s, eidos: str, genome: Dict[str, float]) -> Optional[str]:
     """One species face at 40x scale (5x5 -> 200x200), tinted by its hue."""
     name = f"glyph_{eidos[6:]}.png"
@@ -86,16 +105,14 @@ def render_discovery_stamp_png(s, discovery: dict, world_dict: dict) -> Optional
             o = x * 3
             rows[y] = rows[y][:o] + bytes(rgb) + rows[y][o + 3:]
 
-    # food layer
+    # food layer: every cell, so bare ground reads as poor soil
     for y in range(w.h):
         for x in range(w.w):
-            f = w.food[y][x]
-            if f > 0.0:
-                g = int(55 + 110 * min(1.0, f / W.MAX_FOOD))
-                for iy in range(CELL - 1):
-                    for ix in range(CELL - 1):
-                        px(x * (CELL + PAD) + 1 + ix, y * (CELL + PAD) + 1 + iy,
-                           (30, g, 40))
+            rgb = food_rgb(w.food[y][x])
+            for iy in range(CELL - 1):
+                for ix in range(CELL - 1):
+                    px(x * (CELL + PAD) + 1 + ix, y * (CELL + PAD) + 1 + iy,
+                       rgb)
     # creatures as lineage-colored squares (top-8 coloring like render_live)
     counts: Dict[str, int] = {}
     for c in w.creatures:
@@ -127,13 +144,11 @@ def render_dish_png(s, w, name: str, mark=None) -> Optional[str]:
 
     for y in range(w.h):
         for x in range(w.w):
-            f = w.food[y][x]
-            if f > 0.0:
-                g = int(55 + 110 * min(1.0, f / W.MAX_FOOD))
-                for iy in range(CELL - 1):
-                    for ix in range(CELL - 1):
-                        px(x * (CELL + PAD) + 1 + ix,
-                           y * (CELL + PAD) + 1 + iy, (30, g, 40))
+            rgb = food_rgb(w.food[y][x])
+            for iy in range(CELL - 1):
+                for ix in range(CELL - 1):
+                    px(x * (CELL + PAD) + 1 + ix,
+                       y * (CELL + PAD) + 1 + iy, rgb)
     counts: Dict[str, int] = {}
     for c in w.creatures:
         counts[c.lineage] = counts.get(c.lineage, 0) + 1

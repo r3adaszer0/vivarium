@@ -415,6 +415,8 @@ Subcommands:
   explain               how your skills become living creatures (the hash story)
   narration MODE        how much the dish says: off|births|milestones|daily (default births)
   trace [n]             last delivery events (debug: where a beat died)
+  checkpoints           numbered moment-snapshots of the dish (every 12 ticks)
+  checkpoint <tick>     replay one exact moment from its checkpoint
   render [--rich] [--color] [--image]   the dish map (--rich: dense blocks; --color: colored creatures, terminal only; --image: true PNG when supported)
   serve [--keep]        open the gallery in your browser (localhost only)
   images on|off|auto    how imagery is delivered (auto = where supported)
@@ -492,6 +494,50 @@ def _cmd(raw_args: str) -> str:
         if out.get("map"):
             text += "\n\nThe dish:\n" + out["map"] + \
                 "\n\n(X = creatures, dots/: = food blooms)"
+        return text
+    if cmd == "checkpoints":
+        rows = vstate.list_checkpoints()
+        if not rows:
+            return ("No checkpoints yet. One is written every "
+                    f"{vstate.CHECKPOINT_EVERY} ticks of live activity.")
+        body = "\n".join(
+            f"  tick {r['tick']:>5}  era {r['era']}  {r['population']} creatures"
+            for r in rows)
+        return ("Checkpoints (oldest first, newest kept):\n" + body +
+                "\n\n/vivarium checkpoint <tick> shows that exact dish.")
+    if cmd == "checkpoint":
+        if not rest:
+            return "Which tick? /vivarium checkpoints lists them."
+        try:
+            tick = int(rest[0])
+        except ValueError:
+            return "Tick must be a number. /vivarium checkpoints lists them."
+        w = vstate.load_checkpoint(tick)
+        if w is None:
+            return f"No checkpoint at tick {tick}. /vivarium checkpoints lists them."
+        stats = vworld.stats(w)
+        text = (f"Checkpoint tick {w.tick}: {stats['population']} creatures, "
+                f"{len(stats.get('lineages') or [])} lineages.")
+        try:
+            from . import artifacts as vart
+            from . import termrender as vterm
+        except ImportError:  # pragma: no cover
+            import artifacts as vart
+            import termrender as vterm
+        if media_pref() != "ascii" and \
+                vterm.detect_graphics() in ("kitty", "iterm2", "sixel"):
+            try:
+                path = vart.render_dish_png(vstate.state(), w,
+                                            f"checkpoint_{w.tick}")
+                if path:
+                    size = vterm.png_size(path) or (342, 339)
+                    res_rows = max(1, math.ceil(size[1] / vterm.CELL_H))
+                    res_cols = max(20, math.ceil(size[0] / vterm.CELL_W))
+                    spacer = "\n".join(" " * res_cols for _ in range(res_rows))
+                    vterm.paint_over(path, res_rows, 0, delay=0.4)
+                    return text + "\n\n\n" + spacer
+            except Exception:
+                pass
         return text
     if cmd == "render":
         want_image = "image" in rest or "--image" in rest

@@ -137,6 +137,78 @@ def skill_content(skill_name: str) -> Optional[str]:
     return None
 
 
+# ── numbered checkpoints ─────────────────────────────────────────────────────
+# A PNG is a photograph of the dish; a checkpoint is the recipe. Every
+# CHECKPOINT_EVERY ticks the world is written to its own numbered file, so a
+# moment can be replayed exactly instead of reconstructed by eye.
+CHECKPOINT_EVERY = 12
+CHECKPOINT_KEEP = 10
+
+
+def checkpoint_dir():
+    d = getattr(_state(), "data_dir", None)
+    if d is None:
+        return None
+    from pathlib import Path as _P
+    p = _P(str(d)) / "checkpoints"
+    p.mkdir(parents=True, exist_ok=True)
+    return p
+
+
+def save_checkpoint(w: World) -> Optional[str]:
+    """Write the world as tick_NNNNN.json on every Nth tick."""
+    if not w.tick or w.tick % CHECKPOINT_EVERY:
+        return None
+    d = checkpoint_dir()
+    if d is None:
+        return None
+    path = d / f"tick_{w.tick:05d}.json"
+    if path.exists():
+        return str(path)
+    import json as _json
+    payload = {"tick": w.tick, "era": (universe_record() or {}).get("era"),
+               "world": w.to_dict()}
+    path.write_text(_json.dumps(payload, separators=(",", ":")))
+    files = sorted(d.glob("tick_*.json"))
+    for old in files[:-CHECKPOINT_KEEP]:
+        try:
+            old.unlink()
+        except OSError:
+            pass
+    return str(path)
+
+
+def list_checkpoints() -> List[dict]:
+    d = checkpoint_dir()
+    if d is None:
+        return []
+    import json as _json
+    out = []
+    for f in sorted(d.glob("tick_*.json")):
+        try:
+            payload = _json.loads(f.read_text())
+        except (OSError, ValueError):
+            continue
+        w = payload.get("world") or {}
+        out.append({"tick": payload.get("tick") or w.get("tick"),
+                    "era": payload.get("era"),
+                    "population": len(w.get("creatures") or []),
+                    "path": str(f)})
+    return out
+
+
+def load_checkpoint(tick: int) -> Optional[World]:
+    d = checkpoint_dir()
+    if d is None:
+        return None
+    import json as _json
+    f = d / f"tick_{int(tick):05d}.json"
+    if not f.exists():
+        return None
+    payload = _json.loads(f.read_text())
+    return World.from_dict(payload["world"], seed=int(payload["world"].get("seed", 0)))
+
+
 def advance(w: World, ticks: int = 1, nutrients: float = 0.0) -> List[dict]:
     """Advance the dish ``ticks`` ticks, persist, and remember the summary.
 
@@ -150,6 +222,10 @@ def advance(w: World, ticks: int = 1, nutrients: float = 0.0) -> List[dict]:
             before_counts[c.lineage] = before_counts.get(c.lineage, 0) + 1
     summaries = vworld.run(w, ticks=ticks, nutrients_per_tick=nutrients)
     save_world(w)
+    try:
+        save_checkpoint(w)
+    except Exception:
+        pass  # a checkpoint is a convenience; the dish must never stop ticking
     # VIV-31 act-death: a lineage that was alive before and is gone now.
     try:
         from . import acts as vacts
