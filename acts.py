@@ -212,6 +212,11 @@ def act4_text() -> str:
         "record.")
 
 
+def act4_for(result: dict) -> str:
+    """Act 4 with the newborn's face, like act 3: every birth deserves one."""
+    return act3_for(result) + "\n\n" + act4_text().strip()
+
+
 def act_codex_text(discovery_label: str) -> str:
     return (
         f"\n\nThat Codex entry is the first pattern your dish has ever "
@@ -276,7 +281,7 @@ def birth_narration(s, base: str, result: dict, is_big_bang: bool) -> str:
         _save()
         return base + DISH_MARKER + text
     if after_bang == 1 and ACT4 not in acts:
-        text = act4_text()
+        text = act4_for(result)
         _fire(ACT4)
         acts["_births_since_bang"] = 2
         _save()
