@@ -84,16 +84,15 @@ def set_narration(s, mode: str) -> str:
 DISH_MARKER = "\n\n[[vivarium:dish]]\n\n"
 
 ACT2_TEXT = (
-    "\n\nThis dish is your Vivarium universe. The green shades are food: "
-    "rich patches, poor patches. The colored squares are your Hermi, living "
-    "artificial lifeforms. They move, eat and evolve by their DNA, and that "
-    "DNA comes directly from your skills: each species is the fingerprint "
-    "of one thing your agent learned.\n"
-    "The world runs on your work. Using Hermes drops food into the dish: a "
-    "busy day is a feast, a quiet day is a famine. And every skill Hermes "
-    "learns from now on births a new species.\n"
-    "If you ever get lost: /vivarium help. Curious how text becomes DNA? "
-    "/vivarium explain.")
+    "\n\nThis dish is your Vivarium universe. Green is food: pale green is "
+    "a rich patch, dark green is sparse, and the empty cells have already "
+    "been eaten. The colored squares are artificial lifeforms: your Hermi. "
+    "They move, eat and evolve by DNA taken from your skills. Each species "
+    "is a fingerprint of one thing your agent learned.\n"
+    "Your work feeds it. Using Hermes drops food into the dish: a busy day "
+    "is a feast, a quiet day is a famine. Every skill Hermes learns births "
+    "a new species. Teach one more and I'll bring the newborn up close: its "
+    "name, its DNA, and the first ticks of its life.")
 
 
 def act2_for(result: dict) -> str:

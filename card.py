@@ -105,6 +105,29 @@ def parse(body: str, marker: str) -> dict:
     return facts
 
 
+def _lead_split(text: str) -> int:
+    """Length of the first sentence: the clause that carries the point."""
+    norm = " ".join(text.split())
+    m = re.match(r"(.+?[.!?])(\s|$)", norm)
+    return len(m.group(1)) if m else 0
+
+
+def styled_paragraph(text: str, width: int) -> list[str]:
+    """Wrap one paragraph, its opening clause set apart in bold white.
+
+    The first sentence gets its own line(s): a lead that stands alone is
+    what makes the paragraph readable at a glance, and it is also the only
+    way to guarantee the bold run does not start mid-line and stop there.
+    """
+    norm = " ".join(text.split())
+    lead = _lead_split(norm)
+    head, rest = norm[:lead].strip(), norm[lead:].strip()
+    out = [f"{BOLD}{WHITE}{ln}{RST}" for ln in wrap(head, width)]
+    if rest:
+        out += [f"{SOFT}{ln}{RST}" for ln in wrap(rest, width)]
+    return out
+
+
 def _head_block(facts: dict, cols: int, live: dict | None) -> list[str]:
     era = facts.get("era")
     left = f"{ITALIC}{DIM}era {era}{RST}" if era else ""
@@ -189,7 +212,11 @@ def render(body: str, cols: int, marker: str, live: dict | None = None,
 
     if spacer_at is not None:
         right = cols - dish_cols - 4 - TEXT_INSET
-        body_lines = wrap(tail_text, right)
+        body_lines: list[str] = []
+        for i, para in enumerate(p for p in tail_text.split("\n") if p.strip()):
+            if i:
+                body_lines.append("")
+            body_lines += styled_paragraph(para, right)
         block = max(dish_rows, len(body_lines))
         # centre the text beside the dish instead of leaving it stranded
         # at the top of a 23-row block

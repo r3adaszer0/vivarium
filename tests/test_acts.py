@@ -29,7 +29,7 @@ class TestActs(unittest.TestCase):
         base = "🌌 Universe born (era 1)."
         out = A.birth_narration(self.s, base, {}, is_big_bang=True)
         self.assertIn("This dish is your Vivarium universe", out)
-        self.assertIn("DNA comes directly from your skills", out)
+        self.assertIn("DNA taken from your skills", out)
         out2 = A.birth_narration(self.s, base, {}, is_big_bang=True)
         self.assertEqual(out2, base, "act 2 must fire once")
 
