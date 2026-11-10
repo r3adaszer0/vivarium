@@ -65,6 +65,30 @@ def glyph_ascii(g: Dict[str, float]) -> str:
     return "\n".join("".join(SHADES[v] for v in row) for row in cells)
 
 
+def glyph_ansi(g: Dict[str, float], rgb=None) -> str:
+    """The face as coloured blocks, one cell per two columns.
+
+    `/vivarium show` printed the face in the plain shade characters, which
+    on a dark terminal reads as a grey smudge next to a dish where the same
+    species is bright. Same genome, same face, same colour: the show card
+    now uses the hue the dish uses.
+    """
+    cells = glyph_cells(g)
+    if rgb is None:
+        rgb = color_for(g["hue"])
+    mat = glyph_rgb_cells(g, rgb)
+    out = []
+    for row, mrow in zip(cells, mat):
+        line = ""
+        for v, c in zip(row, mrow):
+            if v == 0:
+                line += "  "
+            else:
+                line += f"\x1b[38;2;{c[0]};{c[1]};{c[2]}m██"
+        out.append(line + "\x1b[0m")
+    return "\n".join(out)
+
+
 def glyph_rgb_cells(g: Dict[str, float], rgb: Tuple[int, int, int]) -> List[List[Tuple[int, int, int]]]:
     """Shade matrix -> RGB matrix, tinted by the species color (hue-derived).
 
@@ -132,18 +156,50 @@ def name_of(g: Dict[str, float]) -> Tuple[str, str, str]:
     return genus, epithet, _GENUS_COMMON[genus]
 
 
+_BAR = 12
+_TRAITS = (
+    ("forage", "forage", 3.0, (118, 214, 120)),
+    ("sense", "sense", 3.0, (110, 170, 235)),
+    ("metabolism", "metabolism_mult", 2.0, (232, 168, 90)),
+)
+
+
+def trait_bars(g: Dict[str, float], pod=None, tick=None) -> List[str]:
+    """The three traits as bars. One genome, one panel, everywhere.
+
+    The arrival card and `/vivarium show` printed the same three genes in
+    two different formats (comma list, pipe list). Neither is readable at a
+    glance, and neither matches the other. Bars do both jobs.
+    """
+    out = []
+    if pod is not None and tick is not None:
+        out.append(f"  \x1b[2mpod of {pod} · hatch tick {tick}\x1b[0m")
+    for label, key, scale, rgb in _TRAITS:
+        try:
+            v = float(g[key])
+        except (KeyError, TypeError, ValueError):
+            continue
+        filled = max(0, min(_BAR, int(round(v / scale * _BAR))))
+        bar = (f"\x1b[38;2;{rgb[0]};{rgb[1]};{rgb[2]}m" + "█" * filled
+               + "\x1b[38;2;64;70;84m" + "░" * (_BAR - filled) + "\x1b[0m")
+        # non-breaking padding: the card collapses runs of spaces
+        lab = label.ljust(10).replace(" ", "\u00a0")
+        out.append(f"  {lab} {bar} {v:.2f}")
+    return out
+
+
 def species_card(eidos: str, g: Dict[str, float], rgb: Tuple[int, int, int],
-                 lineage_count: int = 1, founding_skill: str = "") -> str:
+                 lineage_count: int = 1, founding_skill: str = "",
+                 colored: bool = False) -> str:
     """One glanceable card: face + name + stats. Pure text; renderers draw it."""
     genus, epithet, common = name_of(g)
     title = f"{genus} {epithet}"
     lines = [
-        f"{title} ({common}) — {eidos}",
-        glyph_ascii(g),
-        f"  forage {g['forage']:.2f} | aggression {g['aggression']:.2f} | "
-        f"metabolism {g['metabolism_mult']:.2f}",
-        f"  sense {g['sense']:.2f} | mutate {g['mutate']:.2f} | "
-        f"living members {lineage_count}",
+        f"{title} ({common}) · {eidos}",
+        glyph_ansi(g, rgb) if colored else glyph_ascii(g),
+        *trait_bars(g),
+        f"  aggression {g.get('aggression', 0):.2f} · mutate {g.get('mutate', 0):.2f}",
+        f"  living members {lineage_count}",
     ]
     if founding_skill:
         lines.append(f"  hatched from: {founding_skill}")

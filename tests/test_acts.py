@@ -37,7 +37,7 @@ class TestActs(unittest.TestCase):
         r = {"eidos": "Eidos_1", "name": "a", "pod": 4, "tick": 10}
         A.birth_narration(self.s, "BASE", r, is_big_bang=True)  # the Bang
         out = A.birth_narration(self.s, "BASE", r, is_big_bang=False)
-        self.assertIn("Remember the promise?", out)
+        self.assertIn("The first arrival you meet by name", out)
         self.assertIn("/vivarium show Eidos_1", out)
         self.assertIn("/vivarium clip", out)
         out2 = A.birth_narration(self.s, "BASE", r, is_big_bang=False)
@@ -50,14 +50,14 @@ class TestActs(unittest.TestCase):
         r = {"eidos": "Eidos_1", "name": "a", "pod": 4, "tick": 10}
         A.birth_narration(self.s, "BASE", r, is_big_bang=True)  # the Bang
         out = A.birth_narration(self.s, "BASE", r, is_big_bang=False)
-        self.assertIn("it is not your first", out)
+        self.assertIn("The Big Bang already seeded a founding roster", out)
 
     def test_narration_off_bare_lines(self):
         r = {"eidos": "Eidos_1", "name": "a", "pod": 4, "tick": 10}
         A.set_narration(self.s, "off")
         out = A.birth_narration(self.s, "BASE", r, is_big_bang=False)
         self.assertIn("New species: Eidos_1", out)
-        self.assertNotIn("Remember the promise", out)
+        self.assertNotIn(A.DISH_MARKER, out)
         # big bang in off mode: base only, act marked seen
         out2 = A.birth_narration(self.s, "BASE", r, is_big_bang=True)
         self.assertEqual(out2, "BASE")

@@ -476,6 +476,8 @@ def _arm_print() -> None:
                 # so "where it is" is answered by the picture, not a line of
                 # prose pointing at a cell the reader has to hunt for.
                 mark = None
+                callout = None
+                legend = None
                 import re as _re
                 _m = _re.search(r"<<ART:([^>]*)>>", body)
                 if _m:
@@ -484,8 +486,11 @@ def _arm_print() -> None:
                         if getattr(_c, "lineage", "") == _eidos:
                             mark = (_c.x, _c.y)
                             break
+                    if mark is not None:
+                        callout = (mark[0], mark[1], _eidos)
+                        legend = f"1 = {_eidos}, the newborn"
                 path = vart.render_dish_png(vstate.state(), w, f"live_{w.tick}",
-                                            mark=mark)
+                                            mark=mark, callout=callout)
                 if path:
                     size = vterm.png_size(path) or (342, 339)
                     rows = max(1, -(-int(size[1]) // max(1, vterm.CELL_H)))
@@ -498,6 +503,7 @@ def _arm_print() -> None:
             rendered = vcard.render(body, term_cols, vacts.DISH_MARKER,
                                     live=live, dish_rows=rows,
                                     dish=bool(path), dish_cols=dish_cols,
+                                    legend=legend,
                                     era=_rec.get("era"))
             out = rendered["text"]
 

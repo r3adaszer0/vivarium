@@ -130,7 +130,57 @@ def render_discovery_stamp_png(s, discovery: dict, world_dict: dict) -> Optional
     return path
 
 
-def render_dish_png(s, w, name: str, mark=None) -> Optional[str]:
+def _callout_plate(pixels, size, cell_xy, label, cell: int, pad: int,
+                   margin: int = 108):
+    """Ring the cell, then point at it from a label in the right margin.
+
+    A ring alone tells the eye *where* but not *what*: at 232px the dish is
+    a field of dots, and "the white ring" is a scavenger hunt. The plate
+    widens the canvas and draws the id beside the dish, joined by a leader
+    line, so a newcomer can be found in the picture and named in the same
+    glance. Pillow is optional: without it we fall back to the ring.
+    """
+    try:
+        from PIL import Image, ImageDraw, ImageFont
+    except ImportError:  # pragma: no cover - no Pillow, no label
+        return None
+    img = Image.new("RGB", (size, size), (13, 15, 18))
+    img.putdata([px for row in pixels for px in row])
+    d = ImageDraw.Draw(img)
+    try:
+        font = ImageFont.truetype(
+            "/usr/share/fonts/truetype/dejavu/DejaVuSansMono-Bold.ttf", 10)
+    except Exception:  # pragma: no cover
+        font = ImageFont.load_default()
+    mx, my = int(cell_xy[0]), int(cell_xy[1])
+    cx = mx * (cell + pad) + (cell + pad) // 2
+    cy = my * (cell + pad) + (cell + pad) // 2
+    # The label rides next to the cell, not in a far margin: a long leader
+    # line crosses half the dish and turns the arrow into a cut. Short hop,
+    # short line, and the box is clamped to stay inside the picture.
+    tw = d.textlength(label, font=font)
+    bw, bh = int(tw) + 16, 18
+    bx = cx + 12
+    if bx + bw > size - 3:
+        bx = cx - 12 - bw
+    bx = max(3, min(bx, size - bw - 3))
+    by = max(3, min(cy - bh // 2, size - bh - 3))
+    d.line([cx, cy, bx if bx > cx else bx + bw, by + bh // 2],
+           fill=(120, 190, 245), width=1)
+    d.rounded_rectangle([bx, by, bx + bw, by + bh], radius=4,
+                        fill=(16, 26, 42), outline=(90, 170, 235), width=1)
+    d.text((bx + 8, by + bh // 2), label, font=font,
+           fill=(180, 218, 255), anchor="lm")
+    # badge with the digit, offset up-left so the ringed cell stays visible
+    br = 7
+    nb = (cx - 11, cy - 11)
+    d.ellipse([nb[0] - br, nb[1] - br, nb[0] + br, nb[1] + br],
+              fill=(16, 22, 34), outline=(160, 210, 255), width=1)
+    d.text(nb, "1", font=font, fill=(220, 240, 255), anchor="mm")
+    return img
+
+
+def render_dish_png(s, w, name: str, mark=None, callout=None) -> Optional[str]:
     """Snapshot of the CURRENT dish (VIV-28b): same visual language as the
     discovery stamp — food blooms + lineage-colored creature squares."""
     CELL, PAD = 6, 1
@@ -175,7 +225,14 @@ def render_dish_png(s, w, name: str, mark=None) -> Optional[str]:
             pixels[y][x0] = (240, 244, 252)
             pixels[y][x1] = (240, 244, 252)
     path = f"{media_dir(s)}/{name}.png"
-    write_png(path, pixels, size)
+    plate = None
+    if callout is not None:
+        plate = _callout_plate(pixels, size, (callout[0], callout[1]),
+                               str(callout[2]), CELL, PAD)
+    if plate is not None:
+        plate.save(path)
+    else:
+        write_png(path, pixels, size)
     return path
 
 

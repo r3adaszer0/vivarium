@@ -21,17 +21,21 @@ from typing import Optional, Tuple
 try:  # package context (Hermes plugin) or flat import (tests)
     from . import world as W
     from . import identity as I
+    from . import artifacts as A
 except ImportError:  # pragma: no cover
     import world as W
     import identity as I
+    import artifacts as A
 
 
 def _food_rgb(level: float) -> Tuple[int, int, int]:
-    """Food shading: barren = near-black card, fertile = green ramp."""
-    if level <= 0.0:
-        return (18, 20, 26)
-    f = min(1.0, level / W.MAX_FOOD)
-    return (int(20 + 35 * f), int(30 + 120 * f), int(24 + 60 * f))
+    """Food shading: the dish's own ramp, not a second one.
+
+    The clip used to carry its own green (darker, and with a different
+    curve), so the video and the still dish disagreed on what a rich patch
+    looks like. One ramp, one food shade, everywhere food is drawn.
+    """
+    return A.food_rgb(level)
 
 
 def render_frame(world, cell_px: int = 8,

@@ -199,7 +199,8 @@ def _command_table(cols: int) -> list[str]:
 
 def render(body: str, cols: int, marker: str, live: dict | None = None,
            dish_rows: int = 23, dish: bool = True,
-           dish_cols: int = DISH_COLS, era: int | None = None) -> dict:
+           dish_cols: int = DISH_COLS, era: int | None = None,
+           legend: str | None = None) -> dict:
     """Render a beat.
 
     Returns {text, climb, has_dish, rows}. `climb` is how many rows up
@@ -266,7 +267,8 @@ def render(body: str, cols: int, marker: str, live: dict | None = None,
                 lines.append(pad + t)
             else:
                 lines.append(f"{pad}{SOFT}{t}{RST}")
-        cap = _caption(live, "white ring = the pod" if art_lines else "")
+        note = legend or ("white ring = the pod" if art_lines else "")
+        cap = _caption(live, note)
         if cap:
             lines.append(cap)
     elif tail_text:

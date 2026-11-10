@@ -113,8 +113,25 @@ def strip_art(text: str) -> str:
     return _ART_RE.sub("", text or "")
 
 
-def art_block(eidos: str, genome: dict | None = None) -> str:
-    """The face, in the text stream.
+def stat_panel(result: dict) -> list:
+    """The newborn's traits as bars, under the face.
+
+    The old line listed three numbers in a sentence ("forage 1.21, sense
+    1.88, metabolism 1.44"), which is read once and compared never. Bars
+    let the eye rank them in one pass, and they are the same bars
+    `/vivarium show` prints, so the two cards agree.
+    """
+    try:
+        from . import identity as vident
+    except ImportError:  # pragma: no cover
+        import identity as vident
+    return vident.trait_bars(result.get("genome") or {},
+                             pod=result.get("pod"), tick=result.get("tick"))
+
+
+def art_block(eidos: str, genome: dict | None = None,
+              result: dict | None = None) -> str:
+    """The face, and its stat panel, in the text stream.
 
     The card lifts this out and sets it above the copy. It travels in the
     text because the text is what survives the queue, the state file and
@@ -125,27 +142,41 @@ def art_block(eidos: str, genome: dict | None = None) -> str:
     except ImportError:  # pragma: no cover - flat-import mode
         import portrait as vport
     lines = vport.sprite_lines(genome=genome, eidos=eidos)
+    if result is not None:
+        lines = lines + [""] + stat_panel(result)
     return f"\n{ART_OPEN}{eidos}>>\n" + "\n".join(lines) + f"\n{ART_CLOSE}\n"
 
 
 def act3_for(result: dict) -> str:
+    """The arrival: a face, its numbers, and where it came from.
+
+    The old copy opened with a rhetorical question ("Remember the
+    promise?") and then apologised for not being the first species. Both
+    belong to the Big Bang, which already said the roster was seeded; an
+    arrival card should introduce the arrival.
+    """
     eidos = result.get("eidos", "?")
     name = result.get("name", "")
+    try:
+        from . import identity as vident
+    except ImportError:  # pragma: no cover
+        import identity as vident
+    genome = result.get("genome") or {}
+    title = ""
+    if all(k in genome for k in ("forage", "sense", "metabolism_mult",
+                                 "aggression", "mutate", "hue")):
+        genus, epithet, common = vident.name_of(genome)
+        title = f"{genus} {epithet}, {common}. "
     return (
-        art_block(eidos, result.get("genome"))
-        + f"\nRemember the promise? A new skill, a new species. Meet your "
-        f"newest arrival, born from the skill you just taught me: {eidos}"
-        + (f" (from '{name}')" if name else "") + ".\n"
-        "One honesty: it is not your first. The Big Bang seeded a whole "
-        "founding roster from everything Hermes knew at birth. This one is "
-        "just the first you will meet by name.\n"
-        f"/vivarium show {eidos} introduces it properly: its face, its "
-        "genes, its story.\n"
-        "Want to watch life happen? /vivarium clip shows your world as a "
-        "short video, the dish frame by frame.\n"
-        "Keep using Hermes, your world will keep evolving. When you have "
-        "species that survived, I will show you how to compete with your "
-        "friends.")
+        art_block(eidos, genome, result)
+        + "\nThe first arrival you meet by name: the first species in this "
+        "dish that came from something you did"
+        + (f", the '{name}' skill." if name else ".")
+        + "\nThe Big Bang already seeded a founding roster from everything "
+        "Hermes knew at birth; this one is yours."
+        "\n\n"
+        f"Meet it: /vivarium show {eidos}\n"
+        "Watch it: /vivarium clip")
 
 
 def act4_text() -> str:

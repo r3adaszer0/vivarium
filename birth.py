@@ -107,12 +107,19 @@ def birth_species(s, name: str, content: str,
 
 
 def announcement(result: dict) -> str:
-    """The line that opens the beat: what hatched, and what it is."""
+    """The line that opens the beat: the id, the name it earned, the skill.
+
+    The traits moved into the card's stat panel (bars, not a comma list):
+    a sentence of numbers is read once, a panel is read at a glance.
+    """
     g = result["genome"]
-    return (f"New species {result['eidos']}: hatched from your "
-            f"'{result['name']}' skill. forage {g['forage']:.2f}, sense "
-            f"{g['sense']:.2f}, metabolism {g['metabolism_mult']:.2f}. "
-            f"A pod of {result['pod']} was released at tick {result['tick']}.")
+    try:  # package context (Hermes plugin) or flat import (tests)
+        from . import identity as vident
+    except ImportError:  # pragma: no cover
+        import identity as vident
+    genus, epithet, _common = vident.name_of(g)
+    return (f"New species {result['eidos']} · {genus} {epithet}, "
+            f"from your '{result['name']}' skill.")
 
 
 def find_existing(s: dict, content: str):

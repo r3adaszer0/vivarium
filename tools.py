@@ -1067,9 +1067,14 @@ def _show_text(rest: list) -> str:
         from . import identity as vident
     except ImportError:  # pragma: no cover
         import identity as vident
+    # colour the face when the terminal can carry it: the same genome gets
+    # the same hue here as in the dish, so the card and the world agree
+    import sys as _sys
+    _tty = bool(getattr(_sys.stdout, "isatty", lambda: False)())
     card = vident.species_card(eidos, genome, vident.color_for(genome["hue"]),
                                lineage_count=count,
-                               founding_skill=name or "")
+                               founding_skill=name or "",
+                               colored=_tty)
     if "--image" in rest or "image" in rest:
         try:
             from . import artifacts as vart
