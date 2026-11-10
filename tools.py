@@ -1055,11 +1055,16 @@ def _clip_text(rest: list) -> str:
     ticks = 120
     target = None
     zoom = False
+    cell_px = 8
     for a in rest:
         if a.isdigit():
             ticks = max(10, min(600, int(a)))
         elif a in ("--zoom", "zoom"):
             zoom = True
+        elif a in ("720p", "720", "hd"):
+            cell_px = 15          # 48*15 = 720: the full dish in HD
+        elif a in ("1080p", "1080", "fhd"):
+            cell_px = 23          # 48*23 = 1104 (zoom clips scale to 1080)
         else:
             target = a
     w = _world()
@@ -1108,13 +1113,14 @@ def _clip_text(rest: list) -> str:
     try:
         vcin.render_clip_ffmpeg(w, path, ticks=ticks, region=region,
                                 lineage_colors=colors or None,
-                                highlight=lineage)
+                                highlight=lineage, cell_px=cell_px)
     except FileNotFoundError:
         return ("ffmpeg is required to encode the clip but is not on "
                 "this machine's PATH. The dish still lives — install "
                 "ffmpeg and try again.")
+    res = {8: "", 15: " · 720p", 23: " · 1080p"}[cell_px]
     return (f"🎥 Clip written: {path}\n"
-            f"  {ticks} ticks of the dish at tick {start_tick}"
+            f"  {ticks} ticks of the dish at tick {start_tick}{res}"
             f"{' — ' + lineage + ' highlighted' if lineage else ''}\n"
             f"Watch it in the gallery: /vivarium serve "
             f"(or open the file directly).")
