@@ -219,15 +219,21 @@ def birth_narration(s, base: str, result: dict, is_big_bang: bool) -> str:
         _save()
         return bare_birth_line(result)
     if after_bang == 0 and ACT3 not in acts:
+        # Build the text BEFORE advancing the ladder. Building it can fail
+        # (a bad import in the art path did exactly that), and if the
+        # counter moves first the act is burnt: the next birth skips to
+        # act 4 and the user never sees act 3 at all.
+        text = act3_for(result)
         _fire(ACT3)
         acts["_births_since_bang"] = 1
         _save()
-        return base + DISH_MARKER + act3_for(result)
+        return base + DISH_MARKER + text
     if after_bang == 1 and ACT4 not in acts:
+        text = act4_text()
         _fire(ACT4)
         acts["_births_since_bang"] = 2
         _save()
-        return base + act4_text()
+        return base + text
     acts["_births_since_bang"] = after_bang + 1
     _save()
     return base

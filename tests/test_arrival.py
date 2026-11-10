@@ -88,3 +88,54 @@ class StripArt(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class LadderSurvivesAFailedRender(unittest.TestCase):
+    """A crash while building an act must not burn the act."""
+
+    def setUp(self):
+        import acts as A
+        self.A = A
+        self.s = _Dict()
+
+    def test_failed_act3_leaves_the_counter_untouched(self):
+        import acts as A
+        real = A.act3_for
+        g = _genome()
+        res = {"eidos": "Eidos_aaa111", "name": "probe", "pod": 4,
+               "tick": 12, "genome": g}
+
+        def boom(_r):
+            raise RuntimeError("art path exploded")
+
+        A.act3_for = boom
+        try:
+            with self.assertRaises(RuntimeError):
+                A.birth_narration(self.s, "BASE", res, is_big_bang=False)
+        finally:
+            A.act3_for = real
+        self.assertNotIn("first_hermi", self.s.get("acts", {}))
+        self.assertEqual(self.s.get("acts", {}).get("_births_since_bang", 0), 0)
+
+    def test_next_birth_still_gets_act3(self):
+        import acts as A
+        res = {"eidos": "Eidos_bbb222", "name": "probe", "pod": 3,
+               "tick": 20, "genome": _genome()}
+        text = A.birth_narration(self.s, "BASE", res, is_big_bang=False)
+        self.assertIn("Remember the promise", text)
+
+
+class _Dict:
+    def __init__(self):
+        self.d = {}
+
+    def get(self, k, default=None):
+        return self.d.get(k, default)
+
+    def set(self, k, v):
+        self.d[k] = v
+
+
+def _genome():
+    import world as W
+    return W.genome_from_bytes(bytes(range(24)))

@@ -35,6 +35,23 @@ class TestPrinterIntegration(unittest.TestCase):
         self.s = FakeState()
         make_live(self.s)
         vstate._ctx = _C(self.s)
+        # The printer prefers /dev/tty, which exists on this dev box but
+        # not under every runner: the write then lands on the real
+        # terminal instead of the StringIO and the assertions see "".
+        # Force the fallback so the test measures the bytes, not the box.
+        import os
+        self._real_open = os.open
+
+        def _no_tty(path, *a, **kw):
+            if path == "/dev/tty":
+                raise OSError("no tty in tests")
+            return self._real_open(path, *a, **kw)
+
+        os.open = _no_tty
+
+    def tearDown(self):
+        import os
+        os.open = self._real_open
 
     def test_beat_prints_headline_then_picture_then_explanation(self):
         import acts as vacts
