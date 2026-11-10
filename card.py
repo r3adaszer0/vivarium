@@ -209,7 +209,7 @@ def _caption(live: dict | None, note: str = "") -> str:
     return f"{ITALIC}{DIM}  " + "  ·  ".join(bits) + f"{RST}"
 
 
-def status_panel(stats: dict, dish_rows: int) -> list[str]:
+def status_panel(stats: dict, dish_rows: int, gutter: int = 0) -> list[str]:
     """The census beside the dish: one row per fact, labels dim, values plain.
 
     `dish_rows` drives the height so text and picture bottom-align; the
@@ -223,6 +223,12 @@ def status_panel(stats: dict, dish_rows: int) -> list[str]:
 
     def _pair(label: str, value: str) -> str:
         return f"{DIM}{label:<11}{RST} {SOFT}{value}{RST}"
+
+    # The panel is printed as the RIGHT column: every row starts with a
+    # gutter as wide as the dish will be, so when the dish paints over the
+    # left edge nothing collides. Callers may pass gutter=0 to get the
+    # bare panel (tests, previews).
+    pad = " " * (gutter or 0)
 
     facts: list[tuple[str, str]] = [
         ("state", f"tick {stats.get('tick', 0)} · {stats.get('population', 0)} alive"
@@ -244,7 +250,8 @@ def status_panel(stats: dict, dish_rows: int) -> list[str]:
         facts.append(("", f"avg age {a.get('avg_age', 0)} — {verdict}"))
     rows.append("")
     for label, value in facts:
-        rows.append(_pair(label, value) if label else f"{'':11} {SOFT}{value}{RST}")
+        body = _pair(label, value) if label else f"{'':11} {SOFT}{value}{RST}"
+        rows.append(pad + body)
     rows.append("")
     # bottom-align with the dish: pad up to the picture's height
     while len(rows) < dish_rows:
