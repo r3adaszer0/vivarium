@@ -24,7 +24,7 @@ except ImportError:  # pragma: no cover
 canon_digest = vdisc.canon_digest   # public derivation lives in discovery.py
 
 POD_SIZE = 4          # creatures released per skill-species
-EIDOS_RANGE = (0.6, 1.9)   # founding energy boost for skill-species
+EIDOS_RANGE = (2.6, 3.4)   # founding energy boost for skill-species
 
 
 def genome_of_digest(digest: bytes) -> dict:

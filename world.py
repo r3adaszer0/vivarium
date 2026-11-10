@@ -44,11 +44,23 @@ EAT_RATE = 0.9             # food units a creature can eat per tick
 METABOLISM = 0.30           # energy burned per tick (live drain; retuned 2026-11-05)
 MOVE_COST = 0.06           # extra energy for a purposeful move
 REPRODUCE_COST = 0.65      # parent energy cost of one child
-REPRODUCE_MIN = 1.35       # energy needed to attempt reproduction
+REPRODUCE_MIN = 3.00       # energy needed to attempt reproduction
 REPRO_CHANCE = 0.25         # per-tick probability of reproducing when eligible
 MIN_MATURITY_AGE = 15      # newborns can't reproduce until this age (boom-bust delay)
 MUTATION_SCALE = 0.12      # genome jitter per generation
 MAX_AGE = 900              # ticks; die of old age around here
+
+# ── newborns ────────────────────────────────────────────────────────────────
+# A child used to inherit half its parent's energy minus the birth cost, so
+# a parent breeding at the old REPRODUCE_MIN (1.35) produced a child with
+# 0.35: less than one tick of metabolism. Every pod was stillborn, and the
+# arrival card showed a face that was already extinct. These two constants
+# give a newborn a real start without minting energy from nothing: breeding
+# now requires enough energy to fund a viable child, and a juvenile burns
+# at a reduced rate while it learns to find food.
+NEWBORN_FLOOR = 1.20       # energy a child is guaranteed at birth
+JUVENILE_TICKS = 30        # ticks a newborn counts as juvenile
+JUVENILE_DRAIN = 0.55      # fraction of metabolism paid while juvenile
 START_CREATURES = 26
 FOOD_ENERGY = 1.0          # energy gained per food unit eaten
 FLEDGE_AGE = 120           # ticks a newborn pod is shielded (grace window)
@@ -362,7 +374,10 @@ def _creature_tick(world: World, nutrients: float) -> None:
     # -- phase 1: age, metabolism, movement --------------------------------------
     for c in living:
         c.age += 1
-        c.energy -= METABOLISM * c.genome["metabolism_mult"]
+        _drain = METABOLISM * c.genome["metabolism_mult"]
+        if c.age <= JUVENILE_TICKS:
+            _drain *= JUVENILE_DRAIN
+        c.energy -= _drain
         if not c.alive():
             continue  # starvation during phase 1 skips movement
         # -- sense: best food cell within a square sense radius
@@ -472,7 +487,7 @@ def _creature_tick(world: World, nutrients: float) -> None:
             half = c.energy * 0.5
             friction = REPRODUCE_COST * 0.5
             c.energy = max(0.05, half - friction)
-            child_energy = max(0.05, half - friction)
+            child_energy = max(NEWBORN_FLOOR, half - friction)
             child_genome = {k: max(0.05, v + _gauss6(
                                 world.seed, world.tick, c.gid, b"mut" + k.encode())
                                 * MUTATION_SCALE * c.genome["mutate"])
