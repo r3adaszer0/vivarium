@@ -201,7 +201,7 @@ def _caption(live: dict | None, note: str = "") -> str:
             # is the renderer's business: the reader needs only what the
             # greys MEAN. "Not yet dominant" is the whole message - grey is
             # a rank, never a dead species.
-            bits.append(f"{total} lineages · {grey} dim (not yet dominant)")
+            bits.append(f"{total} lineages · top 8 coloured")
         else:
             bits.append(f"{total} lineages")
     if note:
