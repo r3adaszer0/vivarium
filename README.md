@@ -145,10 +145,15 @@ everywhere else.
 
 - **Food** regrows logistically and diffuses to neighbors — weather-like
   blooms and barren fronts travel across the dish.
-- **Creatures** carry six genes (forage, aggression, metabolism, sense,
-  mutation rate, hue) driving real dynamics: contested feeding, live
-  metabolic drain, conservation-split reproduction. Eat → reproduce;
+- **Creatures** carry six evolvable genes (forage, aggression, metabolism,
+  sense, mutation rate, dispersal) driving real dynamics: contested
+  feeding, live metabolic drain, conservation-split reproduction, and a
+  decision to leave a crowded cell instead of sharing it. Eat → reproduce;
   starve → die.
+- **Hue is not a gene, it is a name tag.** A species' colour is derived
+  from its lineage id and inherited exactly, so one lineage is one colour
+  on the dish and the colour you see is the family you can count. Nothing
+  selects on colour; it never drifts.
 - **Skills → species:** `SHA-256` over skill content (keyed by your universe
   key for private skills; a public domain-separated digest for stock skills)
   selects 192 bits of genome. Deterministic, private, collision-safe.

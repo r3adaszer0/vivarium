@@ -15,6 +15,8 @@ from __future__ import annotations
 
 from typing import Dict, List, Tuple
 
+import world as _W
+
 try:  # package context (Hermes plugin) or flat import (tests)
     from . import world as W
 except ImportError:  # pragma: no cover
@@ -42,7 +44,9 @@ def _genome_stream(g: Dict[str, float]) -> bytes:
     """Genome -> stable byte stream (rounded floats, key order = GENOME_KEYS)."""
     parts = []
     for k in W.GENOME_KEYS:
-        parts.append(f"{k}={round(float(g[k]), 4).hex() if False else round(float(g[k]), 4)!r}")
+        # .get with a floor: a genome recorded before a gene existed still
+        # has a face, it just has that gene at its minimum.
+        parts.append(f"{k}={round(float(g.get(k, 0.0)), 4)!r}")
     return "|".join(parts).encode("utf-8")
 
 
@@ -120,6 +124,7 @@ _GENUS = {
     "metabolism_mult": "Vivax",     # the enduring
     "mutate": "Mutabilis",          # the shifter
     "hue": "Chroma",                # the painter
+    "dispersal": "Peregrina",       # the wanderer
 }
 _GENUS_COMMON = {
     "Venefica": "the striker",
@@ -128,6 +133,7 @@ _GENUS_COMMON = {
     "Vivax": "the enduring",
     "Mutabilis": "the shifter",
     "Chroma": "the painter",
+    "Peregrina": "the wanderer",
 }
 _EPITHETS = ("gracilis", "robusta", "vagans", "velox", "minor", "major",
              "serena", "ferox", "tenuis", "pinguis")
@@ -135,7 +141,7 @@ _EPITHETS = ("gracilis", "robusta", "vagans", "velox", "minor", "major",
 
 def _norm(g: Dict[str, float], key: str) -> float:
     lo, hi = W.GENOME_RANGES[key]
-    return (g[key] - lo) / (hi - lo)
+    return (g.get(key, lo) - lo) / (hi - lo)
 
 
 def name_of(g: Dict[str, float]) -> Tuple[str, str, str]:
@@ -166,11 +172,9 @@ _TRAITS = (
     ("metabolism", "metabolism_mult", (232, 168, 90)),
     ("aggression", "aggression", (226, 110, 110)),
     ("mutate", "mutate", (186, 140, 235)),
+    ("dispersal", "dispersal", (110, 205, 200)),
 )
-_RANGES = {
-    "forage": (0.2, 2.0), "aggression": (0.05, 2.0),
-    "metabolism_mult": (0.7, 1.6), "sense": (1.0, 4.0), "mutate": (0.5, 2.0),
-}
+_RANGES = _W.GENOME_RANGES          # one contract, not a second copy
 
 
 def trait_bars(g: Dict[str, float], pod=None, tick=None) -> List[str]:
@@ -185,11 +189,11 @@ def trait_bars(g: Dict[str, float], pod=None, tick=None) -> List[str]:
     if pod is not None and tick is not None:
         out.append(f"  \x1b[2mpod of {pod} · hatch tick {tick}\x1b[0m")
     for label, key, rgb in _TRAITS:
-        try:
-            v = float(g[key])
-        except (KeyError, TypeError, ValueError):
-            continue
         lo, hi = _RANGES[key]
+        try:
+            v = float(g.get(key, lo))    # a genome older than the gene: floor
+        except (TypeError, ValueError):
+            v = lo
         frac = max(0.0, min(1.0, (v - lo) / (hi - lo)))
         filled = max(0, min(_BAR, int(round(frac * _BAR))))
         bar = (f"\x1b[38;2;{rgb[0]};{rgb[1]};{rgb[2]}m" + "█" * filled

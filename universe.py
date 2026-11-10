@@ -85,7 +85,7 @@ def genesis(s, skill_name: str, skill_content: str,
     digest = skill_digest(s, skill_content)
     eidos = "Eidos_" + digest[:4].hex()  # 32 bits, 4.3B ids
     # the genesis species itself: genome straight from the first 24 digest bytes
-    founder_genome = vworld.genome_from_bytes(digest[:24])
+    founder_genome = vworld.genome_from_bytes(digest[:vworld.GENOME_BYTES])
     founder = vworld.Creature(
         gid=1, genome=founder_genome, x=vworld._uint(digest[:4]) % vworld.GRID_W,
         y=vworld._uint(digest[4:8]) % vworld.GRID_H, energy=1.4, lineage=eidos)

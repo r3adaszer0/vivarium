@@ -28,7 +28,7 @@ EIDOS_RANGE = (2.6, 3.4)   # founding energy boost for skill-species
 
 
 def genome_of_digest(digest: bytes) -> dict:
-    return W.genome_from_bytes(digest[:24])
+    return W.genome_from_bytes(digest[:W.GENOME_BYTES])
 
 
 def eidos_id(digest: bytes) -> str:
@@ -41,7 +41,8 @@ def _release_pod(w, digest: bytes, lineage: str, bs) -> List:
     for i in range(POD_SIZE):
         x, y = bs.uint(2, w.w), bs.uint(2, w.h)
         made.append(W.Creature(
-            gid=w.next_gid, genome=genome_of_digest(digest),
+            gid=w.next_gid,
+            genome=W.tag_hue(genome_of_digest(digest), lineage),
             x=x, y=y,
             energy=EIDOS_RANGE[0] + (EIDOS_RANGE[1] - EIDOS_RANGE[0])
             * bs.uint(2, 65536) / 65536,
@@ -108,7 +109,7 @@ def seed(s, skills: List[dict],
         canon_species.append({"name": sk["name"], "eidos": eidos_id(d)})
         births[sk["name"]] = {"eidos": eidos_id(d), "day": date.today().isoformat(),
                               "pod": POD_SIZE, "digest_fp": d[:8].hex(),
-                              "era": era, "genome": W.genome_from_bytes(d[:24])}
+                              "era": era, "genome": W.genome_from_bytes(d[:W.GENOME_BYTES])}
 
     # private species: keyed derivation (unique per universe)
     priv_species = []
@@ -119,7 +120,7 @@ def seed(s, skills: List[dict],
         births[sk["name"]] = {"eidos": eidos_id(d), "day": date.today().isoformat(),
                               "pod": POD_SIZE, "digest_fp": d[:8].hex(),
                               "era": era,
-                              "genome": W.genome_from_bytes(d[:24])}
+                              "genome": W.genome_from_bytes(d[:W.GENOME_BYTES])}
     s.set(BIRTHS_KEY, births)
 
     U.save_seed_record(s, {

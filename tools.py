@@ -371,8 +371,9 @@ that text and computes its SHA-256 hash: a fixed fingerprint that is
 the same for the same text and completely different for any other.
 
 That fingerprint becomes the creature's genome: six numbers (forage,
-aggression, metabolism, sense, mutation rate, hue) read out of the
-hash bytes. Change one word of the skill and the fingerprint changes
+aggression, metabolism, sense, mutation rate, dispersal) read out of the
+hash bytes, plus the species' colour, which is derived from the id and
+never evolves. Change one word of the skill and the fingerprint changes
 completely, so every skill makes a species nobody has ever seen.
 
 Three properties make this the heart of Vivarium:

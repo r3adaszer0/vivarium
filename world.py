@@ -65,16 +65,33 @@ START_CREATURES = 26
 FOOD_ENERGY = 1.0          # energy gained per food unit eaten
 FLEDGE_AGE = 120           # ticks a newborn pod is shielded (grace window)
 FLEDGE_BURST = 8           # extra reproduction headroom RESERVED for fledgling parents
+# Dispersal tuning, measured over 700 ticks on seed 7 (pop / max-per-cell /
+# mean gene):  crowd 2, cost x1  -> 28 pop, 1 per cell, 0.69 mean: too eager,
+# it scatters the dish into the desert.  crowd 3, cost x2, upkeep 0.02 ->
+# 137 pop, 3 per cell, 0.56 mean: crowding survives, the gene stays mixed
+# instead of fixing at 1.0.  crowd 4 -> 62 pop: too shy to matter.
+DISPERSE_MIN_CROWD = 3    # sharing a cell with this many others makes leaving pay
+DISPERSE_COST_MULT = 2.0  # energy multiplier on MOVE_COST when dispersing
+DISPERSE_UPKEEP = 0.02    # per-tick energy cost of the gene itself
 POP_CAP = 200               # emergency brake only (K is the real limiter);
                             # at 4x founders it pinned the dish and killed the Pulse
 
 FOUNDER_STRAINS = ("amber", "violet", "jade", "ember")
-GENOME_KEYS = ("forage", "aggression", "metabolism_mult", "sense", "mutate", "hue")
-# evolvable ranges (lo, hi) — the contract genome_from_bytes samples within
+GENOME_KEYS = ("forage", "aggression", "metabolism_mult", "sense", "mutate",
+               "hue", "dispersal")
+# evolvable ranges (lo, hi) — the contract genome_from_bytes samples within.
+# New genes are appended so existing byte slots never move. HUE IS NOT
+# EVOLVABLE: it is a species tag derived from the lineage id at birth and
+# inherited exactly (see lineage_hue). It stays in the genome because the
+# export code, the Codex and the face hash all read it, but no child ever
+# changes it, so one lineage is one colour by construction.
 GENOME_RANGES = {
     "forage": (0.2, 2.0), "aggression": (0.05, 2.0), "metabolism_mult": (0.7, 1.6),
     "sense": (1.0, 4.0), "mutate": (0.5, 2.0), "hue": (0.0, 1.0),
+    "dispersal": (0.0, 1.0),
 }
+GENOME_BYTES = 4 * len(GENOME_RANGES)   # 28: four bytes per gene
+FIXED_GENES = ("hue",)                  # inherited exactly, never jittered
 
 
 class ByteStream:
@@ -112,12 +129,62 @@ def _uint(b: bytes) -> int:
 
 
 def genome_from_bytes(b: bytes) -> Dict[str, float]:
-    """24 bytes -> a genome: 4 bytes per trait, uniform in its range."""
+    """Four bytes per gene -> a genome, uniform in each range.
+
+    Short input is zero-padded rather than rejected: genomes recorded before
+    a gene existed (older export codes, older checkpoints) then decode to
+    that gene's floor instead of failing.
+    """
+    b = bytes(b).ljust(GENOME_BYTES, b"\x00")
     genome = {}
     for i, (trait, (lo, hi)) in enumerate(GENOME_RANGES.items()):
         v = int.from_bytes(b[i * 4:(i + 1) * 4], "big") / 2**32
         genome[trait] = round(lo + (hi - lo) * v, 3)
     return genome
+
+
+def with_defaults(g: Dict[str, float]) -> Dict[str, float]:
+    """A stored genome, completed with each gene's floor.
+
+    Genomes recorded before a gene existed must keep loading, and must not
+    silently behave as if they had it: a missing dispersal is 0, which is
+    the old dish exactly.
+    """
+    out = dict(g)
+    for key, (lo, _hi) in GENOME_RANGES.items():
+        out.setdefault(key, lo)
+    return out
+
+
+def clamp_gene(name: str, value: float) -> float:
+    lo, hi = GENOME_RANGES[name]
+    return round(min(hi, max(lo, value)), 3)
+
+
+def tag_hue(genome: Dict[str, float], lineage: str,
+            salt: str = "") -> Dict[str, float]:
+    """Stamp the lineage's colour onto a genome. The species tag, not a trait.
+
+    `salt` keeps the four FOUNDER strains distinct per universe without
+    letting their colours drift: the same strain name in another universe is
+    another palette entry, and within one universe a name is one colour.
+    Born species need no salt, their id already carries the universe.
+    """
+    genome["hue"] = lineage_hue(lineage, salt)
+    return genome
+
+
+def lineage_hue(eidos: str, salt: str = "") -> float:
+    """A species' colour, from its id. Constant for the life of the lineage.
+
+    Hue used to mutate with the rest of the genome: the dish showed 135
+    distinct colours for 3 lineages, because colour was painted from each
+    creature's own drifted hue (and hue is hashed into the face, so every
+    child also re-rolled its crest). A species tag that drifts is not a tag.
+    """
+    key = f"vivarium:hue:{eidos}|{salt}"
+    h = hashlib.sha256(key.encode()).digest()
+    return round(int.from_bytes(h[:4], "big") / 2**32, 3)
 
 
 def new_world_from_digest(digest: bytes, founders_extra: Optional[List[Creature]] = None) -> World:
@@ -138,12 +205,14 @@ def new_world_from_digest(digest: bytes, founders_extra: Optional[List[Creature]
             food[y][x] = max(food[y][x], max(0.0, 2.2 - dist * 0.08))
     creatures: List[Creature] = []
     for i in range(24):  # 4 strains x 6 founders, genomes straight from the digest
-        genome = genome_from_bytes(bs.take(24))
+        genome = genome_from_bytes(bs.take(GENOME_BYTES))
         creatures.append(Creature(
             gid=i + 1, genome=genome,
             x=bs.uint(2, GRID_W), y=bs.uint(2, GRID_H),
             energy=0.9 + 0.5 * (bs.uint(2, 65536) / 65536),
-            lineage=_strain_for(genome["hue"])))
+            lineage=tag_hue(genome, _strain_for(genome["hue"]),
+                            digest[:8].hex()) and
+            _strain_for(genome["hue"])))
     if founders_extra:
         creatures.extend(founders_extra)
         for j, c in enumerate(creatures, start=1):  # renumber cleanly
@@ -219,7 +288,7 @@ class World:
     def from_dict(cls, d: dict, seed: int = 0) -> "World":
         creatures = [
             Creature(
-                gid=c["gid"], genome=dict(c["g"]), x=c["x"], y=c["y"],
+                gid=c["gid"], genome=with_defaults(c["g"]), x=c["x"], y=c["y"],
                 energy=c["e"], age=c["a"], lineage=c.get("l", "wild"),
             )
             for c in d["creatures"]
@@ -302,11 +371,17 @@ def new_world(seed: int = 0, w: int = GRID_W, h: int = GRID_H) -> World:
             "sense": rng.uniform(1.0, 3.0),
             "mutate": rng.uniform(0.5, 1.5),
             "hue": rng.random(),
+            # hash-derived, not rng: drawing it from the rng stream would
+            # shift every later draw and silently rewrite the founding dish
+            "dispersal": round(_u(seed, 0, i + 1, b"disp") * 0.4, 3),
         }
+        _lineage = _strain_for(genome["hue"])
         creatures.append(Creature(
-            gid=i + 1, genome=genome, x=(bx + ox) % w, y=(by + oy) % h,
+            gid=i + 1,
+            genome=tag_hue(genome, _lineage, f"seed:{seed}"),
+            x=(bx + ox) % w, y=(by + oy) % h,
             energy=rng.uniform(0.9, 1.4),
-            lineage=_strain_for(genome["hue"]),
+            lineage=_lineage,
         ))
     return World(w=w, h=h, tick=0, food=food, creatures=creatures,
                  rng=random.Random(seed * 2654435761 % (2**31)),
@@ -414,6 +489,49 @@ def _creature_tick(world: World, nutrients: float) -> None:
             c.y = (c.y + int(_u(world.seed, world.tick, c.gid, b"wdy") * 3) - 1) % h
             c.energy -= MOVE_COST * 0.5
 
+    # -- phase 1b: dispersal ------------------------------------------------
+    # A crowded cell is a shared meal. A creature carrying the dispersal gene
+    # may step to the best adjacent cell instead of contesting, paying
+    # MOVE_COST to do it: leaving rich food behind is the cost of not
+    # sharing it. Hash-driven like every other decision, so 0 dispersal
+    # (every creature born before the gene existed) reproduces the old dish
+    # exactly.
+    occupancy: Dict[tuple, int] = {}
+    for c in living:
+        if c.alive():
+            occupancy[(c.x, c.y)] = occupancy.get((c.x, c.y), 0) + 1
+    for c in living:
+        if not c.alive():
+            continue
+        d = c.genome.get("dispersal", 0.0)
+        if d <= 0.0:
+            continue
+        if DISPERSE_UPKEEP:
+            c.energy -= DISPERSE_UPKEEP * d
+            if not c.alive():
+                continue
+        here = occupancy.get((c.x, c.y), 0)
+        if here < DISPERSE_MIN_CROWD:
+            continue
+        if _u(world.seed, world.tick, c.gid, b"disp") >= d:
+            continue
+        best_score, best_xy = None, None
+        for dy in (-1, 0, 1):
+            for dx in (-1, 0, 1):
+                if dx == 0 and dy == 0:
+                    continue
+                x, y = (c.x + dx) % w, (c.y + dy) % h
+                score = food[y][x] - 0.35 * occupancy.get((x, y), 0)
+                if best_score is None or score > best_score:
+                    best_score, best_xy = score, (x, y)
+        stay = food[c.y][c.x] - 0.35 * here
+        if best_xy is None or best_score <= stay:
+            continue
+        occupancy[(c.x, c.y)] -= 1
+        c.x, c.y = best_xy
+        occupancy[best_xy] = occupancy.get(best_xy, 0) + 1
+        c.energy -= MOVE_COST * DISPERSE_COST_MULT
+
     # -- fledge displacement: a fledgling sharing a cell with an adult
     # steps aside to the richest adjacent adult-free cell (hash-picked
     # among ties). Measured: standing there = skipped meals = death
@@ -488,10 +606,15 @@ def _creature_tick(world: World, nutrients: float) -> None:
             friction = REPRODUCE_COST * 0.5
             c.energy = max(0.05, half - friction)
             child_energy = max(NEWBORN_FLOOR, half - friction)
-            child_genome = {k: max(0.05, v + _gauss6(
-                                world.seed, world.tick, c.gid, b"mut" + k.encode())
-                                * MUTATION_SCALE * c.genome["mutate"])
-                            for k, v in c.genome.items()}
+            child_genome = {}
+            for k, v in c.genome.items():
+                if k in FIXED_GENES:
+                    child_genome[k] = v          # a species tag does not drift
+                    continue
+                jitter = _gauss6(world.seed, world.tick, c.gid,
+                                 b"mut" + k.encode()) * MUTATION_SCALE
+                child_genome[k] = clamp_gene(
+                    k, v + jitter * c.genome.get("mutate", 1.0))
             born_this_tick.append(Creature(
                 gid=world.next_gid, genome=child_genome, x=c.x, y=c.y,
                 energy=child_energy, lineage=c.lineage,
@@ -544,7 +667,8 @@ def stats(world: World) -> dict:
     for c in world.creatures:
         counts[c.lineage] = counts.get(c.lineage, 0) + 1
     lineages = sorted(counts.items(), key=lambda kv: -kv[1])[:5]
-    avg = lambda key: round(sum(c.genome[key] for c in world.creatures) / len(world.creatures), 3)
+    avg = lambda key: round(sum(c.genome.get(key, GENOME_RANGES[key][0])
+                                for c in world.creatures) / len(world.creatures), 3)
     return {
         "tick": world.tick,
         "population": len(world.creatures),

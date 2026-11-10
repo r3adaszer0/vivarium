@@ -76,18 +76,20 @@ class TestFledge(unittest.TestCase):
         w = _plateau()
         d = bytes(range(24))
         genome = W.genome_from_bytes(d)
-        # land the pod at a high-food, empty cell (plateau has some)
-        cell = None
+        # Land the pod on the richest empty cell. The plateau's standing crop
+        # is not a fixed number: once founder genomes carried dispersal, the
+        # same 4000 ticks graze it flatter, so the fixture takes the best
+        # open cell and tops it up rather than betting on a threshold.
+        best_val, cell = -1.0, None
         for y in range(w.h):
             for x in range(w.w):
-                if not any(c.x == x and c.y == y for c in w.creatures) \
-                        and w.food[y][x] > 1.0:
-                    cell = (x, y)
-                    break
-            if cell:
-                break
-        self.assertIsNotNone(cell, "plateau must have an open fertile cell")
+                if any(c.x == x and c.y == y for c in w.creatures):
+                    continue
+                if w.food[y][x] > best_val:
+                    best_val, cell = w.food[y][x], (x, y)
+        self.assertIsNotNone(cell, "plateau must have an open cell")
         x0, y0 = cell
+        w.food[y0][x0] = max(w.food[y0][x0], 1.5)
         for i in range(4):
             w.creatures.append(W.Creature(
                 gid=w.next_gid + i, genome=dict(genome),

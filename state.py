@@ -459,9 +459,13 @@ def decode_genome(code: str) -> Optional[Dict[str, float]]:
         genome = json.loads(base64.urlsafe_b64decode(b64))
     except Exception:
         return None
-    if not isinstance(genome, dict) or not all(k in genome for k in vworld.GENOME_KEYS):
+    # A code written before a gene existed still decodes: the genes that
+    # shape survival must be there, anything newer takes its floor. Refusing
+    # the whole code would make every previously exported species invalid.
+    required = ("forage", "aggression", "metabolism_mult", "sense", "mutate")
+    if not isinstance(genome, dict) or not all(k in genome for k in required):
         return None
-    return genome
+    return vworld.with_defaults(genome)
 
 
 def best_genome() -> Optional[Dict[str, float]]:
@@ -500,6 +504,7 @@ def release_creatures(w: World, genomes: Optional[List[Dict[str, float]]] = None
                 "sense": w.rng.uniform(1.0, 3.0),
                 "mutate": w.rng.uniform(0.5, 1.5),
                 "hue": w.rng.random(),
+                "dispersal": w.rng.uniform(0.0, 0.4),
             }
             made.append(Creature(
                 gid=w.next_gid, genome=genome,

@@ -58,7 +58,11 @@ def birth_species(s, name: str, content: str,
         if isinstance(known, dict) and known.get("digest_fp") == fp:
             return None
     eidos = "Eidos_" + digest[:4].hex()  # 32 bits, 4.3B ids
-    genome = W.genome_from_bytes(digest[:24])
+    genome = W.genome_from_bytes(digest[:W.GENOME_BYTES])
+    # The colour is the species tag: derived from the id, not sampled from
+    # the digest, so it can never be confused with a heritable trait. Older
+    # species keep their stored hue until their next record is written.
+    W.tag_hue(genome, eidos)
     # Landing (VIV-31 fledge): the digest picks among the dish's most
     # fertile cells (top 16 by food, ties in scan order), each pod member
     # on its OWN cell, ties broken toward the LEAST occupied cell — a

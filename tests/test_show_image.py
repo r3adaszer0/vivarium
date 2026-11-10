@@ -91,12 +91,15 @@ class ShowDrawsTheSameFace(unittest.TestCase):
 
 
 class EveryGeneHasABar(unittest.TestCase):
-    def test_five_bars(self):
-        g = W.genome_from_bytes(bytes(range(24)))
+    def test_six_bars(self):
+        g = W.genome_from_bytes(bytes(range(W.GENOME_BYTES)))
         panel = I.trait_bars(g)
-        for gene in ("forage", "sense", "metabolism", "aggression", "mutate"):
+        for gene in ("forage", "sense", "metabolism", "aggression", "mutate",
+                     "dispersal"):
             self.assertTrue(any(gene in ln for ln in panel), gene)
-        self.assertEqual(len(panel), 5)
+        self.assertEqual(len(panel), 6)
+        # hue is a species tag, not a trait: it must not get a bar
+        self.assertFalse(any("hue" in ln for ln in panel))
 
     def test_bar_fills_according_to_the_gene_range(self):
         g = dict(W.genome_from_bytes(bytes(range(24))), forage=2.0)
@@ -107,9 +110,10 @@ class EveryGeneHasABar(unittest.TestCase):
         self.assertEqual(empty.count("█"), 0)
 
     def test_show_card_carries_all_five(self):
-        g = W.genome_from_bytes(bytes(range(24)))
+        g = W.genome_from_bytes(bytes(range(W.GENOME_BYTES)))
         card = I.species_card("Eidos_1", g, I.color_for(g["hue"]))
-        for gene in ("forage", "sense", "metabolism", "aggression", "mutate"):
+        for gene in ("forage", "sense", "metabolism", "aggression", "mutate",
+                     "dispersal"):
             self.assertIn(gene, card)
 
 
