@@ -145,12 +145,13 @@ def art_block(eidos: str, genome: dict | None = None,
     except ImportError:  # pragma: no cover - flat-import mode
         import portrait as vport
     lines = vport.sprite_lines(genome=genome, eidos=eidos)
-    # Align the face with the labels below: the stat rows start with two
-    # spaces before the label, so the face gets the same two spaces and
-    # its left edge sits on the "f" of forage, not on the panel margin.
-    lines = ["  " + ln if ln else ln for ln in lines]
     if result is not None:
         panel = stat_panel(result)
+        # Center the face over the panel's full width. A stat row is
+        # 2 + 10 + 1 + 12 + 1 + 4 = 30 cells; the face is 14, so it gets
+        # (30-14)//2 = 8 spaces and floats mid-table, not hugging a side.
+        indent = " " * max(0, (30 - 14) // 2)
+        lines = [indent + ln if ln else ln for ln in lines]
         # Center the face against the stat table: the block reads as one
         # object only when the face's middle row is the panel's middle
         # row; top-aligned it hangs like a stamp above a receipt.
