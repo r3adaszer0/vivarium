@@ -309,6 +309,11 @@ def render(body: str, cols: int, marker: str, live: dict | None = None,
     else:
         art_lines, art_eidos, tail_text = split_art(tail_text)
     two_col = dish and bool(tail_text) and cols >= dish_cols + MIN_GUTTER
+    if two_col and lines and lines[-1] == "":
+        # The blank under the headline reads as air on a one-column card,
+        # but above the dish it is a whole spare row pushing the picture
+        # down. When the two-column block takes over, spend that row.
+        lines.pop()
     spacer_at = len(lines) if two_col else None
 
     if spacer_at is not None:

@@ -773,12 +773,32 @@ def _race_text(rest: list) -> str:
     except ImportError:  # pragma: no cover
         import scenario as vscen
     if not rest:
-        return ("Usage:\n"
-                "  /vivarium race <scenario-code>\n"
-                "  /vivarium race <seed> [challenge-code ...]  — new duel "
-                "from a seed word; optional contestant strains\n"
-                "Contestant codes come from /vivarium codex exports or other "
-                "agents' challenge codes.")
+        return ("Usage: /vivarium race <seed-word> <code> [<code> …]"
+                "\n\n"
+                "A race is a small duel between species in a sealed jar: "
+                "same start, same rules, same result every time - anyone "
+                "can re-run it and get the same scoreboard.\n"
+                "\n"
+                "How to run one:\n"
+                "  1. Pick contestants. /vivarium export lists your "
+                "species as challenge codes (a code IS its genome - six "
+                "numbers, nothing private).\n"
+                "  2. Choose a seed word. Any word works: it fixes the "
+                "arena - terrain, food, start positions - so the same "
+                "seed always builds the same jar.\n"
+                "  3. Race.\n"
+                "     /vivarium race titanic <code>          your species, "
+                "solo, vs the jar's baseline\n"
+                "     /vivarium race titanic <codeA> <codeB>  head-to-head\n"
+                "     /vivarium race SCEN1…                  re-run a race "
+                "someone shared with you\n"
+                "  4. The result prints a scoreboard and a share code. "
+                "Send that code to a friend (or post it): they can replay "
+                "the exact same race and check the score.\n"
+                "\n"
+                "Codes come from /vivarium export, or from other agents' "
+                "challenge codes. No skill content ever leaves your "
+                "machine - only the genome numbers.")
     if rest[0].startswith("SCEN1"):
         spec = vscen.decode_scenario(rest[0])
         if spec is None:
@@ -839,6 +859,43 @@ def _export_text(rest: list) -> str:
         return (f"{rec.get('eidos', name)} — challenge code:\n{code}\n\n"
                 f"Enter a race: /vivarium race <seed> {code[:16]}…\n"
                 f"Anyone can run it — codes carry the genome only.")
+    # Default: the lineages that actually matter on the dish right now -
+    # the coloured ones. A 90-species roster is archaeology; the reader
+    # wants the eight the dish paints. '/vivarium export all' is the
+    # archaeologist's view.
+    show_all = bool(rest and rest[0] in ("all", "--all"))
+    w = _world()
+    living = {}
+    if w is not None:
+        for c in w.creatures:
+            if c.alive():
+                living[c.lineage] = living.get(c.lineage, 0) + 1
+    top = [k for k, _ in sorted(living.items(), key=lambda kv: -kv[1])[:8]]
+    by_eidos = {}
+    for name, rec in births.items():
+        by_eidos.setdefault(rec.get("eidos", "?"), name)
+    birth_eidos = {rec.get("eidos") for rec in births.values()}
+    ours = [e for e in top if e in birth_eidos]
+    if not show_all and ours:
+        picked = [(by_eidos.get(e, "?"), e, living[e]) for e in ours]
+        lines = ["Your coloured species — challenge codes (share freely, "
+                 "genome only):"]
+        for name, eidos, pop in picked:
+            rec = births.get(name) or {}
+            g = rec.get("genome")
+            if g:
+                code = vstate.encode_genome(g)
+                lines.append(f"  {eidos:<14} {name:<28} ×{pop:<4} {code}")
+            else:
+                lines.append(f"  {eidos:<14} {name:<28} ×{pop:<4} "
+                             "(code unavailable — born pre-VIV-13, "
+                             "skill no longer installed)")
+        lines.append("")
+        lines.append(f"{len(births)} species exist; these are the dish's "
+                     f"top {len(picked)}. Everything: /vivarium export all")
+        lines.append("Race them: /vivarium race <seed-word> <code> "
+                     "[<code> …]")
+        return "\n".join(lines)
     lines = ["Your species — challenge codes (share freely, genome only):"]
     for name in sorted(births):
         rec = births[name]
@@ -1138,8 +1195,13 @@ def _show_text(rest: list) -> str:
             # trail_rows = every line printed AFTER the reserved block, so
             # the deferred paint can climb back over them to the image top.
             vterm.paint_over(path, res_rows, len(after) + 1, delay=0.6)
-            # blank line under the picture: the stats start on their own line
-            return head + "\n" + spacer + "\n\n" + rest_text
+            # one blank line above the reserved block: the face drops a row
+            # and clears the headline; the birth tick rides the head line.
+            tick = rec.get("tick")
+            head = head.rstrip()
+            if tick is not None:
+                head += f"\x1b[2m · born tick {tick}\x1b[0m"
+            return head + "\n\n" + spacer + "\n\n" + rest_text
     card = vident.species_card(eidos, genome, vident.color_for(genome["hue"]),
                                lineage_count=count,
                                founding_skill=name or "",

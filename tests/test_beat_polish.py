@@ -51,8 +51,10 @@ class TraitsAreBars(unittest.TestCase):
         for gene in ("forage", "sense", "metabolism"):
             self.assertIn(gene, panel)
         self.assertEqual(panel.count("█"), panel.count("█"))  # readable rows
-        self.assertIn("pod of 4", panel)
-        self.assertIn("hatch tick 114", panel)
+        # VIV-64: the pod-of-N · hatch-tick line was cut on purpose; the
+        # panel is genes only. The birth tick lives on /vivarium show.
+        self.assertNotIn("pod of", panel)
+        self.assertNotIn("hatch tick", panel)
 
     def test_show_and_arrival_print_the_same_bars(self):
         g = _genome()

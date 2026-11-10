@@ -146,7 +146,12 @@ def art_block(eidos: str, genome: dict | None = None,
         import portrait as vport
     lines = vport.sprite_lines(genome=genome, eidos=eidos)
     if result is not None:
-        lines = lines + [""] + stat_panel(result)
+        panel = stat_panel(result)
+        # Center the face against the stat table: the block reads as one
+        # object only when the face's middle row is the panel's middle
+        # row; top-aligned it hangs like a stamp above a receipt.
+        pad = max(0, (len(panel) + 1 - len(lines)) // 2)
+        lines = [""] * pad + lines + [""] + panel
     return f"\n{ART_OPEN}{eidos}>>\n" + "\n".join(lines) + f"\n{ART_CLOSE}\n"
 
 
@@ -175,10 +180,10 @@ def act3_for(result: dict) -> str:
     # VIV-62 follow-up: the census row already says tick/alive/lineages
     # under the dish, and the stat panel beside the face carries the
     # numbers. Copy here is one line: who this is, and the two commands.
-    src = f", the '{name}' skill." if name else "."
+    src = f" from your '{name}' skill" if name else ""
     return (
         art_block(eidos, genome, result)
-        + f"\nFirstborn of yours{src}"
+        + f"\nA new Hermes skill gave birth to a new species: {eidos}{src}."
         "\n\n"
         f"Meet it: /vivarium show {eidos}\n"
         "Watch it: /vivarium clip")
@@ -186,10 +191,11 @@ def act3_for(result: dict) -> str:
 
 def act4_text() -> str:
     return (
-        "\n\nYour dish has been running for a while now. Some lineages "
+        "\n\n" + DISH_MARKER + "\n\n"
+        "Your dish has been running for a while now. Some lineages "
         "thrived, some are gone. Survival was the filter; what remains is "
         "strong."
-        "\n\n" + DISH_MARKER + "\n\n"
+        "\n\n"
         "Time to meet the neighbors. /vivarium export turns any species "
         "into a challenge code: a sealed capsule carrying its genome, never "
         "your skills (those stay yours). Send a code to a friend running "
@@ -221,7 +227,7 @@ def bare_birth_line(result: dict) -> str:
     """Narration-off mode: name + ID only, no ceremony."""
     return (f"🧬 New species: {result.get('eidos', '?')} "
             f"(from '{result.get('name', '')}'), "
-            f"pod of {result.get('pod', '?')} at tick {result.get('tick', '?')}.")
+            f"tick {result.get('tick', '?')}.")
 
 
 # ── gating ───────────────────────────────────────────────────────────────────

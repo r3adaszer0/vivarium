@@ -186,8 +186,6 @@ def trait_bars(g: Dict[str, float], pod=None, tick=None) -> List[str]:
     panel is identical on both cards.
     """
     out = []
-    if pod is not None and tick is not None:
-        out.append(f"  \x1b[2mpod of {pod} · hatch tick {tick}\x1b[0m")
     for label, key, rgb in _TRAITS:
         lo, hi = _RANGES[key]
         try:
