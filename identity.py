@@ -15,12 +15,12 @@ from __future__ import annotations
 
 from typing import Dict, List, Tuple
 
-import world as _W
-
 try:  # package context (Hermes plugin) or flat import (tests)
     from . import world as W
 except ImportError:  # pragma: no cover
     import world as W
+
+_W = W   # legacy alias
 
 GLYPH_SIZE = 7
 SHADES = " .o@"          # darkest -> brightest (matches dish render shading)
