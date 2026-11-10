@@ -160,7 +160,7 @@ def art_block(eidos: str, genome: dict | None = None,
     return f"\n{ART_OPEN}{eidos}>>\n" + "\n".join(lines) + f"\n{ART_CLOSE}\n"
 
 
-def act3_for(result: dict) -> str:
+def act3_for(result: dict, arrival: bool = True) -> str:
     """The arrival: a face, its numbers, and where it came from.
 
     The old copy opened with a rhetorical question ("Remember the
@@ -185,6 +185,10 @@ def act3_for(result: dict) -> str:
     # VIV-62 follow-up: the census row already says tick/alive/lineages
     # under the dish, and the stat panel beside the face carries the
     # numbers. Copy here is one line: who this is, and the two commands.
+    if not arrival:
+        # Later acts already told the birth story; the face and the arena
+        # copy are what is new. No registry rows, no 'gave birth' line.
+        return art_block(eidos, genome, result) + "\n" + act4_text().strip()
     src = f" from your '{name}' skill" if name else ""
     return (
         art_block(eidos, genome, result)
@@ -214,7 +218,7 @@ def act4_text() -> str:
 
 def act4_for(result: dict) -> str:
     """Act 4 with the newborn's face, like act 3: every birth deserves one."""
-    return act3_for(result) + "\n\n" + act4_text().strip()
+    return act3_for(result, arrival=False)
 
 
 def act_codex_text(discovery_label: str) -> str:
