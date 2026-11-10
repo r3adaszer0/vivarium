@@ -42,8 +42,16 @@ def birth_species(s, name: str, content: str,
         births = {b["skill"]: {"eidos": b["eidos"], "day": b["day"],
                                "pod": 4, "digest_fp": "", "era": 1}
                   for b in births if isinstance(b, dict) and "skill" in b}
-    if name in births:
-        return None  # deterministic per universe: one birth per skill, ever
+    era = rec.get("era", 1)
+    prior = births.get(name)
+    if prior is not None:
+        # Deterministic per universe: one birth per skill, ever - but a
+        # restart is a NEW universe (new key, new physics, VIV: era N+1
+        # replays the walkthrough). A registry row stamped with an older
+        # era describes a dead universe, not this one; the skill is free
+        # to be born again here.
+        if int(prior.get("era") or 1) >= era:
+            return None
 
     w = load_world() if load_world is not None else None
     if w is None:

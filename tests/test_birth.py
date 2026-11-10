@@ -99,6 +99,41 @@ class SkillBirth(unittest.TestCase):
             self.assertEqual(s.d["births"]["dup-skill"], first)
             self.assertEqual(s.d["world"], before)  # world untouched on re-fire
 
+    def test_birth_from_an_older_era_is_not_a_blocker(self):
+        # A restart is a new universe: registry rows stamped with an older
+        # era must not block the same skill from being born again here.
+        # (Era-6 live, registry says probe-user-two was born in era 2 ->
+        # the skill stayed unborn and act 3 never fired.)
+        ctx = self._wired()
+        s = ctx.state
+        make_live(s)
+        s.d["universe"]["era"] = 6
+        s.d.setdefault("births", {})["legacy-skill"] = {
+            "eidos": "Eidos_deadbeef", "day": "2026-11-01", "pod": 4,
+            "digest_fp": "0123456789abcdef", "era": 2}
+        with TempSkills("legacy-skill", "Brand new content for era six."):
+            ctx._hooks["on_skill_lifecycle"](
+                skill_name="legacy-skill", action="created")
+        births = s.d["births"]
+        self.assertIn("legacy-skill", births)
+        self.assertEqual(births["legacy-skill"]["era"], 6)
+        self.assertNotEqual(births["legacy-skill"]["digest_fp"],
+                            "0123456789abcdef")
+        self.assertIn("New species", vstate.narration_text())
+
+    def test_birth_in_this_era_still_never_twice(self):
+        ctx = self._wired()
+        s = ctx.state
+        make_live(s)
+        s.d["universe"]["era"] = 6
+        with TempSkills("fresh-skill", "Same-era duplicate content abc."):
+            ctx._hooks["on_skill_lifecycle"](
+                skill_name="fresh-skill", action="created")
+            first = dict(s.d["births"]["fresh-skill"])
+            ctx._hooks["on_skill_lifecycle"](
+                skill_name="fresh-skill", action="restored")
+        self.assertEqual(s.d["births"]["fresh-skill"], first)
+
     def test_dormant_universe_skips_birth(self):
         ctx = self._wired()
         s = ctx.state
