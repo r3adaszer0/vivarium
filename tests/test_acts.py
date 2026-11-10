@@ -37,7 +37,7 @@ class TestActs(unittest.TestCase):
         r = {"eidos": "Eidos_1", "name": "a", "pod": 4, "tick": 10}
         A.birth_narration(self.s, "BASE", r, is_big_bang=True)  # the Bang
         out = A.birth_narration(self.s, "BASE", r, is_big_bang=False)
-        self.assertIn("The first arrival you meet by name", out)
+        self.assertIn("Firstborn of yours", out)
         self.assertIn("/vivarium show Eidos_1", out)
         self.assertIn("/vivarium clip", out)
         out2 = A.birth_narration(self.s, "BASE", r, is_big_bang=False)
@@ -50,7 +50,7 @@ class TestActs(unittest.TestCase):
         r = {"eidos": "Eidos_1", "name": "a", "pod": 4, "tick": 10}
         A.birth_narration(self.s, "BASE", r, is_big_bang=True)  # the Bang
         out = A.birth_narration(self.s, "BASE", r, is_big_bang=False)
-        self.assertIn("The Big Bang already seeded a founding roster", out)
+        self.assertIn("Firstborn of yours", out)
 
     def test_narration_off_bare_lines(self):
         r = {"eidos": "Eidos_1", "name": "a", "pod": 4, "tick": 10}

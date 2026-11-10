@@ -68,11 +68,11 @@ class ArtInTheCard(unittest.TestCase):
         art_rows = [ln for ln in text.split("\n") if "█" in ln]
         self.assertTrue(art_rows, "no portrait drawn")
         body = [ln for ln in text.split("\n")
-                if "The first arrival you meet by name" in ln]
+                if "Firstborn of yours" in ln]
         self.assertTrue(body)
         # the face starts where the copy starts: same left column
         self.assertGreaterEqual(art_rows[0].index("█"),
-                                body[0].index("The first arrival") - 2)
+                                body[0].index("Firstborn of yours") - 2)
 
     def test_narrow_terminal_keeps_the_portrait(self):
         text = card.plain(self._render(72)["text"])
@@ -84,7 +84,7 @@ class StripArt(unittest.TestCase):
         t = acts.act3_for({"eidos": "Eidos_abc123", "name": "x", "pod": 4})
         out = acts.strip_art(t)
         self.assertNotIn("█", out)
-        self.assertIn("The first arrival you meet by name", out)
+        self.assertIn("Firstborn of yours", out)
 
 
 if __name__ == "__main__":
@@ -123,7 +123,7 @@ class LadderSurvivesAFailedRender(unittest.TestCase):
         res = {"eidos": "Eidos_bbb222", "name": "probe", "pod": 3,
                "tick": 20, "genome": _genome()}
         text = A.birth_narration(self.s, "BASE", res, is_big_bang=False)
-        self.assertIn("The first arrival you meet by name", text)
+        self.assertIn("Firstborn of yours", text)
 
 
 class _Dict:

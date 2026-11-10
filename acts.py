@@ -172,13 +172,13 @@ def act3_for(result: dict) -> str:
                                    "aggression", "mutate")):
         genus, epithet, common = vident.name_of(genome)
         title = f"{genus} {epithet}, {common}. "
+    # VIV-62 follow-up: the census row already says tick/alive/lineages
+    # under the dish, and the stat panel beside the face carries the
+    # numbers. Copy here is one line: who this is, and the two commands.
+    src = f", the '{name}' skill." if name else "."
     return (
         art_block(eidos, genome, result)
-        + "\nThe first arrival you meet by name: the first species in this "
-        "dish that came from something you did"
-        + (f", the '{name}' skill." if name else ".")
-        + "\nThe Big Bang already seeded a founding roster from everything "
-        "Hermes knew at birth; this one is yours."
+        + f"\nFirstborn of yours{src}"
         "\n\n"
         f"Meet it: /vivarium show {eidos}\n"
         "Watch it: /vivarium clip")
