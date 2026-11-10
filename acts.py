@@ -113,7 +113,7 @@ def strip_art(text: str) -> str:
     return _ART_RE.sub("", text or "")
 
 
-def art_block(eidos: str) -> str:
+def art_block(eidos: str, genome: dict | None = None) -> str:
     """The face, in the text stream.
 
     The card lifts this out and sets it above the copy. It travels in the
@@ -124,7 +124,7 @@ def art_block(eidos: str) -> str:
         from . import portrait as vport
     except ImportError:  # pragma: no cover - flat-import mode
         import portrait as vport
-    lines = vport.sprite_lines(eidos)
+    lines = vport.sprite_lines(genome=genome, eidos=eidos)
     return f"\n{ART_OPEN}{eidos}>>\n" + "\n".join(lines) + f"\n{ART_CLOSE}\n"
 
 
@@ -132,7 +132,7 @@ def act3_for(result: dict) -> str:
     eidos = result.get("eidos", "?")
     name = result.get("name", "")
     return (
-        art_block(eidos)
+        art_block(eidos, result.get("genome"))
         + f"\nRemember the promise? A new skill, a new species. Meet your "
         f"newest arrival, born from the skill you just taught me: {eidos}"
         + (f" (from '{name}')" if name else "") + ".\n"

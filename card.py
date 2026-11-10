@@ -174,12 +174,14 @@ def _head_block(facts: dict, cols: int, live: dict | None) -> list[str]:
     return lines
 
 
-def _caption(live: dict | None) -> str:
+def _caption(live: dict | None, note: str = "") -> str:
     if not live:
         return ""
     bits = [f"tick {live['tick']}", f"{live['alive']} alive"]
     if live.get("lineages"):
         bits.append(f"{live['lineages']} lineages")
+    if note:
+        bits.append(note)
     return f"{ITALIC}{DIM}  " + "  ·  ".join(bits) + f"{RST}"
 
 
@@ -240,7 +242,6 @@ def render(body: str, cols: int, marker: str, live: dict | None = None,
             # where it is. The legend names the ring instead of numbering
             # it: nothing in an image can hold a digit.
             body_lines += [(ln, True) for ln in art_lines]
-            body_lines.append((f"{ITALIC}{DIM}white ring marks the pod{RST}", True))
             body_lines.append(("", True))
         for i, para in enumerate(p for p in tail_text.split("\n") if p.strip()):
             if i:
@@ -265,7 +266,7 @@ def render(body: str, cols: int, marker: str, live: dict | None = None,
                 lines.append(pad + t)
             else:
                 lines.append(f"{pad}{SOFT}{t}{RST}")
-        cap = _caption(live)
+        cap = _caption(live, "white ring = the pod" if art_lines else "")
         if cap:
             lines.append(cap)
     elif tail_text:

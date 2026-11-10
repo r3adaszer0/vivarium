@@ -12,19 +12,39 @@ import portrait      # noqa: E402
 
 
 class Portrait(unittest.TestCase):
-    def test_same_eidos_same_face(self):
-        self.assertEqual(portrait.body_plan("Eidos_abc123"),
-                         portrait.body_plan("Eidos_abc123"))
+    """One genome, one face: the portrait is the glyph, only bigger."""
 
-    def test_different_species_different_face(self):
-        self.assertNotEqual(portrait.body_plan("Eidos_abc123"),
-                            portrait.body_plan("Eidos_def456"))
+    def setUp(self):
+        import world as W
+        self.g = W.genome_from_bytes(bytes(range(24)))
+        self.other = W.genome_from_bytes(bytes(range(1, 25)))
 
-    def test_sprite_is_symmetric_and_square(self):
-        grid = portrait.body_plan("Eidos_abc123")
-        self.assertEqual({len(r) for r in grid}, {15})
-        for row in grid:
-            self.assertEqual(row, list(reversed(row)))
+    def test_same_genome_same_face(self):
+        self.assertEqual(portrait.sprite_lines(genome=self.g),
+                         portrait.sprite_lines(genome=self.g))
+
+    def test_different_genome_different_face(self):
+        self.assertNotEqual(portrait.sprite_lines(genome=self.g),
+                            portrait.sprite_lines(genome=self.other))
+
+    def test_portrait_is_the_show_glyph_widened(self):
+        import identity as I
+        cells = I.glyph_cells(self.g)
+        lines = portrait.sprite_lines(genome=self.g, scale=3)
+        self.assertEqual(len(lines), len(cells))
+        for row, line in zip(cells, lines):
+            plain = line.split("m", 1)[1].rsplit("\x1b", 1)[0]
+            self.assertEqual(len(plain), 15)
+            for i, v in enumerate(row):
+                block = plain[i * 3:(i + 1) * 3]
+                self.assertEqual(len(set(block)), 1)
+                self.assertEqual(block[0] == " ", v == 0)
+
+    def test_missing_genome_still_gives_a_stable_face(self):
+        a = portrait.sprite_lines(eidos="Eidos_abc123")
+        b = portrait.sprite_lines(eidos="Eidos_abc123")
+        self.assertEqual(a, b)
+        self.assertTrue(any("█" in ln for ln in a))
 
 
 class ArtInTheCard(unittest.TestCase):
