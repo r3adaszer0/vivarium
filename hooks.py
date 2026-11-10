@@ -434,7 +434,13 @@ def _arm_print() -> None:
             path = ""
             rows = 23
             dish_cols = 24
-            if w is not None and not vstate.already_painted(w):
+            # No "already painted" guard here. It existed when the agent
+            # could also call vivarium_render for the same beat; the agent
+            # no longer paints, and the guard is stateful across runs — a
+            # restart that lands on the same (era, tick) then silently
+            # drops the picture, which is exactly how the dish vanished
+            # twice. The beat always paints.
+            if w is not None:
                 path = vart.render_dish_png(vstate.state(), w, f"live_{w.tick}")
                 if path:
                     size = vterm.png_size(path) or (342, 339)
