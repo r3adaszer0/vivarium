@@ -199,7 +199,10 @@ def _caption(live: dict | None, note: str = "") -> str:
         if grey > 0:
             # The dish colours the top-8 and greys the rest; say so here,
             # so a grey dish reads as a census fact, not a rendering bug.
-            bits.append(f"{live.get('coloured') or 0} in {total} lineages"
+            # Name every number with its unit: N lineages alive, the top 8
+            # painted, the rest dim. "32 in 93" was ambiguous on purpose
+            # of nobody: a creature count read as a lineage count.
+            bits.append(f"{total} lineages · top 8 coloured"
                         f" · {grey} dim (not yet dominant)")
         else:
             bits.append(f"{total} lineages")
