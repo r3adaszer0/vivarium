@@ -29,7 +29,12 @@ from typing import Dict, List, Optional, Tuple
 # ── Tunables (module-level so tests and the Gauntlet can override) ───────────
 GRID_W = 48
 GRID_H = 48
-BASE_REGROWTH = 0.018       # food per tick a cell regrows toward saturation
+BASE_REGROWTH = 0.009       # food per tick a cell regrows toward saturation.
+                            # Was 0.018, which refilled a grazed dish in one
+                            # afternoon: 102 ticks of agent activity took the
+                            # mean from 0.18 to 1.28 of MAX_FOOD. At 0.009 the
+                            # same 102 ticks reach about 0.75 with grazing, so a
+                            # famine you can see is still there an hour later.
                             # (retuned under LIVE metabolism: K ~ 93 creatures;
                             #  0.003 was tuned while the drain was a dead gene)
 FERTILITY_SPREAD = 0.6     # how much neighbours' food boosts regrowth
