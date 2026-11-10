@@ -209,6 +209,49 @@ def _caption(live: dict | None, note: str = "") -> str:
     return f"{ITALIC}{DIM}  " + "  ·  ".join(bits) + f"{RST}"
 
 
+def status_panel(stats: dict, dish_rows: int) -> list[str]:
+    """The census beside the dish: one row per fact, labels dim, values plain.
+
+    `dish_rows` drives the height so text and picture bottom-align; the
+    panel never wraps - every value is composed short enough to fit the
+    right column at the widths the card allows.
+    """
+    rows: list[str] = []
+    a = stats.get("ages") or {}
+    lineages = stats.get("lineages") or []
+    total = stats.get("lineages_total") or len(lineages)
+
+    def _pair(label: str, value: str) -> str:
+        return f"{DIM}{label:<11}{RST} {SOFT}{value}{RST}"
+
+    facts: list[tuple[str, str]] = [
+        ("state", f"tick {stats.get('tick', 0)} · {stats.get('population', 0)} alive"
+                  f" · peak {stats.get('peak', '?')}"),
+    ]
+    if stats.get("born") is not None:
+        facts.append(("balance", f"{stats['born']} born · {stats['died']} died"))
+    if stats.get("avg_energy") is not None:
+        facts.append(("energy", f"avg {stats['avg_energy']}"))
+    if total:
+        top_note = " · top 8 coloured" if (stats.get("grey") or 0) > 0 else ""
+        facts.append(("lineages", f"{total} alive{top_note}"))
+        for n, c in lineages:
+            facts.append(("", f"{c} ×{n}"))
+    if a:
+        facts.append(("ages", f"{a.get('newborns', 0)} newborn · {a.get('young', 0)} young · "
+                              f"{a.get('adults', 0)} adult · {a.get('elders', 0)} elder"))
+        verdict = a.get("verdict") or ""
+        facts.append(("", f"avg age {a.get('avg_age', 0)} — {verdict}"))
+    rows.append("")
+    for label, value in facts:
+        rows.append(_pair(label, value) if label else f"{'':11} {SOFT}{value}{RST}")
+    rows.append("")
+    # bottom-align with the dish: pad up to the picture's height
+    while len(rows) < dish_rows:
+        rows.append("")
+    return rows
+
+
 def _command_table(cols: int) -> list[str]:
     rows = [
         ("/vivarium help", "all commands and shortcuts"),

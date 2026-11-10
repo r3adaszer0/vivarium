@@ -12,6 +12,7 @@ from __future__ import annotations
 import json
 import math
 import os
+import shutil
 from typing import Any, Dict
 
 def _tool_shim(data=None, error=None, **kwargs):
@@ -482,12 +483,45 @@ def _cmd(raw_args: str) -> str:
                 except ImportError:  # pragma: no cover
                     import artifacts as vart
                 w = _world()
+                stats = vworld.stats(w)
                 path = vart.render_dish_png(
                     vstate.state(), w, f"status_{w.tick}")
                 if path:
                     size = vterm.png_size(path) or (342, 339)
                     res_rows = max(1, math.ceil(size[1] / vterm.CELL_H))
                     res_cols = max(20, math.ceil(size[0] / vterm.CELL_W))
+                    cols_now = shutil.get_terminal_size((100, 40)).columns
+                    # Wide terminal: the census sits BESIDE the dish, the
+                    # same two-column language as the arrival card. Narrow
+                    # or plain: the summary stays above the picture.
+                    if cols_now >= res_cols + 44:
+                        try:
+                            from . import card as vcard
+                        except ImportError:  # pragma: no cover
+                            import card as vcard
+                        panel = vcard.status_panel(stats, res_rows)
+                        # The panel IS the summary; the prose line would
+                        # duplicate every number. The dish paints over the
+                        # left column, facts ride beside it, the stale
+                        # nudge (if any) stays under the panel where the
+                        # caption row lives on other cards.
+                        stale = ""
+                        try:
+                            from . import codex as vcodex
+                            curve = (stats.get("curve")
+                                     or [{"tick": stats["tick"],
+                                          "population": stats["population"]}])
+                            st2 = vcodex.staleness(curve)
+                            if st2["verdict"] == "stale":
+                                stale = f"{st2['detail']} — consider {st2['suggestion']}"
+                        except Exception:
+                            pass
+                        body = "\n".join(panel)
+                        if stale:
+                            body += f"\n\n  {stale}"
+                        vterm.paint_over(path, res_rows, 0, delay=0.4)
+                        return body + "\n" + "\n".join(
+                            " " * res_cols for _ in range(res_rows))
                     spacer = "\n".join(" " * res_cols
                                        for _ in range(res_rows))
                     vterm.paint_over(path, res_rows, 0, delay=0.4)
