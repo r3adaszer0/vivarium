@@ -1185,6 +1185,7 @@ def _show_text(rest: list) -> str:
                                        vident.color_for(genome["hue"]),
                                        lineage_count=count,
                                        founding_skill=name or "",
+                                       born_tick=rec.get("tick"),
                                        colored=False, face=False)
             head, _, rest_text = text.partition("\n")
             size = vterm.png_size(path) or (230, 230)
@@ -1205,6 +1206,7 @@ def _show_text(rest: list) -> str:
     card = vident.species_card(eidos, genome, vident.color_for(genome["hue"]),
                                lineage_count=count,
                                founding_skill=name or "",
+                               born_tick=rec.get("tick"),
                                colored=_tty)
     if "--image" in rest or "image" in rest:
         path = vart.render_glyph_png(s, eidos, genome)

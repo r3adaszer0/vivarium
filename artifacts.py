@@ -83,14 +83,18 @@ def render_glyph_png(s, eidos: str, genome: Dict[str, float]) -> Optional[str]:
     SCALE, PAD = int(210 / I.GLYPH_SIZE), 10
     size = I.GLYPH_SIZE * SCALE + 2 * PAD
     rgb = I.glyph_rgb_cells(genome, I.color_for(genome["hue"]))
-    EMPTY = (24, 26, 32)
     # Empty glyph cells go fully transparent: the face floats on the
     # terminal's own background instead of carrying a dark box into every
-    # card. Filled cells stay opaque so hue survives any background.
-    pixels = [[(rgb[(py - PAD) // SCALE][(px - PAD) // SCALE] + (255,))
-               if PAD <= py < size - PAD and PAD <= px < size - PAD
-               and rgb[(py - PAD) // SCALE][(px - PAD) // SCALE] != EMPTY
-               else (0, 0, 0, 0) for px in range(size)] for py in range(size)]
+    # card. glyph_rgb_cells marks empties with the (16,18,22) sentinel
+    # (identity.py "background dark"); any cell holding it becomes alpha 0.
+    # Filled cells stay opaque so hue survives any background.
+    EMPTY = (16, 18, 22)
+    def _cell(py, px):
+        if not (PAD <= py < size - PAD and PAD <= px < size - PAD):
+            return (0, 0, 0, 0)
+        c = rgb[(py - PAD) // SCALE][(px - PAD) // SCALE]
+        return (0, 0, 0, 0) if c == EMPTY else (c + (255,))
+    pixels = [[_cell(py, px) for px in range(size)] for py in range(size)]
     write_png(path, pixels, size)
     return path
 

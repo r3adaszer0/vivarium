@@ -204,6 +204,7 @@ def trait_bars(g: Dict[str, float], pod=None, tick=None) -> List[str]:
 
 def species_card(eidos: str, g: Dict[str, float], rgb: Tuple[int, int, int],
                  lineage_count: int = 1, founding_skill: str = "",
+                 born_tick: int | None = None,
                  colored: bool = False, face: bool = True) -> str:
     """One glanceable card: face + name + stats. Pure text; renderers draw it."""
     genus, epithet, common = name_of(g)
@@ -214,9 +215,11 @@ def species_card(eidos: str, g: Dict[str, float], rgb: Tuple[int, int, int],
     lines += [
         *trait_bars(g),
         f"  living members {lineage_count}",
+        f"  hatched from: {founding_skill}" if founding_skill
+        else "  hatched from: a founder",
     ]
-    if founding_skill:
-        lines.append(f"  hatched from: {founding_skill}")
+    if born_tick is not None:
+        lines.append(f"  born tick {born_tick}")
     return "\n".join(lines)
 
 
