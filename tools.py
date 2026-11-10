@@ -1067,24 +1067,48 @@ def _show_text(rest: list) -> str:
         from . import identity as vident
     except ImportError:  # pragma: no cover
         import identity as vident
-    # colour the face when the terminal can carry it: the same genome gets
-    # the same hue here as in the dish, so the card and the world agree
+    try:
+        from . import artifacts as vart
+        from . import termrender as vterm
+        from . import card as vcard
+    except ImportError:  # pragma: no cover
+        import artifacts as vart
+        import termrender as vterm
+        import card as vcard
     import sys as _sys
     _tty = bool(getattr(_sys.stdout, "isatty", lambda: False)())
+    gfx = _tty and vterm.detect_graphics() in ("kitty", "iterm2", "sixel")
+    if gfx and "noimage" not in rest:
+        # The face as an image, not as terminal cells: the dish paints the
+        # creature in pixel space and the terminal's own palette drifts the
+        # hue, so the same species looked like two different animals. One
+        # renderer, one colour.
+        path = vart.render_glyph_png(s, eidos, genome)
+        if path:
+            text = vident.species_card(eidos, genome,
+                                       vident.color_for(genome["hue"]),
+                                       lineage_count=count,
+                                       founding_skill=name or "",
+                                       colored=False, face=False)
+            head, _, rest_text = text.partition("\n")
+            size = vterm.png_size(path) or (230, 230)
+            res_rows = max(1, math.ceil(size[1] / vterm.CELL_H))
+            res_cols = max(12, math.ceil(size[0] / vterm.CELL_W))
+            spacer = "\n".join(" " * res_cols for _ in range(res_rows))
+            after = rest_text.splitlines()
+            # trail_rows = every line printed AFTER the reserved block, so
+            # the deferred paint can climb back over them to the image top.
+            vterm.paint_over(path, res_rows, len(after) + 1, delay=0.6)
+            # blank line under the picture: the stats start on their own line
+            return head + "\n" + spacer + "\n\n" + rest_text
     card = vident.species_card(eidos, genome, vident.color_for(genome["hue"]),
                                lineage_count=count,
                                founding_skill=name or "",
                                colored=_tty)
     if "--image" in rest or "image" in rest:
-        try:
-            from . import artifacts as vart
-            from . import termrender as vterm
-        except ImportError:  # pragma: no cover
-            import artifacts as vart
-            import termrender as vterm
         path = vart.render_glyph_png(s, eidos, genome)
         if path:
-            size = vterm.png_size(path) or (220, 220)
+            size = vterm.png_size(path) or (230, 230)
             res_rows = max(1, math.ceil(size[1] / vterm.CELL_H))
             res_cols = max(20, math.ceil(size[0] / vterm.CELL_W))
             spacer = "\n".join(" " * res_cols for _ in range(res_rows))

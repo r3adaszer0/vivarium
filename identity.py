@@ -157,31 +157,43 @@ def name_of(g: Dict[str, float]) -> Tuple[str, str, str]:
 
 
 _BAR = 12
+# Every gene gets a bar, scaled to its own evolvable range: a full bar means
+# "as high as this gene can go", so two species are comparable at a glance
+# and a 1.21 forage is not silently read as a third of a bar.
 _TRAITS = (
-    ("forage", "forage", 3.0, (118, 214, 120)),
-    ("sense", "sense", 3.0, (110, 170, 235)),
-    ("metabolism", "metabolism_mult", 2.0, (232, 168, 90)),
+    ("forage", "forage", (118, 214, 120)),
+    ("sense", "sense", (110, 170, 235)),
+    ("metabolism", "metabolism_mult", (232, 168, 90)),
+    ("aggression", "aggression", (226, 110, 110)),
+    ("mutate", "mutate", (186, 140, 235)),
 )
+_RANGES = {
+    "forage": (0.2, 2.0), "aggression": (0.05, 2.0),
+    "metabolism_mult": (0.7, 1.6), "sense": (1.0, 4.0), "mutate": (0.5, 2.0),
+}
 
 
 def trait_bars(g: Dict[str, float], pod=None, tick=None) -> List[str]:
-    """The three traits as bars. One genome, one panel, everywhere.
+    """Every gene as a bar. One genome, one panel, everywhere.
 
-    The arrival card and `/vivarium show` printed the same three genes in
-    two different formats (comma list, pipe list). Neither is readable at a
-    glance, and neither matches the other. Bars do both jobs.
+    The arrival card and `/vivarium show` printed the same genes in two
+    different formats (comma list, pipe list), and one of them listed
+    aggression and mutate as bare numbers. Bars read in one pass, and the
+    panel is identical on both cards.
     """
     out = []
     if pod is not None and tick is not None:
         out.append(f"  \x1b[2mpod of {pod} · hatch tick {tick}\x1b[0m")
-    for label, key, scale, rgb in _TRAITS:
+    for label, key, rgb in _TRAITS:
         try:
             v = float(g[key])
         except (KeyError, TypeError, ValueError):
             continue
-        filled = max(0, min(_BAR, int(round(v / scale * _BAR))))
+        lo, hi = _RANGES[key]
+        frac = max(0.0, min(1.0, (v - lo) / (hi - lo)))
+        filled = max(0, min(_BAR, int(round(frac * _BAR))))
         bar = (f"\x1b[38;2;{rgb[0]};{rgb[1]};{rgb[2]}m" + "█" * filled
-               + "\x1b[38;2;64;70;84m" + "░" * (_BAR - filled) + "\x1b[0m")
+               + f"\x1b[38;2;64;70;84m" + "░" * (_BAR - filled) + "\x1b[0m")
         # non-breaking padding: the card collapses runs of spaces
         lab = label.ljust(10).replace(" ", "\u00a0")
         out.append(f"  {lab} {bar} {v:.2f}")
@@ -190,15 +202,15 @@ def trait_bars(g: Dict[str, float], pod=None, tick=None) -> List[str]:
 
 def species_card(eidos: str, g: Dict[str, float], rgb: Tuple[int, int, int],
                  lineage_count: int = 1, founding_skill: str = "",
-                 colored: bool = False) -> str:
+                 colored: bool = False, face: bool = True) -> str:
     """One glanceable card: face + name + stats. Pure text; renderers draw it."""
     genus, epithet, common = name_of(g)
     title = f"{genus} {epithet}"
-    lines = [
-        f"{title} ({common}) · {eidos}",
-        glyph_ansi(g, rgb) if colored else glyph_ascii(g),
+    lines = [f"{title} ({common}) · {eidos}"]
+    if face:
+        lines.append(glyph_ansi(g, rgb) if colored else glyph_ascii(g))
+    lines += [
         *trait_bars(g),
-        f"  aggression {g.get('aggression', 0):.2f} · mutate {g.get('mutate', 0):.2f}",
         f"  living members {lineage_count}",
     ]
     if founding_skill:

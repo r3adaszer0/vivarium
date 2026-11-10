@@ -124,7 +124,11 @@ def announcement(result: dict) -> str:
     except ImportError:  # pragma: no cover
         import identity as vident
     genus, epithet, _common = vident.name_of(g)
-    return (f"New species {result['eidos']} · {genus} {epithet}, "
+    # The id is the one token a reader has to copy, so it gets its own
+    # colour instead of disappearing into the white headline. Fixed accent,
+    # not the species hue: a red species would otherwise print a red id.
+    eidos = f"\x1b[38;2;124;199;255m{result['eidos']}\x1b[0m"
+    return (f"New species {eidos} · {genus} {epithet}, "
             f"from your '{result['name']}' skill.")
 
 

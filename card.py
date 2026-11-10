@@ -88,8 +88,23 @@ def parse(body: str, marker: str) -> dict:
     numbers are stable; anything that does not match is simply omitted
     rather than invented.
     """
-    head, _, tail = body.partition(marker)
-    facts: dict = {"head": head.strip(), "tail": tail.strip()}
+    # The marker is the wordmark, and it is not always before the portrait:
+    # an arrival card is announcement, face, copy. Splitting on the bare
+    # word meant the first occurrence of "vivarium" inside the copy
+    # ("Meet it: /vivarium show Eidos_x") cut the card in half and left
+    # "Meet it: /" as the headline. When there is a face, the face is the
+    # seam: facts above it, copy below it.
+    m = _ART_RE.search(body or "")
+    art: list = []
+    art_id = ""
+    if m:
+        head, tail = body[:m.start()], body[m.end():]
+        art = m.group(2).split("\n")
+        art_id = m.group(1)
+    else:
+        head, _, tail = body.partition(marker)
+    facts: dict = {"head": head.strip(), "tail": tail.strip(),
+                   "art": art, "art_id": art_id}
     for key, pattern in (
         ("era", r"era (\d+)"),
         ("species", r"Seeded (\d+) species"),
@@ -230,7 +245,10 @@ def render(body: str, cols: int, marker: str, live: dict | None = None,
         lines.append("")
 
     tail_text = facts["tail"]
-    art_lines, art_eidos, tail_text = split_art(tail_text)
+    if facts.get("art"):
+        art_lines, art_eidos = facts["art"], facts.get("art_id", "")
+    else:
+        art_lines, art_eidos, tail_text = split_art(tail_text)
     two_col = dish and bool(tail_text) and cols >= dish_cols + MIN_GUTTER
     spacer_at = len(lines) if two_col else None
 
