@@ -26,12 +26,18 @@ except ImportError:  # pragma: no cover
 
 # ── minimal PNG writer (zero-dependency, proven in render_live.py) ───────────
 def write_png(path: str, pixels, size: int) -> None:
+    """Write an RGB or RGBA PNG. Alpha (color type 6) lets a sprite's empty
+    cells show the terminal's own background, the same way the dish's
+    trails already do not exist: the picture is the creature, nothing else."""
+    px0 = pixels[0][0]
+    rgba = len(px0) == 4
     raw = b"".join(b"\x00" + b"".join(bytes(px) for px in row) for row in pixels)
     def chunk(t, d):
         c = t + d
         return struct.pack(">I", len(d)) + c + struct.pack(">I", zlib.crc32(c))
     png = b"\x89PNG\r\n\x1a\n"
-    png += chunk(b"IHDR", struct.pack(">IIBBBBB", size, size, 8, 2, 0, 0, 0))
+    png += chunk(b"IHDR", struct.pack(">IIBBBBB", size, size, 8,
+                                      6 if rgba else 2, 0, 0, 0))
     png += chunk(b"IDAT", zlib.compress(raw, 9))
     png += chunk(b"IEND", b"")
     with open(path, "wb") as fh:
@@ -77,9 +83,14 @@ def render_glyph_png(s, eidos: str, genome: Dict[str, float]) -> Optional[str]:
     SCALE, PAD = int(210 / I.GLYPH_SIZE), 10
     size = I.GLYPH_SIZE * SCALE + 2 * PAD
     rgb = I.glyph_rgb_cells(genome, I.color_for(genome["hue"]))
-    pixels = [[rgb[(py - PAD) // SCALE][(px - PAD) // SCALE]
+    EMPTY = (24, 26, 32)
+    # Empty glyph cells go fully transparent: the face floats on the
+    # terminal's own background instead of carrying a dark box into every
+    # card. Filled cells stay opaque so hue survives any background.
+    pixels = [[(rgb[(py - PAD) // SCALE][(px - PAD) // SCALE] + (255,))
                if PAD <= py < size - PAD and PAD <= px < size - PAD
-               else (24, 26, 32) for px in range(size)] for py in range(size)]
+               and rgb[(py - PAD) // SCALE][(px - PAD) // SCALE] != EMPTY
+               else (0, 0, 0, 0) for px in range(size)] for py in range(size)]
     write_png(path, pixels, size)
     return path
 
@@ -171,12 +182,8 @@ def _callout_plate(pixels, size, cell_xy, label, cell: int, pad: int,
                         fill=(16, 26, 42), outline=(90, 170, 235), width=1)
     d.text((bx + 8, by + bh // 2), label, font=font,
            fill=(180, 218, 255), anchor="lm")
-    # badge with the digit, offset up-left so the ringed cell stays visible
-    br = 7
-    nb = (cx - 11, cy - 11)
-    d.ellipse([nb[0] - br, nb[1] - br, nb[0] + br, nb[1] + br],
-              fill=(16, 22, 34), outline=(160, 210, 255), width=1)
-    d.text(nb, "1", font=font, fill=(220, 240, 255), anchor="mm")
+    # No badge digit: the label box carries the id itself, so the eye
+    # goes cell -> line -> id with no cipher to decode.
     return img
 
 

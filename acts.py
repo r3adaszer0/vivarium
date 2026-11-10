@@ -83,7 +83,10 @@ def set_narration(s, mode: str) -> str:
 # Placeholder where the dish picture belongs. The plugin's own printer
 # splits the narration on it (headline above the image, the explanation
 # below); surfaces that cannot paint strip it.
-DISH_MARKER = "\n\n[[vivarium:dish]]\n\n"
+# The dish seam between copy halves. Was the literal "[[vivarium:dish]]",
+# which printed verbatim on any path that skipped the split (the user saw
+# it above the act-2 card). A control char survives a split miss invisibly.
+DISH_MARKER = "\n\n\x1a\n\n"
 
 ACT2_TEXT = (
     "\n\nThis dish is your Vivarium universe. Green is food: pale green is "

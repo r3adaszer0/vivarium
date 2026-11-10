@@ -491,7 +491,7 @@ def _arm_print() -> None:
                             break
                     if mark is not None:
                         callout = (mark[0], mark[1], _eidos)
-                        legend = f"1 = {_eidos}, the newborn"
+                        legend = f"the label names the newborn: {_eidos}"
                 path = vart.render_dish_png(vstate.state(), w, f"live_{w.tick}",
                                             mark=mark, callout=callout)
                 if path:
