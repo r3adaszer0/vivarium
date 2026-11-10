@@ -867,7 +867,7 @@ def _export_text(rest: list) -> str:
             return (f"{rec.get('eidos', name)} was born before challenge-code "
                     f"storage — its genome can no longer be re-derived "
                     f"(the skill was removed). It lives on in the dish.")
-        code = vstate.encode_genome(g)
+        code = vstate.encode_genome(g, rec.get("eidos"))
         return (f"{rec.get('eidos', name)} — challenge code:\n{code}\n\n"
                 f"Enter a race: /vivarium race <seed> {code[:16]}…\n"
                 f"Anyone can run it — codes carry the genome only.")
@@ -896,7 +896,7 @@ def _export_text(rest: list) -> str:
             rec = births.get(name) or {}
             g = rec.get("genome")
             if g:
-                code = vstate.encode_genome(g)
+                code = vstate.encode_genome(g, eidos)
                 lines.append(f"  {eidos:<14} {name:<28} ×{pop:<4} {code}")
             else:
                 lines.append(f"  {eidos:<14} {name:<28} ×{pop:<4} "
@@ -914,7 +914,7 @@ def _export_text(rest: list) -> str:
         g = rec.get("genome")
         eidos = rec.get("eidos", "?")
         if g:
-            code = vstate.encode_genome(g)
+            code = vstate.encode_genome(g, eidos)
             lines.append(f"  {eidos:<14} {name:<28} {code}")
         else:
             lines.append(f"  {eidos:<14} {name:<28} (code unavailable — "

@@ -444,9 +444,17 @@ def pop_narration() -> Optional[str]:
 
 
 # ── challenge codes ──────────────────────────────────────────────────────────
-def encode_genome(genome: Dict[str, float]) -> str:
-    blob = json.dumps({k: round(v, 4) for k, v in genome.items()}, sort_keys=True)
-    return "VIV1" + base64.urlsafe_b64encode(blob.encode()).decode().rstrip("=")
+def encode_genome(genome: Dict[str, float],
+                  eidos: Optional[str] = None) -> str:
+    # The id rides along when known: a scoreboard reading "Xbf6285" made
+    # the reader decode hex to learn who won. The id is 32 bits of a
+    # skill-content HMAC - an address, not content - so privacy holds
+    # (VIV-70). Codes without it stay valid; races fall back to X-hash.
+    blob: Dict[str, object] = {k: round(v, 4) for k, v in genome.items()}
+    if eidos:
+        blob["eidos"] = eidos
+    blob_js = json.dumps(blob, sort_keys=True)
+    return "VIV1" + base64.urlsafe_b64encode(blob_js.encode()).decode().rstrip("=")
 
 
 def decode_genome(code: str) -> Optional[Dict[str, float]]:
@@ -465,7 +473,30 @@ def decode_genome(code: str) -> Optional[Dict[str, float]]:
     required = ("forage", "aggression", "metabolism_mult", "sense", "mutate")
     if not isinstance(genome, dict) or not all(k in genome for k in required):
         return None
+    genome.pop("eidos", None)  # the label rides the same envelope, OUT here
     return vworld.with_defaults(genome)
+
+
+def decode_code_label(code: str) -> Optional[str]:
+    """The eidos id carried by a VIV1 code, if it has one.
+
+    Labels are addresses, not content: 8 hex chars of a skill-content
+    HMAC. A code without a label decodes fine; races hash the genome
+    instead (the old X-names).
+    """
+    code = code.strip()
+    if not code.startswith("VIV1"):
+        return None
+    b64 = code[4:]
+    b64 += "=" * (-len(b64) % 4)
+    try:
+        blob = json.loads(base64.urlsafe_b64decode(b64))
+    except Exception:
+        return None
+    eidos = blob.get("eidos") if isinstance(blob, dict) else None
+    if isinstance(eidos, str) and eidos.startswith("Eidos_"):
+        return eidos
+    return None
 
 
 def best_genome() -> Optional[Dict[str, float]]:
