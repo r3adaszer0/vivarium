@@ -500,7 +500,7 @@ def _cmd(raw_args: str) -> str:
                         except ImportError:  # pragma: no cover
                             import card as vcard
                         panel = vcard.status_panel(stats, res_rows,
-                                                   gutter=res_cols + 32)
+                                                   gutter=res_cols + 17)
                         # The panel IS the summary; the prose line would
                         # duplicate every number. The dish paints over the
                         # left column, facts ride beside it, the stale
@@ -519,7 +519,7 @@ def _cmd(raw_args: str) -> str:
                             pass
                         body = "\n".join(panel)
                         if stale:
-                            body += f"\n\n{' ' * (res_cols + 32)}  {stale}"
+                            body += f"\n\n{' ' * (res_cols + 17)}  {stale}"
                         vterm.paint_over(path, res_rows, 0, delay=0.4)
                         return body
                     spacer = "\n".join(" " * res_cols
