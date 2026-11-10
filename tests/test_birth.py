@@ -222,6 +222,25 @@ class SkillBirth(unittest.TestCase):
                                  advance=0)
         self.assertEqual(r["eidos"], "Eidos_" + d1[:4].hex())
 
+    def test_pod_is_still_alive_when_the_birth_returns(self):
+        """A birth must be watchable: the pod cannot be dead on arrival.
+
+        `advance` used to default to 90 ticks, and the world fast-forwarded
+        inside the birth call. The pod landed, starved somewhere inside
+        those 90 ticks, and the arrival beat then had nothing to point at
+        while the registry recorded a tick 90 late. The pod must survive
+        the call itself, with the registry tick equal to the world tick.
+        """
+        s = FakeState()
+        make_live(s)
+        r = vbirth.birth_species(s, "t-pod", "content that lands a pod",
+                                 save_world=lambda w: s.set("world", w.to_dict()),
+                                 load_world=lambda: W.World.from_dict(s.d["world"]))
+        w = W.World.from_dict(s.d["world"])
+        alive = [c for c in w.creatures if c.lineage == r["eidos"] and c.alive()]
+        self.assertEqual(len(alive), r["pod"])
+        self.assertEqual(w.tick, r["tick"])
+
 
 if __name__ == "__main__":
     unittest.main()

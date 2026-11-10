@@ -25,7 +25,7 @@ POD_SIZE = 4                   # landing party per birth
 def birth_species(s, name: str, content: str,
                   save_world: Callable[[object], None],
                   load_world: Optional[Callable[[], object]] = None,
-                  advance: int = 90) -> Optional[dict]:
+                  advance: int = 0) -> Optional[dict]:
     """Birth the species for one skill into the live universe.
 
     Returns the announcement dict, or None when nothing should happen:
@@ -86,6 +86,12 @@ def birth_species(s, name: str, content: str,
     w.creatures.extend(pod)
     w.fledge[eidos] = w.tick   # the fledge grace starts now
     if advance:
+        # Advance DEFAULTED to 90 and that was a quiet bug: the pod landed,
+        # the world fast-forwarded 90 ticks inside the birth call, and by the
+        # time the arrival card painted there was nothing left to point at.
+        # The registry even recorded the post-advance tick, so the birth
+        # looked like it happened 90 ticks late. A birth is a moment; let the
+        # dish keep its own pace.
         W.run(w, advance)
 
     from datetime import date
