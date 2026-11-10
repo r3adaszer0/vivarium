@@ -5,6 +5,11 @@ from __future__ import annotations
 import os
 import sys
 import unittest
+import re as _re
+
+
+def _plain(s):
+    return _re.sub(r'\x1b\[[0-9;]*m', '', s)
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -38,8 +43,8 @@ class TestShow(unittest.TestCase):
         text = T._cmd(f"show {self.eidos}")
         self.assertIn(self.eidos, text)
         self.assertIn("Venefica", text) or self.assertIn("the", text)
-        self.assertIn("hatched from: proof-skill", text)
-        self.assertIn("living members", text)
+        self.assertIn("hatched    tick", _plain(text))
+        self.assertIn("alive      ", _plain(text))
 
     def test_show_by_name_fragment(self):
         text = T._cmd("show proof")

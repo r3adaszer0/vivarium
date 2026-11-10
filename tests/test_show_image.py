@@ -71,11 +71,10 @@ class ShowDrawsTheSameFace(unittest.TestCase):
         rows = text.split("\n")
         spacer_rows = self.painted[0]["rows"]
         # title, one blank (the face sits a row down, per VIV-64),
-        # the spacer block, one empty line, then the stats
+        # the spacer block, then the stats directly beneath (VIV-66)
         self.assertEqual(rows[1], "")
         self.assertTrue(all(r.strip() == "" for r in rows[2:2 + spacer_rows]))
-        self.assertEqual(rows[2 + spacer_rows], "")
-        self.assertIn("forage", rows[3 + spacer_rows])
+        self.assertIn("forage", rows[2 + spacer_rows])
 
     def test_trail_rows_cover_every_line_after_the_image(self):
         self._class("kitty")

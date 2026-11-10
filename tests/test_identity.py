@@ -1,5 +1,12 @@
 """VIV-8 acceptance: glyphs and names are deterministic, distinct, spec-stable."""
 import sys, unittest
+import re as _re
+
+
+def _plain(s):
+    return _re.sub(r'\x1b\[[0-9;]*m', '', s)
+
+
 sys.path.insert(0, '.')
 
 try:
@@ -78,7 +85,7 @@ class Card(unittest.TestCase):
                               lineage_count=4, founding_skill="demo-skill")
         self.assertIn("Eidos_c88c94", card)
         self.assertIn("demo-skill", card)
-        self.assertIn("living members 4", card)
+        self.assertIn("alive      4", _plain(card))
 
 
 if __name__ == "__main__":

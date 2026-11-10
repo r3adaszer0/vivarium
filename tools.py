@@ -1195,14 +1195,11 @@ def _show_text(rest: list) -> str:
             after = rest_text.splitlines()
             # trail_rows = every line printed AFTER the reserved block, so
             # the deferred paint can climb back over them to the image top.
-            vterm.paint_over(path, res_rows, len(after) + 1, delay=0.6)
+            vterm.paint_over(path, res_rows, len(after), delay=0.6)
             # one blank line above the reserved block: the face drops a row
-            # and clears the headline; the birth tick rides the head line.
-            tick = rec.get("tick")
-            head = head.rstrip()
-            if tick is not None:
-                head += f"\x1b[2m · born tick {tick}\x1b[0m"
-            return head + "\n\n" + spacer + "\n\n" + rest_text
+            # and clears the headline. Provenance rides the card, not the
+            # title - the title names the creature and nothing else.
+            return head + "\n\n" + spacer + "\n" + rest_text
     card = vident.species_card(eidos, genome, vident.color_for(genome["hue"]),
                                lineage_count=count,
                                founding_skill=name or "",

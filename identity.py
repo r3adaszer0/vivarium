@@ -212,14 +212,16 @@ def species_card(eidos: str, g: Dict[str, float], rgb: Tuple[int, int, int],
     lines = [f"{title} ({common}) · {eidos}"]
     if face:
         lines.append(glyph_ansi(g, rgb) if colored else glyph_ascii(g))
+    lines += [*trait_bars(g), "  \u2500" * 15]
+    # Provenance: dim key, bright value, one column - a registry row, not
+    # a sentence. 'hatched' merges skill and tick: one line, one fact.
+    hatched = f"tick {born_tick}" if born_tick is not None else "founder era"
+    if founding_skill:
+        hatched += f" · {founding_skill}"
     lines += [
-        *trait_bars(g),
-        f"  living members {lineage_count}",
-        f"  hatched from: {founding_skill}" if founding_skill
-        else "  hatched from: a founder",
+        f"  \x1b[2malive\x1b[0m      {lineage_count}",
+        f"  \x1b[2mhatched\x1b[0m    {hatched}",
     ]
-    if born_tick is not None:
-        lines.append(f"  born tick {born_tick}")
     return "\n".join(lines)
 
 
