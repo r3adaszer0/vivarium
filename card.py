@@ -197,7 +197,7 @@ def _command_table(cols: int) -> list[str]:
 
 def render(body: str, cols: int, marker: str, live: dict | None = None,
            dish_rows: int = 23, dish: bool = True,
-           dish_cols: int = DISH_COLS) -> dict:
+           dish_cols: int = DISH_COLS, era: int | None = None) -> dict:
     """Render a beat.
 
     Returns {text, climb, has_dish, rows}. `climb` is how many rows up
@@ -216,9 +216,10 @@ def render(body: str, cols: int, marker: str, live: dict | None = None,
     if is_bang:
         lines += _head_block(facts, cols, live)
     else:
-        # A birth note or any other beat: a rule, the line, the rest dim.
+        # Every beat opens the same way: the wordmark, the hairline, the
+        # era on the right. An arrival card is a card too, not a log line.
         head_lines = wrap(facts["head"], cols - 2)
-        lines.append(_rule(cols, "", ""))
+        lines.append(_rule(cols, LABEL, f"era {era}" if era else ""))
         if head_lines:
             lines.append(f"{BOLD}{WHITE}{head_lines[0]}{RST}")
             for extra in head_lines[1:]:

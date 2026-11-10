@@ -494,9 +494,11 @@ def _arm_print() -> None:
                     # and add one column of gutter. Wasting two columns
                     # is invisible; overlapping the text is not.
                     dish_cols = max(12, -(-int(size[0]) // 9) + 1)
+            _rec = vstate.universe_record() or {}
             rendered = vcard.render(body, term_cols, vacts.DISH_MARKER,
                                     live=live, dish_rows=rows,
-                                    dish=bool(path), dish_cols=dish_cols)
+                                    dish=bool(path), dish_cols=dish_cols,
+                                    era=_rec.get("era"))
             out = rendered["text"]
 
             def _write(_out=out, _path=path, _climb=rendered["climb"]):
