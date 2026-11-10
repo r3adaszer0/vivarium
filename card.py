@@ -322,8 +322,13 @@ def render(body: str, cols: int, marker: str, live: dict | None = None,
         if art_lines:
             # The face sits at the top of the column, above the copy, so
             # the first thing read is the creature and the second is
-            # where it is. The legend names the ring instead of numbering
-            # it: nothing in an image can hold a digit.
+            # where it is. Centered against the dish block: the face
+            # hanging at the very top while the dish starts lower reads
+            # as a stamp glued to a letter; the middle of the art should
+            # meet the middle of the dish.
+            art_h = len(art_lines)
+            pad = max(0, (dish_rows - art_h) // 2)
+            body_lines += [("", True) for _ in range(pad)]
             body_lines += [(ln, True) for ln in art_lines]
             body_lines.append(("", True))
         for i, para in enumerate(p for p in tail_text.split("\n") if p.strip()):
@@ -336,8 +341,8 @@ def render(body: str, cols: int, marker: str, live: dict | None = None,
             body_lines += [(ln, False)
                            for ln in styled_paragraph(para, right, lead=i < 2)]
         block = max(dish_rows, len(body_lines))
-        # centre the text beside the dish instead of leaving it stranded
-        # at the top of a 23-row block
+        # centre the copy beside the dish; with the art centered too, the
+        # whole column reads as one object between two equal margins.
         top_pad = 1 if dish_rows > len(body_lines) else 0
         pad = "  " + " " * (dish_cols + TEXT_INSET)
         for i in range(block):
