@@ -33,6 +33,7 @@ RST = "\x1b[0m"
 _ANSI = re.compile(r"\x1b\[[0-9;]*m")
 DISH_COLS = 24          # fallback; the worker passes the real width
 MIN_GUTTER = 40
+TEXT_INSET = 8          # breathing room between the dish and the copy
 MAX_COLS = 104
 LABEL = "vivarium"
 
@@ -163,7 +164,9 @@ def render(body: str, cols: int, marker: str, live: dict | None = None,
     """
     # A card, not a page: past ~104 columns it stops growing so the
     # measure stays readable on wide kitty windows.
-    cols = max(40, min(cols, MAX_COLS))
+    # Leave the final column empty: a line that fills the last cell makes
+    # most terminals wrap, and the card then pushes the prompt down.
+    cols = max(40, min(cols - 1, MAX_COLS))
     facts = parse(body, marker)
     is_bang = "Universe born" in facts["head"] or bool(facts.get("era"))
     lines: list[str] = [""]
@@ -185,7 +188,7 @@ def render(body: str, cols: int, marker: str, live: dict | None = None,
     spacer_at = len(lines) if two_col else None
 
     if spacer_at is not None:
-        right = cols - dish_cols - 4
+        right = cols - dish_cols - 4 - TEXT_INSET
         body_lines = wrap(tail_text, right)
         block = max(dish_rows, len(body_lines))
         # centre the text beside the dish instead of leaving it stranded
@@ -194,7 +197,7 @@ def render(body: str, cols: int, marker: str, live: dict | None = None,
         for i in range(block):
             j = i - top_pad
             t = body_lines[j] if 0 <= j < len(body_lines) else ""
-            lines.append(f"  {' ' * dish_cols}{SOFT}{t}{RST}" if t else "")
+            lines.append(f"  {' ' * (dish_cols + TEXT_INSET)}{SOFT}{t}{RST}" if t else "")
         cap = _caption(live)
         if cap:
             lines.append(cap)
