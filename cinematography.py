@@ -113,6 +113,122 @@ def render_clip(world, path: str, tick_start: int = 0, tick_end: int = 120,
     return path
 
 
+def render_clip_cinematic(world, path: str, ticks: int = 120, fps: int = 12,
+                          half: int = 24, center: Optional[Tuple[int, int]] = None,
+                          highlight: Optional[str] = None,
+                          lineage_colors: Optional[dict] = None,
+                          nutrients_per_tick: float = 1.2,
+                          upscale: int = 4) -> str:
+    """The dish filmed in the unified lattice look (VIV-73).
+
+    One 15px-equivalent subpixel grid for everything: each dish cell is
+    6 native pixels with its own deterministic tint (hash of its world
+    coordinates - the same patch always looks the same), rich cells get
+    nutrient speckles, and every creature is stamped as its real 7x7
+    glyph with a pixel-consistent drop shadow. NEAREST-upscaled 4x, so
+    the full 48-cell dish lands at 1152px - crisp 1080-class footage
+    with zero flat-cell squares.
+    """
+    import hashlib as _h
+    import os
+    import shutil
+    import subprocess
+    from PIL import Image, ImageDraw
+    if shutil.which("ffmpeg") is None:
+        raise FileNotFoundError("ffmpeg not on PATH")
+    w_, h_ = world.w, world.h
+    cx, cy = center if center else (w_ // 2, h_ // 2)
+    span = 2 * half
+    npx = span * 6
+    dim = (lineage_colors or {}).get("__dim__", (70, 74, 84))
+    BG_EMPTY = (16, 18, 22)
+
+    def frame() -> Image.Image:
+        base = Image.new("RGB", (npx, npx))
+        bd = ImageDraw.Draw(base)
+        for ry in range(span):
+            wy = (cy - half + ry) % h_
+            for rx in range(span):
+                wx = (cx - half + rx) % w_
+                r, g, b = A.food_rgb(world.food[wy][wx])
+                hh = _h.sha256(bytes([wx, wy])).digest()
+                dr = (hh[0] % 11) - 5
+                dg = (hh[1] % 17) - 8
+                db = (hh[2] % 11) - 5
+                bd.rectangle([rx * 6, ry * 6, rx * 6 + 5, ry * 6 + 5],
+                             fill=(max(0, min(255, r + dr)),
+                                   max(0, min(255, g + dg)),
+                                   max(0, min(255, b + db))))
+                if world.food[wy][wx] > 1.4:
+                    sx = rx * 6 + (hh[3] % 6)
+                    sy = ry * 6 + (hh[5] % 6)
+                    bd.point((sx, sy),
+                             fill=(int(r * 1.4), int(g * 1.4), int(b * 1.25)))
+        at = {}
+        for c in world.creatures:
+            if c.alive():
+                dx = (c.x - (cx - half)) % w_
+                dy = (c.y - (cy - half)) % h_
+                if dx < span and dy < span:
+                    at.setdefault((dx, dy), []).append(c)
+        for (dx, dy), group in at.items():
+            rep = max(group, key=lambda c: (c.genome["aggression"] * c.energy,
+                                            -c.gid))
+            if lineage_colors:
+                if rep.lineage == highlight:
+                    rgb = lineage_colors.get(rep.lineage,
+                                             I.color_for(rep.genome["hue"]))
+                elif highlight:
+                    rgb = dim
+                else:
+                    rgb = lineage_colors.get(rep.lineage,
+                                             I.color_for(rep.genome["hue"]))
+            else:
+                rgb = I.color_for(rep.genome["hue"])
+            glyph = I.glyph_rgb_cells(rep.genome, rgb)
+            x0 = dx * 6
+            y0 = dy * 6
+            for gy in range(7):
+                for gx in range(7):
+                    if glyph[gy][gx] == BG_EMPTY:
+                        continue
+                    xx = x0 + gx + 1
+                    yy = y0 + gy + 1
+                    if 0 <= xx < npx and 0 <= yy < npx:
+                        r0, g0, b0 = base.getpixel((xx, yy))
+                        base.putpixel((xx, yy),
+                                      (int(r0 * 0.6), int(g0 * 0.6),
+                                       int(b0 * 0.6)))
+            for gy in range(7):
+                for gx in range(7):
+                    pr, pg, pb = glyph[gy][gx]
+                    if (pr, pg, pb) == BG_EMPTY:
+                        continue
+                    xx = x0 + gx
+                    yy = y0 + gy
+                    if 0 <= xx < npx and 0 <= yy < npx:
+                        bd.point((xx, yy), fill=(pr, pg, pb))
+        return base.resize((npx * upscale, npx * upscale), Image.NEAREST)
+
+    size = npx * upscale
+    proc = subprocess.Popen(
+        ["ffmpeg", "-y", "-loglevel", "error", "-f", "rawvideo",
+         "-pix_fmt", "rgb24", "-s", f"{size}x{size}", "-r", str(fps),
+         "-i", "-", "-c:v", "libx264", "-pix_fmt", "yuv420p", path],
+        stdin=subprocess.PIPE, stdout=subprocess.DEVNULL,
+        stderr=subprocess.PIPE)
+    try:
+        proc.stdin.write(frame().tobytes())
+        for _ in range(ticks - 1):
+            W.tick_world(world, nutrients=nutrients_per_tick)
+            proc.stdin.write(frame().tobytes())
+        proc.stdin.close()
+    except BrokenPipeError:
+        pass
+    proc.wait()
+    return path
+
+
 def render_clip_ffmpeg(world, path: str, ticks: int = 120, fps: int = 12,
                        cell_px: int = 8,
                        region: Optional[Tuple[int, int, int]] = None,

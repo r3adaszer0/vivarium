@@ -1108,12 +1108,26 @@ def _clip_text(rest: list) -> str:
                 colors[c.lineage] = vident.color_for(hue)
         colors.setdefault("__dim__", (70, 74, 84))
     start_tick = w.tick
-    name = f"clip_{start_tick}_{lineage or 'dish'}.mp4"
+    res_tag = {8: "", 15: "_720p", 23: "_1080p"}[cell_px]
+    name = f"clip_{start_tick}_{lineage or 'dish'}{res_tag}.mp4"
     path = f"{vart.media_dir(vstate.state())}/{name}"
     try:
-        vcin.render_clip_ffmpeg(w, path, ticks=ticks, region=region,
-                                lineage_colors=colors or None,
-                                highlight=lineage, cell_px=cell_px)
+        if cell_px == 8:
+            vcin.render_clip_ffmpeg(w, path, ticks=ticks, region=region,
+                                    lineage_colors=colors or None,
+                                    highlight=lineage, cell_px=cell_px)
+        else:
+            # VIV-73: HD clips film in the unified-lattice look.
+            if region:
+                half = region[2]
+                center = (region[0], region[1])
+            else:
+                half, center = 24, None
+            upscale = 3 if cell_px == 15 else 4   # 864 / 1152 px
+            vcin.render_clip_cinematic(w, path, ticks=ticks, half=half,
+                                       center=center,
+                                       lineage_colors=colors or None,
+                                       highlight=lineage, upscale=upscale)
     except FileNotFoundError:
         return ("ffmpeg is required to encode the clip but is not on "
                 "this machine's PATH. The dish still lives — install "
