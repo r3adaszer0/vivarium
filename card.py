@@ -197,13 +197,11 @@ def _caption(live: dict | None, note: str = "") -> str:
     if total:
         grey = live.get("grey") or 0
         if grey > 0:
-            # The dish colours the top-8 and greys the rest; say so here,
-            # so a grey dish reads as a census fact, not a rendering bug.
-            # Name every number with its unit: N lineages alive, the top 8
-            # painted, the rest dim. "32 in 93" was ambiguous on purpose
-            # of nobody: a creature count read as a lineage count.
-            bits.append(f"{total} lineages · top 8 coloured"
-                        f" · {grey} dim (not yet dominant)")
+            # The dish colours the top-8 and greys the rest. The paint rule
+            # is the renderer's business: the reader needs only what the
+            # greys MEAN. "Not yet dominant" is the whole message - grey is
+            # a rank, never a dead species.
+            bits.append(f"{total} lineages · {grey} dim (not yet dominant)")
         else:
             bits.append(f"{total} lineages")
     if note:
