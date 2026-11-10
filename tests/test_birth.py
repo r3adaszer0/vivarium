@@ -79,7 +79,7 @@ class SkillBirth(unittest.TestCase):
         line = vstate.narration_text()
         self.assertIn("Eidos_", line)
         self.assertIn("proof-skill", line)
-        self.assertIn("crawled out of the dish", line)
+        self.assertIn("New species", line)
         births = s.d.get("births", {})
         self.assertIn("proof-skill", births)
         w = W.World.from_dict(s.d["world"])
@@ -225,3 +225,24 @@ class SkillBirth(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class DuplicateContent(unittest.TestCase):
+    """Same content is the same species: no birth, but say so."""
+
+    def test_find_existing_matches_by_digest(self):
+        from types import SimpleNamespace
+        import universe as _U
+        s = FakeState()
+        content = "the same body"
+        digest = _U.skill_digest(s, content)
+        s.d["births"] = {"probe-a": {"eidos": "Eidos_abcdef", "day": "2026-11-09",
+                                     "digest_fp": digest[:8].hex()}}
+        hit = vbirth.find_existing(s, content)
+        self.assertIsNotNone(hit)
+        self.assertEqual(hit["eidos"], "Eidos_abcdef")
+
+    def test_unknown_content_has_no_match(self):
+        s = FakeState()
+        s.d["births"] = {}
+        self.assertIsNone(vbirth.find_existing(s, "never seen"))

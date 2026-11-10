@@ -107,10 +107,27 @@ def birth_species(s, name: str, content: str,
 
 
 def announcement(result: dict) -> str:
-    """The narration line queued into the agent's next turn."""
+    """The line that opens the beat: what hatched, and what it is."""
     g = result["genome"]
-    return (f"🧬 New skill banked — a new species crawled out of the dish: "
-            f"{result['eidos']}, hatched from your '{result['name']}' skill "
-            f"(forage {g['forage']:.2f}, sense {g['sense']:.2f}, "
-            f"metabolism {g['metabolism_mult']:.2f}). A pod of {result['pod']} "
-            f"was released at tick {result['tick']}.")
+    return (f"New species {result['eidos']}: hatched from your "
+            f"'{result['name']}' skill. forage {g['forage']:.2f}, sense "
+            f"{g['sense']:.2f}, metabolism {g['metabolism_mult']:.2f}. "
+            f"A pod of {result['pod']} was released at tick {result['tick']}.")
+
+
+def find_existing(s: dict, content: str):
+    """The species this content already is, or None.
+
+    birth_species returns None for a repeat (same digest, no twin). That
+    silence is correct but confusing: the user taught a skill and saw
+    nothing. This lets the caller say WHY nothing happened.
+    """
+    reg = s.get("births") or {}
+    digest = U.skill_digest(s, content)
+    fp = digest[:8].hex()
+    for name, known in reg.items():
+        if isinstance(known, dict) and known.get("digest_fp") == fp:
+            out = dict(known)
+            out.setdefault("name", name)
+            return out
+    return None

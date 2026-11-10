@@ -112,7 +112,7 @@ def _lead_split(text: str) -> int:
     return len(m.group(1)) if m else 0
 
 
-def styled_paragraph(text: str, width: int) -> list[str]:
+def styled_paragraph(text: str, width: int, lead: bool = True) -> list[str]:
     """Wrap one paragraph, its opening clause set apart in bold white.
 
     The first sentence gets its own line(s): a lead that stands alone is
@@ -120,12 +120,31 @@ def styled_paragraph(text: str, width: int) -> list[str]:
     way to guarantee the bold run does not start mid-line and stop there.
     """
     norm = " ".join(text.split())
-    lead = _lead_split(norm)
-    head, rest = norm[:lead].strip(), norm[lead:].strip()
-    out = [f"{BOLD}{WHITE}{ln}{RST}" for ln in wrap(head, width)]
+    cut = _lead_split(norm) if lead else 0
+    head, rest = norm[:cut].strip(), norm[cut:].strip()
+    out = ([f"{BOLD}{WHITE}{ln}{RST}" for ln in wrap(head, width)]
+           if head else [])
     if rest:
         out += [f"{SOFT}{ln}{RST}" for ln in wrap(rest, width)]
     return out
+
+
+_ART_RE = re.compile(r"<<ART:([^>]*)>>\n(.*?)\n<</ART>>", re.S)
+
+
+def split_art(tail: str):
+    """Lift the portrait block out of the text.
+
+    It arrives inside the beat because the text is the one channel that
+    survives the queue, the state file and the chat relay. The card is
+    where it becomes a picture again.
+    """
+    m = _ART_RE.search(tail or "")
+    if not m:
+        return [], "", tail or ""
+    art = [ln for ln in m.group(2).split("\n")]
+    rest = (tail[:m.start()] + tail[m.end():])
+    return art, m.group(1), rest
 
 
 def _head_block(facts: dict, cols: int, live: dict | None) -> list[str]:
@@ -207,28 +226,52 @@ def render(body: str, cols: int, marker: str, live: dict | None = None,
         lines.append("")
 
     tail_text = facts["tail"]
+    art_lines, art_eidos, tail_text = split_art(tail_text)
     two_col = dish and bool(tail_text) and cols >= dish_cols + MIN_GUTTER
     spacer_at = len(lines) if two_col else None
 
     if spacer_at is not None:
         right = cols - dish_cols - 4 - TEXT_INSET
         body_lines: list[str] = []
+        if art_lines:
+            # The face sits at the top of the column, above the copy, so
+            # the first thing read is the creature and the second is
+            # where it is. The legend names the ring instead of numbering
+            # it: nothing in an image can hold a digit.
+            body_lines += [(ln, True) for ln in art_lines]
+            body_lines.append((f"{ITALIC}{DIM}white ring marks the pod{RST}", True))
+            body_lines.append(("", True))
         for i, para in enumerate(p for p in tail_text.split("\n") if p.strip()):
             if i:
-                body_lines.append("")
-            body_lines += styled_paragraph(para, right)
+                body_lines.append(("", False))
+            # Bolding every paragraph turned act 3 into stripes: five
+            # bright lines and no hierarchy. The lead is an opening
+            # device, so the first two paragraphs get it and the rest
+            # read as the argument they are.
+            body_lines += [(ln, False)
+                           for ln in styled_paragraph(para, right, lead=i < 2)]
         block = max(dish_rows, len(body_lines))
         # centre the text beside the dish instead of leaving it stranded
         # at the top of a 23-row block
         top_pad = 1 if dish_rows > len(body_lines) else 0
+        pad = "  " + " " * (dish_cols + TEXT_INSET)
         for i in range(block):
             j = i - top_pad
-            t = body_lines[j] if 0 <= j < len(body_lines) else ""
-            lines.append(f"  {' ' * (dish_cols + TEXT_INSET)}{SOFT}{t}{RST}" if t else "")
+            t, raw = body_lines[j] if 0 <= j < len(body_lines) else ("", False)
+            if not t:
+                lines.append("")
+            elif raw:
+                lines.append(pad + t)
+            else:
+                lines.append(f"{pad}{SOFT}{t}{RST}")
         cap = _caption(live)
         if cap:
             lines.append(cap)
     elif tail_text:
+        for ln in art_lines:
+            lines.append("  " + ln)
+        if art_lines:
+            lines.append("")
         for ln in wrap(tail_text, cols - 2):
             lines.append(f"  {SOFT}{ln}{RST}")
 

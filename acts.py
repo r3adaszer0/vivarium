@@ -22,6 +22,8 @@ All copy is em-dash-free by design (user rule: remove unless needed).
 """
 from __future__ import annotations
 
+import re
+
 from typing import Dict, Optional
 
 try:  # package context (Hermes plugin) or flat import (tests)
@@ -100,11 +102,38 @@ def act2_for(result: dict) -> str:
     return ACT2_TEXT
 
 
+_ART_RE = re.compile(r"<<ART:([^>]*)>>\n(.*?)\n<</ART>>", re.S)
+
+ART_OPEN = "<<ART:"
+ART_CLOSE = "<</ART>>"
+
+
+def strip_art(text: str) -> str:
+    """Drop the portrait block: chat surfaces relay text, not pictures."""
+    return _ART_RE.sub("", text or "")
+
+
+def art_block(eidos: str) -> str:
+    """The face, in the text stream.
+
+    The card lifts this out and sets it above the copy. It travels in the
+    text because the text is what survives the queue, the state file and
+    the relay; a second channel would be one more thing to get wrong.
+    """
+    try:
+        from . import portrait as vport
+    except ImportError:  # pragma: no cover - flat-import mode
+        import portrait as vport
+    lines = vport.sprite_lines(eidos)
+    return f"\n{ART_OPEN}{eidos}>>\n" + "\n".join(lines) + f"\n{ART_CLOSE}\n"
+
+
 def act3_for(result: dict) -> str:
     eidos = result.get("eidos", "?")
     name = result.get("name", "")
     return (
-        f"\n\nRemember the promise? A new skill, a new species. Meet your "
+        art_block(eidos)
+        + f"\nRemember the promise? A new skill, a new species. Meet your "
         f"newest arrival, born from the skill you just taught me: {eidos}"
         + (f" (from '{name}')" if name else "") + ".\n"
         "One honesty: it is not your first. The Big Bang seeded a whole "
@@ -192,7 +221,7 @@ def birth_narration(s, base: str, result: dict, is_big_bang: bool) -> str:
         _fire(ACT3)
         acts["_births_since_bang"] = 1
         _save()
-        return base + act3_for(result)
+        return base + DISH_MARKER + act3_for(result)
     if after_bang == 1 and ACT4 not in acts:
         _fire(ACT4)
         acts["_births_since_bang"] = 2

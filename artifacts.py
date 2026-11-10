@@ -113,7 +113,7 @@ def render_discovery_stamp_png(s, discovery: dict, world_dict: dict) -> Optional
     return path
 
 
-def render_dish_png(s, w, name: str) -> Optional[str]:
+def render_dish_png(s, w, name: str, mark=None) -> Optional[str]:
     """Snapshot of the CURRENT dish (VIV-28b): same visual language as the
     discovery stamp — food blooms + lineage-colored creature squares."""
     CELL, PAD = 6, 1
@@ -146,6 +146,19 @@ def render_dish_png(s, w, name: str) -> Optional[str]:
                    c.y * (CELL + PAD) + 1 + iy, rgb)
     pixels = [[tuple(rows[y][x * 3:x * 3 + 3]) for x in range(size)]
               for y in range(size)]
+    if mark is not None:
+        # A ring around the cell that matters. Two pixels of white with a
+        # black inset, because one pixel at this size disappears into the
+        # food and a solid block hides the creature it is pointing at.
+        mx, my = int(mark[0]), int(mark[1])
+        x0, y0 = mx * (CELL + PAD), my * (CELL + PAD)
+        x1, y1 = x0 + CELL + PAD - 1, y0 + CELL + PAD - 1
+        for x in range(x0, x1 + 1):
+            pixels[y0][x] = (240, 244, 252)
+            pixels[y1][x] = (240, 244, 252)
+        for y in range(y0, y1 + 1):
+            pixels[y][x0] = (240, 244, 252)
+            pixels[y][x1] = (240, 244, 252)
     path = f"{media_dir(s)}/{name}.png"
     write_png(path, pixels, size)
     return path

@@ -55,12 +55,27 @@ def _on_skill_lifecycle(skill_name: str = "", action: str = "",
             return
         content = vstate.skill_content(skill_name)
         if content is None:
+            vtrace.log("no_content", skill=skill_name)
             return
         result = vbirth.birth_species(
             vstate.state(), skill_name, content,
             save_world=vstate.save_world,
             load_world=vstate.load_world,
         )
+        vtrace.log("birth_result", ok=bool(result))
+        if not result:
+            # Same content, same species (VIV-46). Saying nothing here reads
+            # as a broken plugin, so say the true thing in one line. No dish:
+            # nothing was born.
+            known = vbirth.find_existing(vstate.state(), content)
+            vtrace.log("duplicate_lookup", hit=bool(known))
+            if known:
+                eidos = known.get("eidos") or "?"
+                day = known.get("day") or "an earlier day"
+                _deliver_beat(
+                    f"Already in the dish: {eidos}, born {day} from this "
+                    f"same skill. No new species.")
+            return
         if result:
             try:
                 from . import media_policy as vmp
@@ -360,8 +375,12 @@ def _deliver_beat(text: str) -> None:
             from . import media_policy as vmp
         except ImportError:  # pragma: no cover
             import media_policy as vmp
+        try:
+            from . import acts as vacts
+        except ImportError:  # pragma: no cover
+            import acts as vacts
         vstate.queue_narration(
-            text + vmp.media_offer(vstate.state(), directive=True),
+            vacts.strip_art(text) + vmp.media_offer(vstate.state(), directive=True),
             milestone=True, kind="birth")
 
 
@@ -420,7 +439,19 @@ def _arm_print() -> None:
                 import card as vcard
                 import acts as vacts
             import shutil as _shutil
-            term_cols = _shutil.get_terminal_size((100, 40)).columns
+            # The width has to come from the app we captured, not from
+            # shutil: inside this worker thread shutil reports whatever
+            # the fd says, and one live run read a narrow value, fell back
+            # to the stacked card, and dropped the dish. The app knows.
+            term_cols = 0
+            try:
+                _app = _PICTURE_PENDING.get("app")
+                if _app is not None:
+                    term_cols = int(_app.output.get_size().columns)
+            except Exception:
+                term_cols = 0
+            if term_cols < 40:
+                term_cols = _shutil.get_terminal_size((100, 40)).columns
             w = vstate.load_world()
             live = None
             if w is not None:
@@ -441,7 +472,20 @@ def _arm_print() -> None:
             # drops the picture, which is exactly how the dish vanished
             # twice. The beat always paints.
             if w is not None:
-                path = vart.render_dish_png(vstate.state(), w, f"live_{w.tick}")
+                # An arrival beat carries the newborn's eidos; ring its pod
+                # so "where it is" is answered by the picture, not a line of
+                # prose pointing at a cell the reader has to hunt for.
+                mark = None
+                import re as _re
+                _m = _re.search(r"<<ART:([^>]*)>>", body)
+                if _m:
+                    _eidos = _m.group(1)
+                    for _c in getattr(w, "creatures", []) or []:
+                        if getattr(_c, "lineage", "") == _eidos:
+                            mark = (_c.x, _c.y)
+                            break
+                path = vart.render_dish_png(vstate.state(), w, f"live_{w.tick}",
+                                            mark=mark)
                 if path:
                     size = vterm.png_size(path) or (342, 339)
                     rows = max(1, -(-int(size[1]) // max(1, vterm.CELL_H)))
@@ -489,7 +533,11 @@ def _arm_print() -> None:
                 _write()
             vtrace.log("emit", via="run_in_terminal" if via_pt else "raw_stdout",
                        chars=len(out), dish=bool(path))
-            if path:
+            # Only claim a paint when the bytes actually carried the image.
+            # climb == 0 means the card had no reserved rows for it, so
+            # nothing was painted; logging "painted" there sent me looking
+            # for an overlap bug that did not exist.
+            if path and rendered["climb"]:
                 rec = vstate.universe_record() or {}
                 vstate.mark_painted(rec.get("era"), w.tick)
                 vtrace.log("painted", tick=w.tick, rows=rows,
