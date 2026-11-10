@@ -1055,16 +1055,18 @@ def _clip_text(rest: list) -> str:
     ticks = 120
     target = None
     zoom = False
-    cell_px = 8
+    cell_px = 23          # default: 1080p in the lattice look (VIV-73)
     for a in rest:
         if a.isdigit():
             ticks = max(10, min(600, int(a)))
         elif a in ("--zoom", "zoom"):
             zoom = True
         elif a in ("720p", "720", "hd"):
-            cell_px = 15          # 48*15 = 720: the full dish in HD
+            cell_px = 15
         elif a in ("1080p", "1080", "fhd"):
-            cell_px = 23          # 48*23 = 1104 (zoom clips scale to 1080)
+            cell_px = 23
+        elif a in ("small", "384", "fast"):
+            cell_px = 8           # the old chat-bubble engine, explicit only
         else:
             target = a
     w = _world()
