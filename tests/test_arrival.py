@@ -32,8 +32,9 @@ class Portrait(unittest.TestCase):
         cells = I.glyph_cells(self.g)
         lines = portrait.sprite_lines(genome=self.g, scale=3)
         self.assertEqual(len(lines), len(cells))
+        import re as _re
         for row, line in zip(cells, lines):
-            plain = line.split("m", 1)[1].rsplit("\x1b", 1)[0]
+            plain = _re.sub(r"\x1b\[[0-9;]*m", "", line)
             self.assertEqual(len(plain), 15)
             for i, v in enumerate(row):
                 block = plain[i * 3:(i + 1) * 3]

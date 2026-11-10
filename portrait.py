@@ -26,10 +26,12 @@ except ImportError:  # pragma: no cover - flat-import mode
 RST = "\x1b[0m"
 
 # The glyph's four levels exist as shade characters in /vivarium show
-# (" .o@"). At 3x that shading turns into checkerboard dither and reads as
-# noise, so the portrait keeps the glyph's SHAPE and drops the tones: same
-# face, one solid colour.
+# (" .o@"). Widening THOSE characters turns the face into checkerboard
+# dither, and painting every cell flat throws the shading away, which makes
+# the creature look like a sticker. So the tones move into the COLOUR: every
+# cell is a solid block, and the glyph level sets how bright that block is.
 BLOCKS = (" ", "█", "█", "█")
+LEVEL_LIGHT = (0.0, 0.42, 0.68, 1.0)
 
 
 def _fallback_genome(eidos: str) -> dict:
@@ -51,11 +53,11 @@ def _fallback_genome(eidos: str) -> dict:
 
 
 def sprite_lines(genome=None, eidos: str = "", scale: int = 3):
-    """The face as terminal lines: the glyph matrix, each cell widened.
+    """The face as terminal lines: the glyph matrix, shaded by brightness.
 
-    Solid blocks, not shade characters: at this size four shade levels read
-    as noise, while the silhouette plus the species colour matches what the
-    same creature looks like in the dish.
+    Every lit cell is a solid block; the glyph's 0..3 level chooses the
+    tint, from a dim 42% of the species colour up to full. Solid cells keep
+    the silhouette crisp, the tint keeps the relief.
     """
     if genome is None:
         genome = _fallback_genome(eidos or "Eidos_000000")
@@ -67,13 +69,15 @@ def sprite_lines(genome=None, eidos: str = "", scale: int = 3):
         genome = _fallback_genome(eidos or "Eidos_000000")
         cells = glyph_cells(genome)
     r, g, b = color_for(float(genome.get("hue", 0.5)))
-    fg = f"\x1b[38;2;{r};{g};{b}m"
     out = []
     for row in cells:
-        line = "".join(BLOCKS[min(3, int(v))] * scale for v in row)
-        out.append(fg + line + RST)
+        line = []
+        for level in row:
+            if not level:
+                line.append(" " * scale)
+                continue
+            k = LEVEL_LIGHT[min(3, int(level))]
+            line.append(f"\x1b[38;2;{int(r * k)};{int(g * k)};{int(b * k)}m"
+                        + "█" * scale)
+        out.append("".join(line) + RST)
     return out
-
-
-def sprite_width(scale: int = 3) -> int:
-    return 5 * scale
