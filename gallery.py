@@ -58,7 +58,8 @@ header{padding:38px 0 22px;border-bottom:1px solid var(--line)}
 .eraswrap::after{content:"";position:absolute;right:0;top:0;bottom:0;width:36px;
 background:linear-gradient(90deg,transparent,var(--bg) 82%%);pointer-events:none}
 .toprow .more{flex:none;font-size:10px;color:var(--acc);white-space:nowrap;
-padding:3px 2px}
+padding:3px 2px;background:none;border:0;font-family:var(--mono);cursor:pointer}
+.toprow .more:hover{text-decoration:underline;text-underline-offset:3px}
 .toprow .reglink{flex:none;color:var(--acc);font-size:11px;letter-spacing:.06em;
 text-decoration:none;white-space:nowrap}
 .toprow .reglink:hover{text-decoration:underline;text-underline-offset:3px}
@@ -108,6 +109,9 @@ background:none;border:1px solid var(--line);border-radius:4px;padding:2px 8px;
 cursor:pointer;letter-spacing:.08em;text-transform:uppercase;transition:color .15s,border-color .15s}
 .census .rf:hover{color:var(--ink);border-color:#35594a}
 .census .rf.busy{color:var(--acc);border-color:#1e3a52;opacity:.6;cursor:default}
+.census .nb{color:var(--amber);font-size:10px;margin-left:8px;white-space:nowrap}
+.census .nb a{color:var(--amber);text-decoration:underline;text-underline-offset:3px;
+cursor:pointer}
 .census .line .sep{color:var(--dimink);margin:0 7px}
 .census .line .hi{color:var(--amber)}
 .statgrid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:7px 26px;
@@ -124,7 +128,9 @@ background:var(--panel);padding:12px;text-decoration:none}
 .latest .meta .d{font-size:11px;color:var(--dimink);margin-top:3px;display:block;
 white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .latest .meta .d.see{color:var(--acc)}
-.latest .meta .d.chip-line{font-family:var(--mono);letter-spacing:.02em}
+.latest .lgenes{margin-top:9px;display:grid;grid-template-columns:52px minmax(0,1fr) 30px;
+gap:3px 8px;align-items:center;font-size:9px;color:var(--dimink)}
+.latest .lgenes .track{height:3px}
 .chapter{display:grid;grid-template-columns:96px minmax(0,1fr);gap:0;margin-top:14px;
 border-top:1px solid var(--line);padding-top:34px}
 .rail{align-self:start;text-align:left;padding-left:2px}
@@ -332,6 +338,17 @@ _GEN_KEY = {"forage": "for", "aggression": "agg", "metabolism_mult": "met",
             "sense": "sen", "mutate": "mut", "dispersal": "dis"}
 
 
+def _bars(gen: dict) -> str:
+    """The six DNA trait bars — one renderer, used by the certificate,
+    the featured latest-birth card (VIV-99) and nothing else."""
+    return "".join(
+        f'<span>{lbl}</span>'
+        f'<span class="track"><span class="fill" '
+        f'style="width:{max(3, min(100, float(gen.get(k, 0)) / 3 * 100)):.0f}%"></span></span>'
+        f'<span class="v">{float(gen.get(k, 0)):.2f}</span>'
+        for k, lbl in _GEN_LABEL)
+
+
 def _cert(skill: str, e: dict, extinct_hexes: frozenset) -> str:
     gen = e.get("genome") or {}
     eidos = e.get("eidos", "")
@@ -342,12 +359,7 @@ def _cert(skill: str, e: dict, extinct_hexes: frozenset) -> str:
         nm = f"{genus} {epithet}"
     except Exception:
         nm = "unnamed strain"
-    bars = "".join(
-        f'<span>{lbl}</span>'
-        f'<span class="track"><span class="fill" '
-        f'style="width:{max(3, min(100, float(gen.get(k, 0)) / 3 * 100)):.0f}%"></span></span>'
-        f'<span class="v">{float(gen.get(k, 0)):.2f}</span>'
-        for k, lbl in _GEN_LABEL)
+    bars = _bars(gen)
     chip = " ".join(f"{_GEN_KEY.get(k, k[:3])}:{float(v):.2f}"
                     for k, v in gen.items() if k != "hue")
     q = _esc(skill) + " " + _esc(eidos) + " " + _esc(nm)
@@ -378,15 +390,13 @@ def _latest_species(skill: str, e: dict, extinct_hexes: frozenset) -> str:
         nm = f"{genus} {epithet}"
     except Exception:
         nm = "unnamed strain"
-    chip = " ".join(f"{_GEN_KEY.get(k, k[:3])}:{float(v):.2f}"
-                    for k, v in gen.items() if k != "hue")
     return (f'<a class="latest" href="#cert-{_esc(hexid)}">'
             f'<span class="face">{_face_svg(gen, dead, 64)}</span>'
             f'<span class="meta">'
             f'<span class="t">Latest birth · {_esc(nm)}</span>'
             f'<span class="d">{_esc(eidos)} · era {_esc(e.get("era", "?"))} '
             f'· from skill “{_esc(skill)}”</span>'
-            f'<span class="d chip-line">{_esc(chip)}</span>'
+            f'<span class="genes lgenes">{_bars(gen)}</span>'
             f'<span class="d see">see its certificate ↓</span>'
             f'</span></a>')
 
@@ -500,7 +510,8 @@ def build_page(media_dir: str, dish_map: str, title: str = "The Hermi Gallery",
     # births/fossils in the statgrid.
     _visible = 9
     _hidden = max(0, len(nav_items) - _visible)
-    _more = (f'<span class="more" title="scroll the row">+{_hidden} more &#8594;</span>'
+    _more = (f'<button class="more" title="scroll the row" aria-label="show more eras"'
+             f'>+{_hidden} more &#8594;</button>'
              if _hidden else "")
     head = f"""<header id="top">
   <div class="brandrow"><h1>Vivarium — {_esc(title)}</h1>
@@ -508,7 +519,7 @@ def build_page(media_dir: str, dish_map: str, title: str = "The Hermi Gallery",
       aria-label="search"><kbd>/</kbd></span>
     <span class="chip lock mini">&#128274;127.0.0.1 - private</span></div>
   <div class="hairline"></div>
-  <div class="toprow"><a class="reglink" href="#chapters">the registry of Hermi &#8595;</a>
+  <div class="toprow"><a class="reglink" href="#registry">Hermi Registry &#8595;</a>
     <span class="eraswrap"><nav class="eras"
     aria-label="universes">{nav}</nav></span>{_more}</div>
 </header>"""
@@ -537,7 +548,8 @@ def build_page(media_dir: str, dish_map: str, title: str = "The Hermi Gallery",
                   f'<span class="sep">·</span><b id="census-alive">{_esc(last.get("population", "—"))} alive</b>'
                   f'<span class="sep">·</span><span class="hi">the dish is live</span>'
                   f'<button class="rf" id="status-btn" title="bring the current dish and status"'
-                  f' aria-label="show the dish status">status</button></div>')
+                  f' aria-label="show the dish status">status</button>'
+                  f'<span class="nb" id="newbirths" hidden></span></div>')
     else:
         last = curve[-1] if curve else {}
         census = (f'<div class="line"><b>tick {_esc(last.get("tick", "—"))}</b>'
@@ -598,16 +610,36 @@ def build_page(media_dir: str, dish_map: str, title: str = "The Hermi Gallery",
         f'<path d="M8 5v14l11-7z"/></svg></div></div>'
         f'<div class="cl"><span>{_esc(f["name"])}</span><small>clip</small></div></div>'
         for f in clips)
-    def _snap(f, glyph=False):
+    def _snap(f, glyph=False, cert_e=None):
         # VIV-96: alt="" — the caption below carries the name; alt text on a
         # lazy-loading image paints white boxes over the grid. The time gets
         # an honest "at" prefix and the full date on hover.
+        # VIV-99: a dish snapshot zooms in the theater; a glyph with a
+        # certificate opens that Hermi's stats; a glyph without one just zooms.
         t = _time.strftime("%H:%M", _time.localtime(f["mtime"]))
         full = _time.strftime("%Y-%m-%d %H:%M", _time.localtime(f["mtime"]))
         cls = ' class="snap glyph"' if glyph else ' class="snap"'
-        return (f'<div{cls}><img src="{_esc(f["path"])}" alt="" loading="lazy">'
+        if glyph and cert_e is not None:
+            hx = (cert_e.get("eidos", "") or "").replace("Eidos_", "")
+            attrs = f' data-cert="cert-{_esc(hx)}"'
+        elif glyph:
+            # sim-born faces never entered the registry — their stats come
+            # from the live dish via /live/glyph.json (VIV-99)
+            attrs = (f' data-eidos="Eidos_{_esc(f["name"][6:-4])}" '
+                     f'data-zoom="{_esc(f["path"])}" '
+                     f'data-name="{_esc(f["name"])}"')
+        else:
+            attrs = (f' data-zoom="{_esc(f["path"])}" '
+                     f'data-name="{_esc(f["name"])}"')
+        return (f'<div{cls}{attrs}><img src="{_esc(f["path"])}" alt="" loading="lazy">'
                 f'<div class="cap"><span>{_esc(f["name"])}</span>'
                 f'<span title="{full}">at {t}</span></div></div>')
+
+    glyph_certs = {}
+    for _sk, _e in (births or {}).items():
+        _hx = (_e.get("eidos", "") or "").replace("Eidos_", "")
+        if _hx:
+            glyph_certs[_hx] = _e
 
     dish_snaps = [f for f in snaps if not f["name"].startswith("glyph")]
     glyph_snaps = [f for f in snaps if f["name"].startswith("glyph")]
@@ -620,7 +652,8 @@ def build_page(media_dir: str, dish_map: str, title: str = "The Hermi Gallery",
     if glyph_snaps:
         cur_blocks += (f'<div class="block" data-kind="glyphs"><div class="bt">Hermi glyphs'
                        f' · this era</div><div class="snaprow">'
-                       + "".join(_snap(f, True) for f in glyph_snaps) + '</div></div>')
+                       + "".join(_snap(f, True, glyph_certs.get(f["name"][6:-4]))
+                                 for f in glyph_snaps) + '</div></div>')
     if clips:
         cur_blocks += (f'<div class="block" data-kind="clips"><div class="bt">The filmstrip '
                        f'· clips from this era</div><div class="film">{era_clips}</div></div>')
@@ -724,6 +757,17 @@ def build_page(media_dir: str, dish_map: str, title: str = "The Hermi Gallery",
             a=document.getElementById('census-alive');
       if(t&&d.tick!=null)t.textContent='tick '+d.tick;
       if(a&&d.alive!=null)a.textContent=d.alive+' alive';
+      /* VIV-99: the registry grows only when a skill gives birth — the
+         page was built with a births count; if the dish says otherwise,
+         a reload brings the new Hermi (the serve process re-wrote the page) */
+      const nb=document.getElementById('newbirths');
+      if(nb&&d.births_total!=null&&document.body.dataset.births!==undefined&&
+         String(d.births_total)!==document.body.dataset.births){
+        const diff=d.births_total-parseInt(document.body.dataset.births,10);
+        nb.hidden=false;
+        nb.innerHTML=(diff>0?diff+' new':'registry changed')+
+          ' — <a onclick="location.reload()">reload</a>';
+      }
     };
     const fetchDish=()=>{
       return fetch('/live/dish.json',{cache:'no-store'})
@@ -784,6 +828,80 @@ def build_page(media_dir: str, dish_map: str, title: str = "The Hermi Gallery",
     blocks.forEach(bl=>bl.classList.toggle('hide',k!=='all'&&bl.dataset.kind!==k));
   });
 })();
+/* the era row scrolls with the wheel; "+N more" advances it */
+(function(){
+  const wrap=document.querySelector('.eraswrap'),nav=document.querySelector('nav.eras');
+  if(!wrap||!nav)return;
+  wrap.addEventListener('wheel',e=>{
+    if(Math.abs(e.deltaY)>Math.abs(e.deltaX)){
+      e.preventDefault();
+      nav.scrollLeft+=e.deltaY;
+    }
+  },{passive:false});
+  const more=document.querySelector('.toprow .more');
+  if(more)more.addEventListener('click',()=>{
+    nav.scrollBy({left:nav.clientWidth*0.8,behavior:'smooth'});
+  });
+})();
+/* snapshots: a dish zooms; a glyph with a certificate shows its stats */
+(function(){
+  const ch=document.querySelector('#chapters .chapter');if(!ch)return;
+  const dlg=document.getElementById('theater'),body=document.getElementById('theaterBody');
+  ch.addEventListener('click',e=>{
+    const s=e.target.closest('.snap');if(!s)return;
+    if(s.dataset.cert){
+      const cert=document.getElementById(s.dataset.cert);
+      if(cert){
+        const nm=(cert.querySelector('.nm')||{}).textContent||'',
+              ei=(cert.querySelector('.ei')||{}).textContent||'';
+        body.innerHTML='<div class="t">'+nm+' · '+ei+' — its face and its DNA</div>'+
+          '<img src="'+s.querySelector('img').src+'" alt="" '+
+          'style="width:min(420px,100%);display:block;margin:0 auto;image-rendering:pixelated;'+
+          'background:#0b120e;border:1px solid var(--line);border-radius:8px;padding:10px">'+
+          '<div class="genes" style="margin-top:14px">'+cert.querySelector('.genes').innerHTML+'</div>';
+        dlg.showModal();return;
+      }
+    }
+    if(s.dataset.eidos){
+      /* sim-born face: ask the live dish for this Hermi's stats */
+      body.innerHTML='<div class="t">'+(s.dataset.name||'')+' — asking the dish…</div>';
+      dlg.showModal();
+      fetch('/live/glyph.json?eidos='+encodeURIComponent(s.dataset.eidos),{cache:'no-store'})
+        .then(r=>r.ok?r.json():r.json().then(j=>Promise.reject(j)))
+        .then(g=>{
+          if(!g||!g.genome)throw new Error('no genome');
+          const G=[['forage','forage'],['sense','sense'],['metab','metabolism_mult'],
+                   ['aggr','aggression'],['mutate','mutate'],['disperse','dispersal']];
+          const bars=G.map(p=>{
+            const v=Number(g.genome[p[1]]||0);
+            return '<span>'+p[0]+'</span><span class="track"><span class="fill" '+
+              'style="width:'+Math.max(3,Math.min(100,v/3*100))+'%"></span></span>'+
+              '<span class="v">'+v.toFixed(2)+'</span>';
+          }).join('');
+          const where=(g.source==='dish'?' · living in the dish now':' · from skill “'+g.skill+'”');
+          body.innerHTML='<div class="t">'+g.eidos+' · '+g.alive+' alive'+where+'</div>'+
+            '<img src="'+s.querySelector('img').src+'" alt="" '+
+            'style="width:min(420px,100%);display:block;margin:0 auto;image-rendering:pixelated;'+
+            'background:#0b120e;border:1px solid var(--line);border-radius:8px;padding:10px">'+
+            '<div class="genes" style="margin-top:14px">'+bars+'</div>';
+        })
+        .catch(()=>{
+          body.innerHTML='<div class="t">'+(s.dataset.name||'')+
+            ' · served from 127.0.0.1 only</div>'+
+            '<img src="'+s.dataset.zoom+'" alt="" '+
+            'style="width:100%;display:block;image-rendering:pixelated;border-radius:6px">';
+        });
+      return;
+    }
+    if(s.dataset.zoom){
+      body.innerHTML='<div class="t">'+(s.dataset.name||'the dish')+
+        ' · served from 127.0.0.1 only</div>'+
+        '<img src="'+s.dataset.zoom+'" alt="" '+
+        'style="width:100%;display:block;image-rendering:pixelated;border-radius:6px">';
+      dlg.showModal();
+    }
+  });
+})();
 /* status: one request brings a fresh dish and the full status panel */
 (function(){
   const btn=document.getElementById('status-btn');if(!btn)return;
@@ -831,7 +949,7 @@ def build_page(media_dir: str, dish_map: str, title: str = "The Hermi Gallery",
 
     return f"""<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>{_esc(title)}</title><style>{css}</style></head><body><div class="wrap">
+<title>{_esc(title)}</title><style>{css}</style></head><body data-births="{len(births or {})}"><div class="wrap">
 {head}{now}{chapters}{appendix}{footer}
 </div><dialog id="theater"><div id="theaterBody"></div></dialog>
 <dialog id="statusdlg"><div id="statusBody"></div></dialog>{script}

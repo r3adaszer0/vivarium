@@ -647,12 +647,13 @@ class TestMediaPref(unittest.TestCase):
 class TestLiveDishEndpoint(unittest.TestCase):
     """VIV-90: a page refresh asks the dish for its CURRENT tick."""
 
-    def _serve(self, provider):
+    def _serve(self, provider, glyph_provider=None):
         import termrender as vterm
         tmp = tempfile.mkdtemp()
         Path(tmp, "keep.txt").write_text("x")
         res = vterm.serve_gallery(tmp, dish_map="", title="t",
-                                  open_browser=False, dish_provider=provider)
+                                  open_browser=False, dish_provider=provider,
+                                  glyph_provider=glyph_provider)
         self.assertNotIn("error", res)
         self.addCleanup(res["server"].server_close)
         self.addCleanup(res["thread"].join, timeout=2)
@@ -714,6 +715,35 @@ class TestLiveDishEndpoint(unittest.TestCase):
         with urllib.request.urlopen(url + "/live/dish.json?fresh=1", timeout=5) as r:
             data = _json.loads(r.read().decode())
         self.assertEqual(data["tick"], 7)
+
+    def test_glyph_endpoint_serves_the_provider(self):
+        seen = []
+
+        def glyph_provider(eidos):
+            seen.append(eidos)
+            return {"eidos": "Eidos_ab12cd34", "species": "Foragia",
+                    "genome": {"forage": 1.5}, "alive": 2, "source": "dish"}
+
+        url = self._serve(None, glyph_provider=glyph_provider)
+        import urllib.request, json as _json
+        with urllib.request.urlopen(
+                url + "/live/glyph.json?eidos=Eidos_ab12cd34", timeout=5) as r:
+            data = _json.loads(r.read().decode())
+        self.assertEqual(data["species"], "Foragia")
+        self.assertEqual(seen, ["Eidos_ab12cd34"])
+
+    def test_glyph_endpoint_surfaces_the_truth(self):
+        def glyph_provider(eidos):
+            raise LookupError("no Hermi answers to " + eidos)
+
+        url = self._serve(None, glyph_provider=glyph_provider)
+        import urllib.request, urllib.error
+        try:
+            urllib.request.urlopen(
+                url + "/live/glyph.json?eidos=Eidos_ffffffff", timeout=5)
+            self.fail("expected HTTP 503")
+        except urllib.error.HTTPError as e:
+            self.assertEqual(e.code, 503)
 
     def test_without_provider_the_endpoint_is_404(self):
         url = self._serve(None)

@@ -13,6 +13,7 @@ import json
 import math
 import os
 import shutil
+from pathlib import Path
 from typing import Any, Dict
 
 def _tool_shim(data=None, error=None, **kwargs):
@@ -806,6 +807,7 @@ def _serve_text(keep: bool) -> str:
     # falls back to the flat page; serve must never break over the redesign.
     html = None
     provider = None
+    glyph_provider = None
     try:
         try:
             from . import gallery as vgal
@@ -818,6 +820,7 @@ def _serve_text(keep: bool) -> str:
         # request. Last-good cache: a torn read or a mid-tick race serves
         # the previous frame instead of an error.
         _last = {"tick": None, "alive": None, "grid": ""}
+        _births_seen = [None]   # the registry count the page was built with
 
         def _dish_provider(fresh: bool = False):
             try:
@@ -831,23 +834,89 @@ def _serve_text(keep: bool) -> str:
                        "grid": vgal._grid_json(
                            vworld.render_ascii_rich(w, cols=w.w, rows=w.h,
                                                     color=True)),
-                       "status": st}
+                       "status": st,
+                       "births_total": len(vstate.state().get("births", {}))}
                 if out["grid"]:
                     _last.clear()
                     _last.update(out)
                 else:
                     raise RuntimeError("empty grid rendered")
+                # VIV-99: when the registry grows, quietly rebuild the page
+                # file so the next reload shows the new Hermi with their
+                # certificates. The live page learns it from births_total.
+                seen = _births_seen[0]
+                if seen is not None and seen != out["births_total"]:
+                    try:
+                        (Path(media) / "index.html").write_text(
+                            vgal.build_page(str(media), dish,
+                                            title="The Hermi Gallery",
+                                            st=vstate.state()),
+                            encoding="utf-8")
+                    except Exception:
+                        pass
+                _births_seen[0] = out["births_total"]
                 return dict(_last)
             except Exception:
                 if _last["grid"] and not fresh:
                     return dict(_last)      # keep serving the last good dish
                 raise                        # fresh asks for the truth
         provider = _dish_provider
+
+        def _glyph_provider(eidos: str):
+            # VIV-99: click a glyph -> the stats of that Hermi. The face's
+            # filename carries its display id (6 or 8 hex). Resolve it the
+            # way /vivarium show does: registry births first (prefix match —
+            # display ids shorten), then the live dish's lineages, whose
+            # species never entered the births registry.
+            e = (eidos or "").strip()
+            if not e:
+                raise ValueError("no eidos given")
+            if not e.startswith("Eidos_"):
+                e = "Eidos_" + e
+            births = vstate.state().get("births", {})
+            rec = None
+            name = None
+            for n, r in births.items():
+                be = str(r.get("eidos", ""))
+                if be == e:
+                    rec, name = r, n
+                    break
+            if rec is None:
+                suf = e[6:]
+                pre = [n for n, r in births.items()
+                       if str(r.get("eidos", "")).startswith("Eidos_" + suf)]
+                if len(pre) == 1:
+                    rec, name = births[pre[0]], pre[0]
+            if rec is not None:
+                w = _world()
+                alive = sum(1 for c in (w.creatures if w is not None else [])
+                            if getattr(c, "lineage", "") == rec.get("eidos")
+                            and c.alive())
+                return {"eidos": e, "species": name,
+                        "skill": name, "era": rec.get("era"),
+                        "day": rec.get("day"), "genome": rec.get("genome"),
+                        "alive": alive, "source": "registry"}
+            w = _world()
+            if w is not None:
+                crs = [c for c in w.creatures
+                       if str(getattr(c, "lineage", "")).endswith(e[6:])
+                       and c.alive()]
+                if crs:
+                    c0 = crs[0]
+                    return {"eidos": e,
+                            "species": getattr(c0, "species", None)
+                            or e, "skill": None, "era": None, "day": None,
+                            "genome": getattr(c0, "genome", None),
+                            "alive": len(crs), "source": "dish"}
+            raise LookupError(f"no Hermi answers to {e}")
+        glyph_provider = _glyph_provider
     except Exception:
         html = None
+        glyph_provider = None
     res = vterm.serve_gallery(media, dish_map=dish, keep=keep,
                               open_browser=True, html=html,
-                              dish_provider=provider)
+                              dish_provider=provider,
+                              glyph_provider=glyph_provider)
     if "error" in res:
         return res["error"]
     lifetime = "stays up until Hermes exits (--keep)" if keep \

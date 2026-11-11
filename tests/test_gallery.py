@@ -139,8 +139,8 @@ class TestChaptersAndPulse(unittest.TestCase):
 
     def test_registry_link_in_the_top_row(self):
         html = vgal.build_page("/nonexistent", RICH, st=_St(_state()))
-        self.assertIn('class="reglink" href="#chapters"', html)
-        self.assertIn("the registry of Hermi", html)
+        self.assertIn('class="reglink" href="#registry"', html)
+        self.assertIn("Hermi Registry", html)
 
 
     def test_latest_birth_replaces_latest_clip(self):
@@ -325,7 +325,7 @@ class TestLivingEraKinds(unittest.TestCase):
     def _media(self, tmp):
         import time as _t
         for name in ("era20_final_1.png", "era20_final_2.png",
-                     "glyph_ab12cd34.png", "glyph_ef56ab78.png", "clip_1.mp4"):
+                     "glyph_ef543f71.png", "glyph_ab12cd34.png", "clip_1.mp4"):
             p = os.path.join(tmp, name)
             open(p, "wb").write(b"x")
             os.utime(p, (_t.time(), _t.time()))
@@ -344,6 +344,14 @@ class TestLivingEraKinds(unittest.TestCase):
         self.assertIn("era20_final_1.png", d)
         self.assertNotIn("glyph_ab12cd34.png", d)
         self.assertIn("glyph_ab12cd34.png", g)
+        # VIV-99: dish snaps zoom; a glyph whose eidos has a certificate
+        # opens its stats; a glyph without one just zooms
+        self.assertIn('data-zoom="era20_final_1.png"', html)
+        self.assertIn('data-cert="cert-ef543f71"', html)
+        self.assertIn('data-zoom="glyph_ab12cd34.png"', html)
+        self.assertNotIn('data-cert="cert-ab12cd34"', html)
+        # a cert-less glyph still names its Hermi for the live-dish lookup
+        self.assertIn('data-eidos="Eidos_ab12cd34"', html)
 
     def test_kindbar_filter_chips(self):
         import tempfile
@@ -371,6 +379,21 @@ class TestLivingEraKinds(unittest.TestCase):
         self.assertNotIn("Nothing is deleted on restart", html)
         self.assertNotIn("Every skill that ever ran", html)
         self.assertNotIn("The living ledger", html)
+
+    def test_latest_birth_wears_its_dna_bars(self):
+        """VIV-99: the featured card shows the six trait bars, not raw chips."""
+        html = vgal.build_page("/nonexistent", RICH, st=_St(_state()))
+        latest = html.split('class="latest"')[1].split("</a>")[0]
+        self.assertIn('class="genes lgenes"', latest)
+        self.assertNotIn("chip-line", latest)
+        self.assertIn("forage", latest)
+
+    def test_body_carries_the_births_count(self):
+        """VIV-99: the page knows its births count; the poll can diff it."""
+        html = vgal.build_page("/nonexistent", RICH, st=_St(_state()))
+        self.assertIn('data-births="2"', html)
+        self.assertIn('id="newbirths"', html)
+        self.assertIn("births_total", html)
 
     def test_status_button_bringing_the_current_dish(self):
         html = vgal.build_page("/nonexistent", RICH, st=_St(_state()))
