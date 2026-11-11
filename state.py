@@ -287,18 +287,23 @@ def activity_summary() -> dict:
 
 
 # ── cross-process paint requests (VIV-77b) ───────────────────────────────────
-def request_paint(kind: str = "status") -> None:
+def request_paint(kind: str = "status", extra: dict | None = None) -> None:
     """A headless surface (gateway-side slash worker) cannot paint: it has
     no TERM and no tty anywhere in its ancestry (the doctor trace proved
     it). Drop a request; whichever process actually sits on a terminal
     drains it (hooks._ensure_paint_relay) and overlays the current dish.
-    Kept tiny: at most the last 4 requests, each expires in seconds."""
+    Kept tiny: at most the last 4 requests, each expires in seconds.
+    VIV-80: `extra` carries what the painter needs beyond the kind — a
+    show request carries the glyph path and the reserved geometry."""
     import time as _t
     reqs = _state().get("paint_requests") or []
     if not isinstance(reqs, list):
         reqs = []
     reqs = [r for r in reqs if isinstance(r, dict)]
-    reqs.append({"kind": kind, "ts": _t.time()})
+    item = {"kind": kind, "ts": _t.time()}
+    if extra:
+        item.update(extra)
+    reqs.append(item)
     _state().set("paint_requests", reqs[-4:])
 
 

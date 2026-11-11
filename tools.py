@@ -416,7 +416,7 @@ _HELP = """\
 Subcommands:
   help                  this list (also: bare /vivarium)
   status                population, lineages, ages, and an ASCII map
-  show [name|id]        meet one species up close: face, genes, story (--image: glyph)
+  show [name|id]        meet one species up close: face image, genes, story (noimage: text only)
   clip [species] [ticks] [--zoom]   film the dish as a short MP4 (into the gallery)
   explain               how your skills become living creatures (the hash story)
   narration MODE        how much the dish says: off|births|milestones|daily (default births)
@@ -1252,13 +1252,17 @@ def _show_text(rest: list) -> str:
         import termrender as vterm
         import card as vcard
     import sys as _sys
-    _tty = bool(getattr(_sys.stdout, "isatty", lambda: False)())
+    _tty = bool(getattr(_sys.stdout, "isatty", lambda: False)()) and (
+        _sys.stdout is not None)
     gfx = _tty and vterm.detect_graphics() in ("kitty", "iterm2", "sixel")
-    if gfx and "noimage" not in rest:
-        # The face as an image, not as terminal cells: the dish paints the
-        # creature in pixel space and the terminal's own palette drifts the
-        # hue, so the same species looked like two different animals. One
-        # renderer, one colour.
+    # VIV-80: the face is an IMAGE on every surface, not terminal cells —
+    # the dish paints the creature in pixel space and the terminal's own
+    # palette drifts the hue, so the same species looked like two
+    # different animals. One renderer, one colour. A paint-capable
+    # process paints now; a headless drain reserves the rows and drops a
+    # request the terminal-owning process claims (the status relay's
+    # cross-process contract, extended to the glyph).
+    if "noimage" not in rest:
         path = vart.render_glyph_png(s, eidos, genome)
         if path:
             text = vident.species_card(eidos, genome,
@@ -1275,7 +1279,12 @@ def _show_text(rest: list) -> str:
             after = rest_text.splitlines()
             # trail_rows = every line printed AFTER the reserved block, so
             # the deferred paint can climb back over them to the image top.
-            vterm.paint_over(path, res_rows, len(after), delay=0.6)
+            if gfx:
+                vterm.paint_over(path, res_rows, len(after), delay=0.6)
+            else:
+                vstate.request_paint("show", extra={
+                    "path": path, "res_rows": res_rows,
+                    "trail": len(after)})
             # one blank line above the reserved block: the face drops a row
             # and clears the headline. Provenance rides the card, not the
             # title - the title names the creature and nothing else.
@@ -1285,15 +1294,6 @@ def _show_text(rest: list) -> str:
                                founding_skill=name or "",
                                born_tick=rec.get("tick"),
                                colored=_tty)
-    if "--image" in rest or "image" in rest:
-        path = vart.render_glyph_png(s, eidos, genome)
-        if path:
-            size = vterm.png_size(path) or (230, 230)
-            res_rows = max(1, math.ceil(size[1] / vterm.CELL_H))
-            res_cols = max(20, math.ceil(size[0] / vterm.CELL_W))
-            spacer = "\n".join(" " * res_cols for _ in range(res_rows))
-            vterm.paint_over(path, res_rows, 0, delay=0.4)
-            return card + "\n\n" + spacer
     return card
 
 

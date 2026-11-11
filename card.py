@@ -309,14 +309,30 @@ def render(body: str, cols: int, marker: str, live: dict | None = None,
     else:
         art_lines, art_eidos, tail_text = split_art(tail_text)
     two_col = dish and bool(tail_text) and cols >= dish_cols + MIN_GUTTER
-    if two_col and lines and lines[-1] == "":
-        # The blank under the headline reads as air on a one-column card,
-        # but above the dish it is a whole spare row pushing the picture
-        # down. When the two-column block takes over, spend that row.
-        lines.pop()
+    # VIV-80: the blank under the headline STAYS — the user asked for one
+    # empty terminal line between the copy and the picture (act 2: after
+    # the die-off line, before the dish). It reads as air on a one-column
+    # card, but above the dish it is the breathing room that separates
+    # words from image.
     spacer_at = len(lines) if two_col else None
+    bang_dish_at = None
+    if is_bang and dish and spacer_at is None:
+        # VIV-80 (the second half of "big bang but no image"): the act-2
+        # card carries ALL its copy in the head block, so two_col never
+        # fired and the dish had NO reserved rows — the picture could
+        # never land. Stack it instead: head block, one empty line (the
+        # user's explicit ask), then the dish rows, census table after.
+        lines.append("")
+        bang_dish_at = len(lines)
+        lines += [""] * dish_rows
+        spacer_at = bang_dish_at
 
-    if spacer_at is not None:
+    if spacer_at is not None and bang_dish_at is not None:
+        # Stacked bang dish: the rows are reserved above; the head block
+        # already carries the census line, so no second caption and no
+        # side column. The paint overlays the reserved rows via climb.
+        pass
+    elif spacer_at is not None:
         right = cols - dish_cols - 4 - TEXT_INSET
         body_lines: list[str] = []
         if art_lines:
@@ -354,7 +370,7 @@ def render(body: str, cols: int, marker: str, live: dict | None = None,
                 lines.append(pad + t)
             else:
                 lines.append(f"{pad}{SOFT}{t}{RST}")
-        note = legend or ("white ring = the pod" if art_lines else "")
+        note = legend or ""
         cap = _caption(live, note)
         if cap:
             lines.append(cap)

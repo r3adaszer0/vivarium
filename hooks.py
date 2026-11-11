@@ -330,8 +330,19 @@ def _ensure_paint_relay() -> None:
                     from . import state as vst
                 except ImportError:  # pragma: no cover
                     import state as vst
-                if vst.pop_paint_request() is not None:
-                    _paint_status_relay()
+                # Paint requests claim IMMEDIATELY (the reserved rows sit
+                # in a reply that is already on screen; waiting for the
+                # turn to close would let the 12s expiry eat them). Only
+                # CARD beats wait for the turn gap.
+                req = vst.pop_paint_request()
+                if req is not None:
+                    # VIV-80: a show request carries its own glyph path and
+                    # the reserved geometry; a status request re-renders the
+                    # current dish. One claim point, two payloads.
+                    if req.get("kind") == "show" and req.get("path"):
+                        _paint_show_relay(req)
+                    else:
+                        _paint_status_relay()
                 # VIV-79: claim a CARD beat too. A headless drain queued it
                 # for agent relay; a terminal-owning process can deliver it
                 # BETTER: card+image as one payload between turns, no
@@ -353,6 +364,30 @@ def _ensure_paint_relay() -> None:
     import threading as _threading
     _threading.Thread(target=_poll, daemon=True,
                       name="vivarium-paint-relay").start()
+
+
+def _paint_show_relay(req: dict) -> None:
+    """VIV-80: overlay the glyph a headless /vivarium show reserved.
+
+    The request carries the exact PNG path and the geometry the worker
+    computed (rows reserved, lines printed after the block) — the relay
+    paints THAT file over THOSE rows; it never re-renders, so the face
+    the user asked for is the face that arrives.
+    """
+    try:
+        try:
+            from . import termrender as vterm
+        except ImportError:  # pragma: no cover
+            import termrender as vterm
+        import os as _os
+        path = str(req.get("path") or "")
+        if not path or not _os.path.exists(path):
+            return
+        rows = int(req.get("res_rows") or 1)
+        trail = int(req.get("trail") or 0)
+        vterm.paint_over(path, rows, trail, delay=0.0)
+    except Exception:
+        pass
 
 
 def _paint_status_relay() -> None:
@@ -608,24 +643,11 @@ def _emit_card(body: str) -> None:
         # drops the picture, which is exactly how the dish vanished
         # twice. The beat always paints.
         if w is not None:
-            # An arrival beat carries the newborn's eidos; ring its pod
-            # so "where it is" is answered by the picture, not a line of
-            # prose pointing at a cell the reader has to hunt for.
-            mark = None
-            callout = None
-            legend = None
-            import re as _re
-            _m = _re.search(r"<<ART:([^>]*)>>", body)
-            if _m:
-                _eidos = _m.group(1)
-                for _c in getattr(w, "creatures", []) or []:
-                    if getattr(_c, "lineage", "") == _eidos:
-                        mark = (_c.x, _c.y)
-                        break
-                if mark is not None:
-                    callout = (mark[0], mark[1], _eidos)
-            path = vart.render_dish_png(vstate.state(), w, f"live_{w.tick}",
-                                        mark=mark, callout=callout) or ""
+            # VIV-80: the dish renders CLEAN — no white ring around the
+            # newborn's pod, no callout plate. The user has asked for the
+            # ring's removal repeatedly; the card's text already says who
+            # was born, and a ring on a field of dots reads as noise.
+            path = vart.render_dish_png(vstate.state(), w, f"live_{w.tick}") or ""
             if path:
                 size = vterm.png_size(path) or (342, 339)
                 rows = max(1, -(-int(size[1]) // max(1, vterm.CELL_H)))
@@ -638,7 +660,7 @@ def _emit_card(body: str) -> None:
         rendered = vcard.render(body, term_cols, vacts.DISH_MARKER,
                                 live=live, dish_rows=rows,
                                 dish=bool(path), dish_cols=dish_cols,
-                                legend=legend,
+                                legend=None,
                                 era=_rec.get("era"))
         out = rendered["text"]
 

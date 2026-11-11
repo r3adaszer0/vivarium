@@ -168,7 +168,10 @@ def art_block(eidos: str, genome: dict | None = None,
         # Center the face against the stat table: the block reads as one
         # object only when the face's middle row is the panel's middle
         # row; top-aligned it hangs like a stamp above a receipt.
-        pad = max(0, (len(panel) + 1 - len(lines)) // 2)
+        # VIV-80: the user asked the face TWO LINES HIGHER — the centering
+        # pad gives back two rows, so the face leads the panel instead of
+        # floating mid-table, and the copy below rises with it.
+        pad = max(0, (len(panel) + 1 - len(lines)) // 2 - 2)
         lines = [""] * pad + lines + [""] + panel
     return f"\n{ART_OPEN}{eidos}>>\n" + "\n".join(lines) + f"\n{ART_CLOSE}\n"
 
