@@ -643,11 +643,27 @@ def _emit_card(body: str) -> None:
         # drops the picture, which is exactly how the dish vanished
         # twice. The beat always paints.
         if w is not None:
-            # VIV-80: the dish renders CLEAN — no white ring around the
-            # newborn's pod, no callout plate. The user has asked for the
-            # ring's removal repeatedly; the card's text already says who
-            # was born, and a ring on a field of dots reads as noise.
-            path = vart.render_dish_png(vstate.state(), w, f"live_{w.tick}") or ""
+            # An arrival beat carries the newborn's eidos; ring its pod
+            # and plate it with the name. VIV-80 correction: the user
+            # wants the RING AND THE NAME ON THE IMAGE — only the
+            # "white ring = the pod" legend LINE was the duplication
+            # (the picture shows the ring; a sentence explaining it
+            # repeated what the eye already sees). The legend stays
+            # gone; the ring stays.
+            mark = None
+            callout = None
+            import re as _re
+            _m = _re.search(r"<<ART:([^>]*)>>", body)
+            if _m:
+                _eidos = _m.group(1)
+                for _c in getattr(w, "creatures", []) or []:
+                    if getattr(_c, "lineage", "") == _eidos:
+                        mark = (_c.x, _c.y)
+                        break
+                if mark is not None:
+                    callout = (mark[0], mark[1], _eidos)
+            path = vart.render_dish_png(vstate.state(), w, f"live_{w.tick}",
+                                        mark=mark, callout=callout) or ""
             if path:
                 size = vterm.png_size(path) or (342, 339)
                 rows = max(1, -(-int(size[1]) // max(1, vterm.CELL_H)))
