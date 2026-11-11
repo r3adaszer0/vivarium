@@ -84,7 +84,7 @@ section{padding:46px 0 8px}
 padding:14px;overflow:hidden}
 .dishwrap .dish-title{position:absolute;top:14px;left:16px;font-size:10px;letter-spacing:.2em;
 color:var(--dimink);text-transform:uppercase;z-index:2}
-canvas.dish{width:100%%;aspect-ratio:2.2;display:block;border-radius:4px}
+canvas.dish{width:100%%;height:auto;display:block;border-radius:4px;image-rendering:pixelated}
 img.dishpng{width:100%%;display:block;border-radius:4px;image-rendering:pixelated}
 .plate{position:absolute;left:14px;bottom:14px;font-size:10.5px;background:#0b0f0dcc;
 border:1px solid #4a2a38;border-radius:4px;padding:3px 8px;color:#ffd7e2;white-space:nowrap}
@@ -225,23 +225,30 @@ def _grid_json(rich_map: str) -> str:
 
     Each cell becomes RRGGBB + a one-char tier (solid=full block, dim for
     ▓▒░). Rows are '|' separated, cells ',' separated. Pure stdlib.
+    VIV-91: creatures are SPACES with a BACKGROUND color (48;2;) — the
+    parser tracks bg as well as fg, or every creature renders as lattice.
     """
     import re
     fg = (60, 120, 84)                     # the lattice default
+    bg = None                              # creature blocks carry 48;2;
     rows = []
     for raw in (rich_map or "").splitlines():
         cells = []
         for tok in re.split(r"(\x1b\[[0-9;]*m)", raw):
             if tok.startswith("\x1b["):
-            # FG truecolor -> the active color; reset -> lattice default
                 body = tok[2:-1]
                 if body.startswith("38;2;"):
                     fg = tuple(int(x) for x in body[5:].split(";"))[:3]
+                elif body.startswith("48;2;"):
+                    bg = tuple(int(x) for x in body[5:].split(";"))[:3]
                 elif body in ("0", ""):
                     fg = (60, 120, 84)
+                    bg = None
                 continue
             for ch in tok:
-                if ch == "█":
+                if ch == " " and bg is not None:
+                    r, g, b, a = *bg, "f"          # colored-space creature
+                elif ch == "█":
                     r, g, b, a = *fg, "f"
                 elif ch == "▓":
                     r, g, b, a = *fg, "b"
@@ -430,9 +437,14 @@ def build_page(media_dir: str, dish_map: str, title: str = "The Hermi Gallery",
     # ── now ──
     statgrid, dish_visual = "", ""
     if live and grid:
+        # the dish canvas mirrors the dish's REAL shape (VIV-91): the grid
+        # is built at the world's own cols/rows, so the web dish is the
+        # same square the terminal paints — never a squashed strip.
+        _rows = grid.count("|") + 1
+        _cols = len(grid.split("|")[0].split(","))
         dish_visual = (f'<canvas class="dish" id="dish" data-grid="{_esc(grid)}"'
-                       f'{" data-live" if live_flag else ""}'
-                       f' width="768" height="240"></canvas>')
+                       f'{"" if live_flag is False else " data-live"}'
+                       f' width="{_cols * 10}" height="{_rows * 10}"></canvas>')
     elif newest_png:
         dish_visual = (f'<img class="dishpng" src="{_esc(newest_png["path"])}" '
                        f'alt="the last archived dish">')

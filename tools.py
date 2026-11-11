@@ -794,7 +794,10 @@ def _serve_text(keep: bool) -> str:
                 "Use /vivarium codex first.")
     try:
         w = _world()
-        dish = (vworld.render_ascii_rich(w, cols=64, rows=24)
+        # VIV-91: the web dish mirrors the dish's REAL shape — the world's
+        # own cols/rows, never a squashed strip — and color=True so every
+        # creature wears its lineage hue, like the terminal dish.
+        dish = (vworld.render_ascii_rich(w, cols=w.w, rows=w.h, color=True)
                 if w is not None else "")
     except Exception:
         dish = ""
@@ -826,7 +829,8 @@ def _serve_text(keep: bool) -> str:
                 st = vworld.stats(w)
                 out = {"tick": st.get("tick"), "alive": st.get("population"),
                        "grid": vgal._grid_json(
-                           vworld.render_ascii_rich(w, cols=64, rows=24))}
+                           vworld.render_ascii_rich(w, cols=w.w, rows=w.h,
+                                                    color=True))}
                 if out["grid"]:
                     _last.clear()
                     _last.update(out)
