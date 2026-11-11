@@ -101,8 +101,13 @@ canvas.dish{width:100%%;height:auto;display:block;border-radius:4px;image-render
 img.dishpng{width:100%%;display:block;border-radius:4px;image-rendering:pixelated}
 .nowside{display:flex;flex-direction:column;gap:14px}
 .census{border:1px solid var(--line);border-radius:8px;background:var(--panel);padding:16px 18px}
-.census .line{font-size:13px;color:var(--mut)}
+.census .line{font-size:13px;color:var(--mut);display:flex;align-items:center}
 .census .line b{color:var(--ink);font-weight:600}
+.census .rf{margin-left:auto;font-family:var(--mono);font-size:10px;color:var(--dimink);
+background:none;border:1px solid var(--line);border-radius:4px;padding:2px 8px;
+cursor:pointer;letter-spacing:.08em;text-transform:uppercase;transition:color .15s,border-color .15s}
+.census .rf:hover{color:var(--ink);border-color:#35594a}
+.census .rf.busy{color:var(--acc);border-color:#1e3a52;opacity:.6;cursor:default}
 .census .line .sep{color:var(--dimink);margin:0 7px}
 .census .line .hi{color:var(--amber)}
 .statgrid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:7px 26px;
@@ -519,7 +524,9 @@ def build_page(media_dir: str, dish_map: str, title: str = "The Hermi Gallery",
         last = curve[-1] if curve else {}
         census = (f'<div class="line"><b id="census-tick">tick {_esc(last.get("tick", "—"))}</b>'
                   f'<span class="sep">·</span><b id="census-alive">{_esc(last.get("population", "—"))} alive</b>'
-                  f'<span class="sep">·</span><span class="hi">the dish is live</span></div>')
+                  f'<span class="sep">·</span><span class="hi">the dish is live</span>'
+                  f'<button class="rf" id="dish-refresh" title="bring the current dish"'
+                  f' aria-label="refresh the dish">&#10227; refresh</button></div>')
     else:
         last = curve[-1] if curve else {}
         census = (f'<div class="line"><b>tick {_esc(last.get("tick", "—"))}</b>'
@@ -699,18 +706,30 @@ def build_page(media_dir: str, dish_map: str, title: str = "The Hermi Gallery",
   /* a refresh asks the dish for its current tick; so does a slow poll —
      the page stays a live window on the dish while Hermes works */
   if(cv.dataset.live!==undefined){
-    const askDish=()=>{
-      fetch('/live/dish.json',{cache:'no-store'}).then(r=>r.ok?r.json():r.json().then(j=>Promise.reject(j)))
-      .then(d=>{
-        if(!d||!d.grid)return;
-        cv.dataset.grid=d.grid;drawDish(d.grid);
-        const t=document.getElementById('census-tick'),
-              a=document.getElementById('census-alive');
-        if(t&&d.tick!=null)t.textContent='tick '+d.tick;
-        if(a&&d.alive!=null)a.textContent=d.alive+' alive';
-      }).catch(e=>{console.warn('[vivarium] live dish:',e&&e.error||e)});
+    const applyDish=d=>{
+      if(!d||!d.grid)return;
+      cv.dataset.grid=d.grid;drawDish(d.grid);
+      const t=document.getElementById('census-tick'),
+            a=document.getElementById('census-alive');
+      if(t&&d.tick!=null)t.textContent='tick '+d.tick;
+      if(a&&d.alive!=null)a.textContent=d.alive+' alive';
     };
-    askDish();setInterval(askDish,4000);
+    const fetchDish=()=>{
+      return fetch('/live/dish.json',{cache:'no-store'})
+        .then(r=>r.ok?r.json():r.json().then(j=>Promise.reject(j)))
+        .then(applyDish)
+        .catch(e=>{console.warn('[vivarium] live dish:',e&&e.error||e)});
+    };
+    let timer=null;
+    const schedule=ms=>{if(timer)clearInterval(timer);timer=setInterval(fetchDish,ms)};
+    fetchDish();schedule(4000);
+    /* the refresh button: bring the current dish on demand */
+    const rf=document.getElementById('dish-refresh');
+    if(rf)rf.addEventListener('click',()=>{
+      if(rf.classList.contains('busy'))return;
+      rf.classList.add('busy');
+      fetchDish().finally(()=>{rf.classList.remove('busy');schedule(4000)});
+    });
   }
 })();
 /* search: filter the registry */

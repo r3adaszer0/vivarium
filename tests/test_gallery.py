@@ -371,3 +371,13 @@ class TestLivingEraKinds(unittest.TestCase):
         self.assertNotIn("Nothing is deleted on restart", html)
         self.assertNotIn("Every skill that ever ran", html)
         self.assertNotIn("The living ledger", html)
+
+    def test_refresh_button_bringing_the_current_dish(self):
+        html = vgal.build_page("/nonexistent", RICH, st=_St(_state()))
+        self.assertIn('id="dish-refresh"', html)
+        self.assertIn("bring the current dish", html)
+        self.assertIn("getElementById('dish-refresh')", html)
+        dormant = _state()
+        dormant["universe"]["status"] = "dormant"
+        html2 = vgal.build_page("/nonexistent", RICH, st=_St(dormant))
+        self.assertNotIn('id="dish-refresh"', html2)
