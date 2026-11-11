@@ -22,7 +22,7 @@
 </table>
 </div>
 
-Vivarium is a Hermes Agent plugin that hosts a **persistent artificial-life
+Vivarium is a Hermes Agent plugin that hosts an **artificial-life
 living world**. A 48×48 cellular-automaton dish: food blooms and spreads like
 weather, and genome-carrying creatures forage, reproduce, mutate, and go
 extinct on their own — even while you're away.
@@ -36,20 +36,22 @@ the actual work your agent does.**
 
 **The world is called Vivarium. Each creature is a Hermi. You grow both.**
 
-## The Four Rules
+## Vivarium is:
 
-1. **Not random.** Dynamics are pure functions of state; the only entropy
-   event is the creation of your universe key, outside the simulation. The
-   same skills always produce the same species.
-2. **Mathematically sound.** Every mechanism is a measurable constant with a
-   documented role — carrying capacity, energy conservation with friction,
-   logistic regrowth. Nothing is tuned by vibes.
-3. **Discovery is the game.** The **Vivarium Codex** records emergent patterns your dish
-   exhibits (population pulses, still lifes), each with evidence and rendered
-   artifacts. Scarcity comes from survival, never from payment.
-4. **Private.** Species derive from keyed hashes of your skill *content* —
-   never names, never raw content. Your universe key stays on your machine;
-   shared artifacts carry only Eidos IDs and fingerprints.
+- **Deterministic.** Dynamics are pure functions of state; the only entropy
+  event is the creation of your universe key, outside the simulation. The
+  same skills always produce the same species.
+- **Mathematically sound.** Every mechanism is a measurable constant with a
+  documented role — carrying capacity, energy conservation with friction,
+  logistic regrowth. Nothing is tuned by vibes.
+- **Genetic.** Every Hermi carries a six-gene genome — forage, sense,
+  metabolism, aggression, mutation rate, dispersal — inherited with
+  mutation from its parents, and every species descends from a skill your
+  agent actually learned. The face, the name and the colour are all read
+  off the genes.
+- **Private.** Species derive from keyed hashes of your skill *content* —
+  never names, never raw content. Your universe key stays on your machine;
+  shared artifacts carry only Eidos IDs and fingerprints.
 
 ## Install
 
