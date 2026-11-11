@@ -321,9 +321,12 @@ def render(body: str, cols: int, marker: str, live: dict | None = None,
         # VIV-80 (the second half of "big bang but no image"): the act-2
         # card carries ALL its copy in the head block, so two_col never
         # fired and the dish had NO reserved rows — the picture could
-        # never land. Stack it instead: head block, one empty line (the
-        # user's explicit ask), then the dish rows, census table after.
-        lines.append("")
+        # never land. Stack it: head block, then the dish rows, census
+        # table after.
+        # VIV-83: _head_block already closes with ONE blank line; this
+        # branch used to append a second, giving TWO rows of air between
+        # the die-off sentence and the dish. The locked act-2 spec is the
+        # dish ONE line below the sentence — no extra append here.
         bang_dish_at = len(lines)
         lines += [""] * dish_rows
         spacer_at = bang_dish_at

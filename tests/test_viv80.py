@@ -65,15 +65,12 @@ class TestCardLayout(unittest.TestCase):
                  for ln in r["text"].split("\n")]
         die_off = max(i for i, t in enumerate(texts)
                       if t.startswith("The Hadean die-off"))
-        self.assertEqual(texts[die_off + 1], "", "one empty line")
-        # then the reserved dish rows: a solid block of empty rows before
-        # the next non-blank line (the command table)
-        blanks = 0
-        for t in texts[die_off + 2:]:
-            if t:
-                break
-            blanks += 1
-        self.assertGreaterEqual(blanks, 15, "the reserved dish rows follow")
+        # VIV-83, the LOCKED act-2 spec: the dish sits ONE line below the
+        # die-off sentence — exactly one blank row between them, never two.
+        dish_top = (len(texts) - 1) - r["climb"]
+        self.assertEqual(dish_top - die_off, 2,
+                         "one blank line, then the dish's top row")
+        self.assertEqual(texts[die_off + 1], "", "the single blank")
 
     def test_act2_reserves_dish_rows_at_all(self):
         # the pre-VIV-80 bug: the act-2 card reserved NOTHING, so the
