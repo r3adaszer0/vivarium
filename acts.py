@@ -101,7 +101,20 @@ ACT2_TEXT = (
 
 
 def act2_for(result: dict) -> str:
-    """Act 2 appended to the Big Bang narration (em-dash-free)."""
+    """Act 2 appended to the Big Bang narration (em-dash-free).
+
+    VIV-79: an era > 1 Big Bang acknowledges the predecessor in one line —
+    the user whose era-10 dish went silent must never read a bare
+    "Universe born (era 11)" and wonder what happened to era 10. The
+    champions are not lost: they sleep in the fossil archive, and
+    /vivarium release can wake one in the new dish.
+    """
+    rec = (result or {}).get("record") or {}
+    era = int(rec.get("era") or 1)
+    if era > 1:
+        return (f"\n\n(Era {era - 1} has ended. Its champions sleep in the "
+                f"fossil archive; /vivarium release can wake one in this "
+                f"fresh dish.)") + ACT2_TEXT
     return ACT2_TEXT
 
 

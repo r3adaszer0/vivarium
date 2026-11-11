@@ -192,8 +192,14 @@ class SkillBirth(unittest.TestCase):
             vhooks._discover_skills, vmp.vterm.detect_graphics = old, oldg
         line = vstate.narration_text()
         self.assertIn("Universe born", line)
-        self.assertIn("/vivarium images off", line)   # the offer rides along
-        self.assertIn("vivarium_render", line)  # agent paints via the tool
+        # VIV-79: the beat TEXT is clean — no offer/directive embedded
+        # (the agent relays it verbatim; instructions ride the wrapper).
+        self.assertNotIn("/vivarium images off", line)
+        self.assertNotIn("vivarium_render", line)
+        # the relay wrapper carries the attach instruction instead
+        inj = ctx._hooks["pre_llm_call"]() or {}
+        self.assertIn("Universe born", inj.get("context", ""))
+        self.assertIn("vivarium_render", inj.get("context", ""))
 
     def test_birth_narration_carries_media_offer_and_respects_off(self):
         """Birth announcement offers images when capable; never when off."""
@@ -209,18 +215,24 @@ class SkillBirth(unittest.TestCase):
                     skill_name="offer-skill", action="created")
             line = vstate.narration_text()
             self.assertIn("Eidos_", line)
-            self.assertIn("/vivarium images off", line)
-            self.assertIn("vivarium_render", line)   # agent paints via the tool
+            # VIV-79: clean beat; the directive lives in the pre_llm wrapper
+            self.assertNotIn("/vivarium images off", line)
+            self.assertNotIn("vivarium_render", line)
+            inj = ctx._hooks["pre_llm_call"]() or {}
+            self.assertIn("Eidos_", inj.get("context", ""))
+            self.assertIn("vivarium_render", inj.get("context", ""))
             while vstate.pop_narration():             # drain for the next birth
                 pass
-            # flip to off -> new birth, no offer
+            # flip to off -> new birth, no directive in the wrapper either
             s.set("media_pref", "ascii")
             with TempSkills("offer-skill-2", "Different body content qqq."):
                 ctx._hooks["on_skill_lifecycle"](
                     skill_name="offer-skill-2", action="created")
             line2 = vstate.narration_text()
             self.assertIn("Eidos_", line2)
-            self.assertNotIn("/vivarium images off", line2)
+            inj2 = ctx._hooks["pre_llm_call"]() or {}
+            self.assertIn("Eidos_", inj2.get("context", ""))
+            self.assertNotIn("vivarium_render", inj2.get("context", ""))
         finally:
             vmp.vterm.detect_graphics = oldg
 

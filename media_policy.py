@@ -39,21 +39,24 @@ def media_offer(s, *, directive: bool = False) -> str:
     if media_pref(s) != "auto":
         return ""
     kind = vterm.detect_graphics()
-    if kind not in ("kitty", "iterm2", "sixel"):
-        return ""
     offer = ("\n\n🖼️ Graphics-capable terminal detected — Vivarium "
              "paints the dish here automatically (Big Bang, births, "
              "status). Disable anytime: /vivarium images off")
     if directive:
-        # VIV-42: on an interactive terminal the PLUGIN paints the dish
-        # itself after the turn settles (see hooks._schedule_picture), so
-        # the agent is told nothing about painting. Only surfaces that
-        # cannot paint (chat/gateway: no tty) get the tool directive, and
-        # there the tool attaches the PNG.
+        # VIV-79: the directive is about the RELAY TARGET, not about this
+        # process. Gateway/chat processes are headless — detect_graphics()
+        # is "none" there no matter what the user's terminal really is
+        # (the doctor trace proved it), so gating the directive on it
+        # silently deleted it from every relayed card and the image was
+        # lost. Interactive-graphics processes paint themselves; every
+        # other drain must instruct the agent to attach the picture.
         import sys as _sys
         interactive = getattr(_sys.stdout, "isatty", lambda: False)()
-        if not interactive:
-            offer += ("\n(vivarium layout: relay the text above first, then "
-                      "call vivarium_render with image=true so the picture "
-                      "is attached; the terminal paints for the user.)")
+        if interactive and kind in ("kitty", "iterm2", "sixel"):
+            return offer
+        return ("\n\n(When you relay this card, ALSO call the "
+                "vivarium_render tool with image=true in the same turn so "
+                "the dish image is attached to your reply.)")
+    if kind not in ("kitty", "iterm2", "sixel"):
+        return ""
     return offer

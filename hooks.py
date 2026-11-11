@@ -207,6 +207,23 @@ def _on_pre_llm_call(session_id: str = "", user_message: str = "",
     quiet turn; the dish advances on its own.
     """
     try:
+        _TURN_OPEN["open"] = True        # VIV-79: cards must not paint mid-turn
+        if vstate.peek_milestone() is not None:
+            line = vstate.pop_milestone() or ""
+            tail = ""
+            try:
+                from . import media_policy as vmp
+            except ImportError:  # pragma: no cover
+                import media_policy as vmp
+            if vmp.media_pref(vstate.state()) == "auto":
+                tail = ("\n\n(Vivarium layout: after the verbatim card above, "
+                        "call the vivarium_render tool with image=true in "
+                        "this same turn so the dish image is attached to "
+                        "your reply.)")
+            return {"context": (
+                "🧬 [vivarium] STORY BEAT — relay this to the user in your "
+                "reply, verbatim and complete. Do not summarize, do not drop "
+                "it, do not treat it as internal context:\n" + line + tail)}
         line = vstate.pop_narration()
         if line:
             return {"context": (
@@ -245,6 +262,7 @@ def _on_stream_end(**_):
     missing hook never leaves the dish unpainted).
     """
     import time as _t
+    _TURN_OPEN["open"] = False   # VIV-79: the turn closed; cards may paint
     _capture_pt_app()
     if _PICTURE_PENDING.get("armed"):
         # a little slack: the TUI is still painting the final message
@@ -273,7 +291,8 @@ def _can_paint() -> bool:
         return False
 
 
-_PAINT_RELAY = {"started": False}
+_PAINT_RELAY: dict = {"started": False}
+_TURN_OPEN: dict = {"open": False}   # VIV-79: a turn is streaming; cards wait
 
 
 def _ensure_paint_relay() -> None:
@@ -301,9 +320,23 @@ def _ensure_paint_relay() -> None:
                     from . import state as vst
                 except ImportError:  # pragma: no cover
                     import state as vst
-                if vst.pop_paint_request() is None:
+                if vst.pop_paint_request() is not None:
+                    _paint_status_relay()
+                # VIV-79: claim a CARD beat too. A headless drain queued it
+                # for agent relay; a terminal-owning process can deliver it
+                # BETTER: card+image as one payload between turns, no
+                # one-turn delay, nothing lost. Never mid-turn: the agent's
+                # reply is still streaming; the beat waits for the gap.
+                if _TURN_OPEN.get("open"):
                     continue
-                _paint_status_relay()
+                line = vst.pop_milestone()
+                if line:
+                    try:
+                        from . import delivery_trace as vtrace
+                    except ImportError:  # pragma: no cover
+                        import delivery_trace as vtrace
+                    vtrace.log("card_claim", chars=len(line))
+                    _emit_card(line)
             except Exception:
                 continue
 
@@ -416,6 +449,18 @@ def _beat_layout(text: str, rows: int, cols: int):
     return out, trail
 
 
+def _strip_sgr(text: str) -> str:
+    """VIV-79: chat surfaces relay text, not terminal colour codes.
+
+    The card's SGR sequences render fine on a tty and arrive as literal
+    garbage everywhere else (the user's Matrix paste showed raw
+    ESC[38;2;...m runs). The relay path strips them; the terminal paint
+    keeps the colour.
+    """
+    import re as _re
+    return _re.sub(r"\x1b\[[0-9;]*m", "", text or "")
+
+
 def _deliver_beat(text: str) -> None:
     """VIV-46: queue the beat and arm the printer.
 
@@ -435,18 +480,16 @@ def _deliver_beat(text: str) -> None:
         vstate.queue_narration(text, milestone=True, kind="birth")
         _arm_print()
     else:
-        # Chat / gateway: the beat stays queued for the agent to relay,
-        # with the media offer so images still reach the user.
-        try:
-            from . import media_policy as vmp
-        except ImportError:  # pragma: no cover
-            import media_policy as vmp
+        # Chat / gateway: the beat stays queued for the agent to relay.
+        # VIV-79: the text goes CLEAN (art markers and SGR stripped) —
+        # the attach directive rides in the pre_llm wrapper, never inside
+        # the verbatim block the agent is told to repeat.
         try:
             from . import acts as vacts
         except ImportError:  # pragma: no cover
             import acts as vacts
         vstate.queue_narration(
-            vacts.strip_art(text) + vmp.media_offer(vstate.state(), directive=True),
+            vacts.strip_art(_strip_sgr(text)),
             milestone=True, kind="birth")
 
 
@@ -490,144 +533,156 @@ def _arm_print() -> None:
         if not parts:
             return
         body = "\n\n".join(parts)
-        try:
-            import sys as _sys
-            try:
-                from . import artifacts as vart
-                from . import termrender as vterm
-            except ImportError:  # pragma: no cover - flat-import mode
-                import artifacts as vart
-                import termrender as vterm
-            try:
-                from . import card as vcard
-                from . import acts as vacts
-            except ImportError:  # pragma: no cover - flat-import mode
-                import card as vcard
-                import acts as vacts
-            import shutil as _shutil
-            # The width has to come from the app we captured, not from
-            # shutil: inside this worker thread shutil reports whatever
-            # the fd says, and one live run read a narrow value, fell back
-            # to the stacked card, and dropped the dish. The app knows.
-            term_cols = 0
-            try:
-                _app = _PICTURE_PENDING.get("app")
-                if _app is not None:
-                    term_cols = int(_app.output.get_size().columns)
-            except Exception:
-                term_cols = 0
-            if term_cols < 40:
-                term_cols = _shutil.get_terminal_size((100, 40)).columns
-            w = vstate.load_world()
-            live = None
-            if w is not None:
-                try:
-                    st = vworld.stats(w)
-                    live = {"tick": w.tick,
-                            "alive": st.get("population", 0),
-                            "lineages": len(st.get("lineages") or []),
-                            "lineages_total": st.get("lineages_total", 0),
-                            "coloured": st.get("coloured", 0),
-                            "grey": st.get("grey", 0)}
-                except Exception:
-                    live = {"tick": w.tick}
-            path = ""
-            rows = 23
-            dish_cols = 24
-            # No "already painted" guard here. It existed when the agent
-            # could also call vivarium_render for the same beat; the agent
-            # no longer paints, and the guard is stateful across runs — a
-            # restart that lands on the same (era, tick) then silently
-            # drops the picture, which is exactly how the dish vanished
-            # twice. The beat always paints.
-            if w is not None:
-                # An arrival beat carries the newborn's eidos; ring its pod
-                # so "where it is" is answered by the picture, not a line of
-                # prose pointing at a cell the reader has to hunt for.
-                mark = None
-                callout = None
-                legend = None
-                import re as _re
-                _m = _re.search(r"<<ART:([^>]*)>>", body)
-                if _m:
-                    _eidos = _m.group(1)
-                    for _c in getattr(w, "creatures", []) or []:
-                        if getattr(_c, "lineage", "") == _eidos:
-                            mark = (_c.x, _c.y)
-                            break
-                    if mark is not None:
-                        callout = (mark[0], mark[1], _eidos)
-                path = vart.render_dish_png(vstate.state(), w, f"live_{w.tick}",
-                                            mark=mark, callout=callout)
-                if path:
-                    size = vterm.png_size(path) or (342, 339)
-                    rows = max(1, -(-int(size[1]) // max(1, vterm.CELL_H)))
-                    # Reserve generously: the dish is ~339px wide and a
-                    # narrow font cell is as little as 9px, so assume 9
-                    # and add one column of gutter. Wasting two columns
-                    # is invisible; overlapping the text is not.
-                    dish_cols = max(12, -(-int(size[0]) // 9) + 1)
-            _rec = vstate.universe_record() or {}
-            rendered = vcard.render(body, term_cols, vacts.DISH_MARKER,
-                                    live=live, dish_rows=rows,
-                                    dish=bool(path), dish_cols=dish_cols,
-                                    legend=legend,
-                                    era=_rec.get("era"))
-            out = rendered["text"]
-
-            def _write(_out=out, _path=path, _climb=rendered["climb"]):
-                # One write for text and picture. prompt_toolkit's stdout
-                # proxy eats ESC, so the card goes to /dev/tty; and because
-                # the renderer never learns these rows exist, the picture
-                # must ride in the same bytes — a later deferred paint is
-                # measured against a cursor it no longer controls.
-                payload = _out.encode("utf-8")
-                if _path and _climb:
-                    payload += vterm.overlay_bytes(_path, _climb)
-                wrote = False
-                try:
-                    import os as _os
-                    fd = _os.open("/dev/tty", _os.O_WRONLY)
-                    try:
-                        _os.write(fd, payload)
-                        wrote = True
-                    finally:
-                        _os.close(fd)
-                except OSError:
-                    wrote = False
-                if not wrote:
-                    buf = getattr(_sys.stdout, "buffer", None)
-                    if buf is not None:
-                        buf.write(payload)
-                        buf.flush()
-                    else:
-                        _sys.stdout.write(payload.decode("utf-8", "replace"))
-                        _sys.stdout.flush()
-
-            via_pt = _emit_via_terminal(_write)
-            if not via_pt:
-                _write()
-            vtrace.log("emit", via="run_in_terminal" if via_pt else "raw_stdout",
-                       chars=len(out), dish=bool(path))
-            # Only claim a paint when the bytes actually carried the image.
-            # climb == 0 means the card had no reserved rows for it, so
-            # nothing was painted; logging "painted" there sent me looking
-            # for an overlap bug that did not exist.
-            if path and rendered["climb"]:
-                rec = vstate.universe_record() or {}
-                vstate.mark_painted(rec.get("era"), w.tick)
-                vtrace.log("painted", tick=w.tick, rows=rows,
-                           climb=rendered["climb"], tty=True)
-        except Exception as exc:
-            try:
-                from . import delivery_trace as vtrace
-            except ImportError:  # pragma: no cover
-                import delivery_trace as vtrace
-            vtrace.log("ERROR", where="worker", err=repr(exc)[:300])
-            logger.debug("vivarium beat delivery failed", exc_info=True)
+        _emit_card(body)
 
     import threading
     threading.Thread(target=_work, daemon=True).start()
+
+
+def _emit_card(body: str) -> None:
+    """Render a card body and deliver text+picture as ONE payload.
+
+    Shared by the quiet worker (post-turn flush) and the paint relay
+    (VIV-79: a headless drain's card claimed by the terminal-owning
+    process). One code path so the card can never diverge between them.
+    """
+    vtrace = None
+    try:
+        import sys as _sys
+        try:
+            from . import artifacts as vart
+            from . import termrender as vterm
+        except ImportError:  # pragma: no cover - flat-import mode
+            import artifacts as vart
+            import termrender as vterm
+        try:
+            from . import card as vcard
+            from . import acts as vacts
+        except ImportError:  # pragma: no cover - flat-import mode
+            import card as vcard
+            import acts as vacts
+        try:
+            from . import delivery_trace as vtrace
+        except ImportError:  # pragma: no cover
+            import delivery_trace as vtrace
+        import shutil as _shutil
+        # The width has to come from the app we captured, not from
+        # shutil: inside this worker thread shutil reports whatever
+        # the fd says, and one live run read a narrow value, fell back
+        # to the stacked card, and dropped the dish. The app knows.
+        term_cols = 0
+        try:
+            _app = _PICTURE_PENDING.get("app")
+            if _app is not None:
+                term_cols = int(_app.output.get_size().columns)
+        except Exception:
+            term_cols = 0
+        if term_cols < 40:
+            term_cols = _shutil.get_terminal_size((100, 40)).columns
+        w = vstate.load_world()
+        live = None
+        if w is not None:
+            try:
+                st = vworld.stats(w)
+                live = {"tick": w.tick,
+                        "alive": st.get("population", 0),
+                        "lineages": len(st.get("lineages") or []),
+                        "lineages_total": st.get("lineages_total", 0),
+                        "coloured": st.get("coloured", 0),
+                        "grey": st.get("grey", 0)}
+            except Exception:
+                live = {"tick": w.tick}
+        path = ""
+        rows = 23
+        dish_cols = 24
+        # No "already painted" guard here. It existed when the agent
+        # could also call vivarium_render for the same beat; the agent
+        # no longer paints, and the guard is stateful across runs — a
+        # restart that lands on the same (era, tick) then silently
+        # drops the picture, which is exactly how the dish vanished
+        # twice. The beat always paints.
+        if w is not None:
+            # An arrival beat carries the newborn's eidos; ring its pod
+            # so "where it is" is answered by the picture, not a line of
+            # prose pointing at a cell the reader has to hunt for.
+            mark = None
+            callout = None
+            legend = None
+            import re as _re
+            _m = _re.search(r"<<ART:([^>]*)>>", body)
+            if _m:
+                _eidos = _m.group(1)
+                for _c in getattr(w, "creatures", []) or []:
+                    if getattr(_c, "lineage", "") == _eidos:
+                        mark = (_c.x, _c.y)
+                        break
+                if mark is not None:
+                    callout = (mark[0], mark[1], _eidos)
+            path = vart.render_dish_png(vstate.state(), w, f"live_{w.tick}",
+                                        mark=mark, callout=callout) or ""
+            if path:
+                size = vterm.png_size(path) or (342, 339)
+                rows = max(1, -(-int(size[1]) // max(1, vterm.CELL_H)))
+                # Reserve generously: the dish is ~339px wide and a
+                # narrow font cell is as little as 9px, so assume 9
+                # and add one column of gutter. Wasting two columns
+                # is invisible; overlapping the text is not.
+                dish_cols = max(12, -(-int(size[0]) // 9) + 1)
+        _rec = vstate.universe_record() or {}
+        rendered = vcard.render(body, term_cols, vacts.DISH_MARKER,
+                                live=live, dish_rows=rows,
+                                dish=bool(path), dish_cols=dish_cols,
+                                legend=legend,
+                                era=_rec.get("era"))
+        out = rendered["text"]
+
+        def _write(_out=out, _path=path, _climb=rendered["climb"]):
+            # One write for text and picture. prompt_toolkit's stdout
+            # proxy eats ESC, so the card goes to /dev/tty; and because
+            # the renderer never learns these rows exist, the picture
+            # must ride in the same bytes — a later deferred paint is
+            # measured against a cursor it no longer controls.
+            payload = _out.encode("utf-8")
+            if _path and _climb:
+                payload += vterm.overlay_bytes(_path, _climb)
+            wrote = False
+            try:
+                import os as _os
+                fd = _os.open("/dev/tty", _os.O_WRONLY)
+                try:
+                    _os.write(fd, payload)
+                    wrote = True
+                finally:
+                    _os.close(fd)
+            except OSError:
+                wrote = False
+            if not wrote:
+                buf = getattr(_sys.stdout, "buffer", None)
+                if buf is not None:
+                    buf.write(payload)
+                    buf.flush()
+                else:
+                    _sys.stdout.write(payload.decode("utf-8", "replace"))
+                    _sys.stdout.flush()
+
+        via_pt = _emit_via_terminal(_write)
+        if not via_pt:
+            _write()
+        vtrace.log("emit", via="run_in_terminal" if via_pt else "raw_stdout",
+                   chars=len(out), dish=bool(path))
+        # Only claim a paint when the bytes actually carried the image.
+        # climb == 0 means the card had no reserved rows for it, so
+        # nothing was painted; logging "painted" there sent me looking
+        # for an overlap bug that did not exist.
+        if path and rendered["climb"]:
+            rec = vstate.universe_record() or {}
+            vstate.mark_painted(rec.get("era"), w.tick if w else 0)
+            vtrace.log("painted", tick=w.tick if w else 0, rows=rows,
+                       climb=rendered["climb"], tty=True)
+    except Exception as exc:
+        if vtrace is not None:
+            vtrace.log("ERROR", where="card_emit", err=repr(exc)[:300])
+        logger.debug("vivarium card delivery failed", exc_info=True)
 
 
 # VIV-77b: the paint relay starts in EVERY process at import — the TUI
