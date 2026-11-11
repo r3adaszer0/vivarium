@@ -570,15 +570,13 @@ def build_page(media_dir: str, dish_map: str, title: str = "The Hermi Gallery",
     latest = ""
     if births:
         def _newest():
-            def key(kv):
-                try:
-                    era_v = int(kv[1].get("era", 0))
-                except (TypeError, ValueError):
-                    era_v = 0
-                return (era_v, str(kv[1].get("day", "")))
+            # The registry is insertion-ordered: the LAST entry is the
+            # newest birth. Selecting via max((era, day)) froze the card
+            # on the first same-era-same-day birth, because max() keeps
+            # the first of any tie - every birth of one day ties.
             try:
-                return max(births.items(), key=key)
-            except (AttributeError, TypeError):
+                return list(births.items())[-1]
+            except (AttributeError, TypeError, IndexError):
                 return None
         pair = _newest()
         if pair and isinstance(pair[1], dict) and pair[1].get("eidos"):

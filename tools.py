@@ -844,15 +844,13 @@ def _serve_text(keep: bool) -> str:
                 _births = vstate.state().get("births", {}) or {}
                 latest = None
                 if _births:
-                    def _lkey(kv):
-                        try:
-                            era_v = int(kv[1].get("era", 0))
-                        except (TypeError, ValueError):
-                            era_v = 0
-                        return (era_v, str(kv[1].get("day", "")))
+                    # Insertion-ordered registry: the LAST entry is the
+                    # newest. max((era, day)) froze the card on the first
+                    # same-era-same-day birth (max() keeps the first tie),
+                    # so new skill-births never replaced the featured Hermi.
                     try:
-                        _sk, _rec = max(_births.items(), key=_lkey)
-                    except (AttributeError, TypeError):
+                        _sk, _rec = list(_births.items())[-1]
+                    except (AttributeError, TypeError, IndexError):
                         _sk, _rec = None, None
                     if _rec and _rec.get("eidos"):
                         _gen = _rec.get("genome") or {}
