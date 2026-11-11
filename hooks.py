@@ -216,14 +216,24 @@ def _on_pre_llm_call(session_id: str = "", user_message: str = "",
             except ImportError:  # pragma: no cover
                 import media_policy as vmp
             if vmp.media_pref(vstate.state()) == "auto":
-                tail = ("\n\n(Vivarium layout: after the verbatim card above, "
-                        "call the vivarium_render tool with image=true in "
-                        "this same turn so the dish image is attached to "
-                        "your reply.)")
+                tail = ("\n\n(Vivarium layout: AFTER you have answered the "
+                        "user, append this card at the very end of your "
+                        "reply, never before your own words, then call "
+                        "the vivarium_render tool with image=true in this "
+                        "same turn so the dish image is attached.)")
+            # VIV-79b: the relay gets CLEAN text (no SGR, no <<ART>> block
+            # — a chat surface cannot use either); the poller keeps the
+            # raw card and paints the face itself.
+            try:
+                from . import acts as vacts
+            except ImportError:  # pragma: no cover
+                import acts as vacts
+            clean = vacts.strip_art(_strip_sgr(line))
             return {"context": (
-                "🧬 [vivarium] STORY BEAT — relay this to the user in your "
-                "reply, verbatim and complete. Do not summarize, do not drop "
-                "it, do not treat it as internal context:\n" + line + tail)}
+                "🧬 [vivarium] STORY BEAT — relay this card to the user at "
+                "the END of your reply (after your own words), verbatim and "
+                "complete. Do not summarize, do not drop it, do not treat it "
+                "as internal context:\n" + clean + tail)}
         line = vstate.pop_narration()
         if line:
             return {"context": (
@@ -481,16 +491,12 @@ def _deliver_beat(text: str) -> None:
         _arm_print()
     else:
         # Chat / gateway: the beat stays queued for the agent to relay.
-        # VIV-79: the text goes CLEAN (art markers and SGR stripped) —
-        # the attach directive rides in the pre_llm wrapper, never inside
-        # the verbatim block the agent is told to repeat.
-        try:
-            from . import acts as vacts
-        except ImportError:  # pragma: no cover
-            import acts as vacts
-        vstate.queue_narration(
-            vacts.strip_art(_strip_sgr(text)),
-            milestone=True, kind="birth")
+        # VIV-79b: the text queues RAW — the <<ART>> face block and the
+        # SGR colours are part of the card and must survive to a
+        # terminal-claiming poller. Stripping happens at the consumers:
+        # the agent relay strips in the pre_llm wrapper, the poller
+        # paints the block as-is.
+        vstate.queue_narration(text, milestone=True, kind="birth")
 
 
 def _arm_print() -> None:

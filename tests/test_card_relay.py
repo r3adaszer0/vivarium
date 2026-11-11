@@ -39,20 +39,42 @@ class TestCardRelay(unittest.TestCase):
     def tearDown(self):
         vstate.bind(None)
 
-    def test_relayed_beat_carries_no_sgr_codes(self):
+    def test_queue_keeps_raw_card_for_the_poller(self):
+        # VIV-79b: the queue carries the RAW card (face block + colours);
+        # a terminal-claiming poller must be able to paint the face
         vhooks._deliver_beat("\x1b[38;2;124;199;255mNew species "
-                             "Eidos_1a2b3c4d\x1b[0m from your skill.")
+                             "Eidos_1a2b3c4d\x1b[0m\n\n<<ART:Eidos_1a2b3c4d>>"
+                             "\n o o \n<</ART>>")
         line = vstate.peek_milestone()
         self.assertIn("New species", line)
-        self.assertNotIn("\x1b[", line)
+        self.assertIn("<<ART:Eidos_1a2b3c4d>>", line)   # the face survives
 
     def test_pre_llm_wrapper_adds_attach_directive_for_cards(self):
         vhooks._deliver_beat("New species Eidos_1a2b3c4d from your skill.")
         inj = vhooks._on_pre_llm_call() or {}
         ctx_text = inj.get("context", "")
-        self.assertIn("relay this to the user", ctx_text)
+        self.assertIn("relay this card", ctx_text)
         self.assertIn("Eidos_1a2b3c4d", ctx_text)
         self.assertIn("vivarium_render", ctx_text)   # the image instruction
+
+    def test_pre_llm_relay_says_card_comes_after_the_reply(self):
+        # the user saw the vivarium card fire BEFORE the agent's own
+        # words about the skill: the wrapper must demand the opposite
+        vhooks._deliver_beat("New species Eidos_1a2b3c4d from your skill.")
+        inj = vhooks._on_pre_llm_call() or {}
+        ctx_text = inj.get("context", "")
+        self.assertIn("END of your reply", ctx_text)
+        self.assertIn("after your own words", ctx_text)
+
+    def test_pre_llm_relay_strips_art_and_sgr(self):
+        vhooks._deliver_beat("\x1b[38;2;1;2;3mNew species "
+                             "Eidos_1a2b3c4d\x1b[0m\n\n<<ART:Eidos_1a2b3c4d>>"
+                             "\n o o \n<</ART>>")
+        inj = vhooks._on_pre_llm_call() or {}
+        ctx_text = inj.get("context", "")
+        self.assertIn("Eidos_1a2b3c4d", ctx_text)
+        self.assertNotIn("<<ART:", ctx_text)          # chat cannot paint it
+        self.assertNotIn("\x1b[", ctx_text)
 
     def test_pre_llm_directive_respects_media_off(self):
         vhooks._deliver_beat("New species Eidos_1a2b3c4d from your skill.")
