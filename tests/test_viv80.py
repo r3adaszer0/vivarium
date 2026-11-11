@@ -25,6 +25,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import state as vstate          # noqa: E402
 import hooks as vhooks          # noqa: E402
 import card as vcard            # noqa: E402
+import acts as vacts            # noqa: E402
 import tools as T               # noqa: E402
 import termrender               # noqa: E402
 import world as W               # noqa: E402
@@ -153,6 +154,57 @@ class TestViv82Layout(unittest.TestCase):
         self.assertEqual(texts[head_i + 1], "", "the uniform one-line gap")
         self.assertIn("█", texts[dish_top])
         self.assertEqual(head_i + 2, dish_top)
+
+
+class TestViv86Act4UnderCensus(unittest.TestCase):
+    """VIV-86: act-4's pitch lives UNDER the census, commands recoloured."""
+
+    def _act4(self):
+        import re as _re
+        genome = {"forage": 0.46, "sense": 3.93, "metabolism_mult": 1.55,
+                  "aggression": 1.36, "mutate": 0.63, "dispersal": 0.82}
+        res = {"eidos": "Eidos_2504eba3", "name": "probe-user-three",
+               "genome": genome, "species": "Oculata major", "common": ""}
+        base = ("New species Eidos_2504eba3 \u00b7 Oculata major, "
+                "from your 'probe-user-three' skill.")
+        body = base + vacts.act4_for(res)
+        r = vcard.render(body, 100, "vivarium", live=LIVE, dish=True,
+                         dish_cols=39, era=18)
+        texts = [_re.sub(r"\x1b\[[0-9;]*m", "", ln).rstrip()
+                 for ln in r["text"].split("\n")]
+        return r, texts
+
+    def test_census_sits_directly_under_the_dish(self):
+        r, texts = self._act4()
+        dish_top = (len(texts) - 1) - r["climb"]
+        census = next(i for i, t in enumerate(texts)
+                      if t.strip().startswith("tick "))
+        self.assertEqual(census, dish_top + r["rows"],
+                         "the census hugs the dish's last row")
+
+    def test_pitch_starts_two_rows_below_the_census(self):
+        r, texts = self._act4()
+        census = next(i for i, t in enumerate(texts)
+                      if t.strip().startswith("tick "))
+        pitch = next(i for i, t in enumerate(texts)
+                     if "Time to meet" in t)
+        self.assertEqual(pitch, census + 2, "one blank, then the pitch")
+        dish_bottom = (len(texts) - 1) - r["climb"] + r["rows"] - 1
+        self.assertGreater(pitch, dish_bottom, "under the image, not beside")
+
+    def test_lead_stays_beside_the_face(self):
+        r, texts = self._act4()
+        dish_top = (len(texts) - 1) - r["climb"]
+        lead = next(i for i, t in enumerate(texts)
+                    if "Your dish has been running" in t)
+        self.assertLess(lead, dish_top + r["rows"],
+                        "the reflection stays in the face's column")
+
+    def test_commands_render_in_amber(self):
+        r, _ = self._act4()
+        self.assertTrue(any(vcard.CMD + "/vivarium help" in ln
+                            for ln in r["text"].split("\n")))
+        self.assertNotIn(vcard.ACCENT + "/vivarium help", r["text"])
 
 
 class TestShowRelay(unittest.TestCase):

@@ -26,6 +26,8 @@ SOFT = "\x1b[38;2;169;177;214m"
 DIM = "\x1b[38;2;110;120;160m"
 ACCENT = "\x1b[38;2;125;207;255m"
 GREEN = "\x1b[38;2;158;206;106m"
+CMD = "\x1b[38;2;230;184;90m"  # the command rows: warm amber, distinct
+                               # from the blue accent (VIV-86, user ask)
 BOLD = "\x1b[1m"
 ITALIC = "\x1b[3m"
 RST = "\x1b[0m"
@@ -36,6 +38,8 @@ MIN_GUTTER = 40
 TEXT_INSET = 8          # breathing room between the dish and the copy
 MAX_COLS = 104
 LABEL = "vivarium"
+BELOW_TAIL = "\x1c"     # must match acts.BELOW: the pitch renders under
+                        # the census, not beside the face (VIV-86)
 
 
 def plain(s: str) -> str:
@@ -267,8 +271,8 @@ def _command_table(cols: int) -> list[str]:
     ]
     col2 = max(len(a) for a, _ in rows) + 4
     if cols < col2 + 26:
-        return [f"  {ACCENT}{a}{RST}" for a, _ in rows]
-    return [f"  {ACCENT}{_pad(a, col2)}{RST}{DIM}{b}{RST}" for a, b in rows]
+        return [f"  {CMD}{a}{RST}" for a, _ in rows]
+    return [f"  {CMD}{_pad(a, col2)}{RST}{DIM}{b}{RST}" for a, b in rows]
 
 
 def render(body: str, cols: int, marker: str, live: dict | None = None,
@@ -304,6 +308,13 @@ def render(body: str, cols: int, marker: str, live: dict | None = None,
         lines.append("")
 
     tail_text = facts["tail"]
+    # VIV-86: acts.BELOW ("\x1c") splits act-4's copy — everything before
+    # it stays beside the face, everything after renders as a full-width
+    # block two rows under the census line (the user's screenshot spec).
+    below_src = ""
+    if BELOW_TAIL in tail_text:
+        tail_text, below_src = tail_text.split(BELOW_TAIL, 1)
+        tail_text, below_src = tail_text.strip(), below_src.strip()
     if facts.get("art"):
         art_lines, art_eidos = facts["art"], facts.get("art_id", "")
     else:
@@ -373,6 +384,17 @@ def render(body: str, cols: int, marker: str, live: dict | None = None,
         cap = _caption(live, note)
         if cap:
             lines.append(cap)
+        if below_src:
+            # VIV-86: the pitch lives UNDER the image — the census row,
+            # one blank, then the block: its first line sits exactly two
+            # rows below the census (the user's screenshot spec).
+            lines.append("")
+            for i, para in enumerate(
+                    p for p in below_src.split("\n") if p.strip()):
+                if i:
+                    lines.append("")
+                lines += [f"  {ln}{RST}" for ln in
+                          styled_paragraph(para, cols - 2, lead=i < 1)]
     elif tail_text or art_lines:
         # VIV-85: a face-only body (the ritual card, no prose) must still
         # print its art block in one-column mode — the old gate dropped
@@ -392,6 +414,15 @@ def render(body: str, cols: int, marker: str, live: dict | None = None,
             cap = _caption(live, "")
             if cap:
                 lines.append(cap)
+        if below_src:
+            # VIV-86: one-column surfaces get the same under-census pitch.
+            lines.append("")
+            for i, para in enumerate(
+                    p for p in below_src.split("\n") if p.strip()):
+                if i:
+                    lines.append("")
+                lines += [f"  {ln}{RST}" for ln in
+                          styled_paragraph(para, cols - 2, lead=i < 1)]
 
     lines.append("")
     lines += _command_table(cols)

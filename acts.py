@@ -222,32 +222,42 @@ def act3_for(result: dict, arrival: bool = True, full: bool = False) -> str:
         "Watch it: /vivarium clip")
 
 
+BELOW = "\x1c"  # card.py renders everything after this marker as a
+                # full-width block UNDER the dish and its census (VIV-86)
+
+
+def act4_lead() -> str:
+    """The act-4 reflection: what the dish has become, beside the face."""
+    return ("Your dish has been running for a while now. Some lineages "
+            "thrived, some are gone. Survival was the filter; what remains "
+            "is strong.")
+
+
+def act4_pitch() -> str:
+    """The one-time pitch: export and race, told UNDER the census."""
+    return ("Time to meet the neighbors. /vivarium export turns any species "
+            "into a challenge code: a sealed capsule carrying its genome, never "
+            "your skills (those stay yours). Send a code to a friend running "
+            "Vivarium; when they release it, your creature competes in their "
+            "world.\n"
+            "/vivarium race settles any match in a neutral jar: same start, "
+            "same rules, deterministic. The scoreboard can be re-run by anyone "
+            "to verify. Winners take the bragging rights; the Codex keeps the "
+            "record.")
+
+
 def act4_text(short: bool = False) -> str:
     """The act-4 copy.
 
-    `short=True` (VIV-74, routine arrivals after the walkthrough) keeps
-    one line: survival as the filter. The export/race pitch told its
-    story once at act 4; repeating it on every birth turned the ritual
-    card into a rerun.
+    `short=True` (VIV-74 legacy, unused since VIV-85) keeps one line:
+    survival as the filter. The full copy is the reflection (beside the
+    face) then the BELOW marker, then the pitch — the card renders the
+    pitch as a full-width block two rows under the census line.
     """
     if short:
         return ("\n\nSome lineages thrived, some are gone. Survival was "
                 "the filter; what remains is strong.")
-    return (
-        "\n\n" + DISH_MARKER + "\n\n"
-        "Your dish has been running for a while now. Some lineages "
-        "thrived, some are gone. Survival was the filter; what remains is "
-        "strong."
-        "\n\n"
-        "Time to meet the neighbors. /vivarium export turns any species "
-        "into a challenge code: a sealed capsule carrying its genome, never "
-        "your skills (those stay yours). Send a code to a friend running "
-        "Vivarium; when they release it, your creature competes in their "
-        "world.\n"
-        "/vivarium race settles any match in a neutral jar: same start, "
-        "same rules, deterministic. The scoreboard can be re-run by anyone "
-        "to verify. Winners take the bragging rights; the Codex keeps the "
-        "record.")
+    return "\n\n" + act4_lead() + "\n\n" + BELOW + "\n\n" + act4_pitch()
 
 
 def act4_for(result: dict) -> str:

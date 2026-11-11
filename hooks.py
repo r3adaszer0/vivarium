@@ -237,6 +237,7 @@ def _on_pre_llm_call(session_id: str = "", user_message: str = "",
             except ImportError:  # pragma: no cover
                 import acts as vacts
             clean = vacts.strip_art(_strip_sgr(line))
+            clean = clean.replace(vacts.BELOW, "")  # layout marker, not copy
             return {"context": (
                 "🧬 [vivarium] STORY BEAT — relay this card to the user at "
                 "the END of your reply (after your own words), verbatim and "
