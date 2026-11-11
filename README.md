@@ -23,7 +23,7 @@
 </div>
 
 Vivarium is a Hermes Agent plugin that hosts an **artificial-life
-living world**. A 48×48 cellular-automaton dish: food blooms and spreads like
+living world** on a 48×48 cellular-automaton dish: food blooms and spreads like
 weather, and genome-carrying creatures forage, reproduce, mutate, and go
 extinct on their own — even while you're away.
 
@@ -165,22 +165,31 @@ math, comparisons to cellular automata and related work) and the
 | `/vivarium staleness` | is the living world going stale? |
 | `/vivarium restart` | end the era (with a farewell picture); the next skill births a new universe |
 
-## The Vivarium Codex
+## The gallery on your machine
 
-The dish develops emergent dynamics. When a pattern is confirmed — a
-**Still Life** (a stable plateau) or a **Pulse** (a boom→crash→recovery
-cycle) — it enters your Codex with its evidence, and a rendered snapshot of
-the dish at the moment of discovery:
+`/vivarium serve` turns your dish into a private web gallery. The live
+dish, the registry of every species with its face and genes, the
+fossils, each picture answering a click. Zoom in anywhere, any time:
+the simulation is deterministic, so any past moment re-renders exactly.
+Served only on your machine: no CDN, no external fonts, every byte from
+127.0.0.1.
 
-<p align="center">
-  <img src="docs/assets/birth_replay.png" alt="A species birth" width="480">
-</p>
+## Extras: worlds that play against each other
 
-Patterns can end. When a plateau breaks, the entry records *why* — often a
-speciation event: a newly learned skill landing in a saturated world.
+- `/vivarium export` seals a species into a challenge code. The genome
+  travels; your universe key never does.
+- `/vivarium import <code>` releases a stranger's strain into your dish
+  and lets it fight for its place.
+- `/vivarium race <seed> <codes>` runs two species in a deterministic
+  duel: same seed, same outcome, verifiable on any machine.
 
-Zoom in anywhere, any time: the simulation is deterministic, so any past
-moment re-renders exactly. [Watch a bloom close-up](docs/assets/clip_bloom_zoom.mp4).
+The dish develops patterns the way cellular automata do. A **Still
+Life** is a configuration that stops changing: a plateau the population
+holds. A **Pulse** is an oscillator: the dish booms, crashes and
+recovers on a fixed period, the way one recent universe measured about
+140 ticks. The simulation discovers them itself, confirms them with
+evidence, and enters them into the Vivarium Codex, the same way
+Conway's Game of Life catalogues its still lifes and oscillators.
 
 ## Try it
 
