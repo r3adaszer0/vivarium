@@ -98,9 +98,16 @@ class FoodRamp(unittest.TestCase):
         self.assertEqual(greens, sorted(greens))
 
     def test_low_food_is_visible(self):
-        # 6% of saturation: the shipped linear ramp drew this at g=62,
-        # four steps from the background. The gamma floor keeps it read.
-        self.assertGreaterEqual(A.food_rgb(0.18)[1], 68)
+        # VIV-100 re-tune: the dish went dark — the ramp was compressed to
+        # the gallery canvas's register (soil 37, bloom 88). Thin food must
+        # still rise above the soil: eleven steps of green, enough to read
+        # as mottled terrain, never as a bright field.
+        self.assertGreaterEqual(A.food_rgb(0.18)[1], 45)
+
+    def test_rich_food_stays_dark(self):
+        # VIV-100: the creatures own the brightness. A rich bloom may not
+        # climb back into the old bright-green wall (the old top was 165).
+        self.assertLessEqual(A.food_rgb(W.MAX_FOOD)[1], 96)
 
 
 if __name__ == "__main__":

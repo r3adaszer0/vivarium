@@ -64,15 +64,32 @@ def media_dir(s) -> str:
 # data: lift the floor and compress the top with a gamma, and paint bare cells
 # as poor soil rather than leaving them as background.
 FOOD_EMPTY = (28, 37, 30)
-FOOD_FLOOR_G, FOOD_TOP_G, FOOD_GAMMA = 40, 165, 0.42
+# VIV-100: the dish went dark. The old ramp (floor 40, top 165, gamma 0.42)
+# painted a fed dish as a wall of bright green — the creatures drowned in
+# their own food. The gallery canvas had already solved this with tier
+# alpha (effective greens g≈17-64); the PNG paths now live in the same
+# register, quantized to the SAME tiers the canvas reads (see food_rgb).
+# The floor/top/gamma constants remain for checkpoint compatibility.
+FOOD_FLOOR_G, FOOD_TOP_G, FOOD_GAMMA = 50, 96, 0.75
 
 
 def food_rgb(f: float):
-    """Green for a food value: 0 is poor soil, MAX_FOOD is rich."""
-    if f <= 0.0:
+    """Green for a food value: 0 is poor soil, MAX_FOOD is rich.
+
+    VIV-100: quantized to the same four tiers the rich-ASCII map and the
+    gallery canvas read (· ░ ▒ ▓ breakpoints) — one visual language
+    everywhere, and the tier STEPS keep the terrain mottled even where a
+    continuous ramp would smear into flatness.
+    """
+    if f <= 0.01:
         return FOOD_EMPTY
-    t = min(1.0, f / W.MAX_FOOD) ** FOOD_GAMMA
-    return (30, int(FOOD_FLOOR_G + (FOOD_TOP_G - FOOD_FLOOR_G) * t), 40)
+    if f < 0.4:
+        return (28, 46, 34)      # ·   thin
+    if f < 1.0:
+        return (30, 64, 42)      # ░   = the canvas's faint tier
+    if f < 1.8:
+        return (32, 82, 50)      # ▒   mid bloom
+    return (36, 96, 58)          # ▓   rich bloom — the dark ceiling
 
 
 
