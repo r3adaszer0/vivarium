@@ -59,7 +59,7 @@ class TestCardLayout(unittest.TestCase):
 
     def test_act2_has_one_blank_line_before_the_dish(self):
         import re as _re
-        r = vcard.render(BANG, 100, "vivarium", live=LIVE, dish=True,
+        r = vcard.render(BANG, 100, vacts.DISH_MARKER, live=LIVE, dish=True,
                          dish_cols=39, era=13)
         self.assertTrue(r["has_dish"])
         texts = [_re.sub(r"\x1b\[[0-9;]*m", "", ln).strip()
@@ -76,7 +76,7 @@ class TestCardLayout(unittest.TestCase):
     def test_act2_reserves_dish_rows_at_all(self):
         # the pre-VIV-80 bug: the act-2 card reserved NOTHING, so the
         # image had nowhere to land even with the relay fixed
-        r = vcard.render(BANG, 100, "vivarium", live=LIVE, dish=True,
+        r = vcard.render(BANG, 100, vacts.DISH_MARKER, live=LIVE, dish=True,
                          dish_cols=39, era=13)
         self.assertTrue(r["has_dish"])
         self.assertGreaterEqual(r["rows"], 20)
@@ -86,7 +86,7 @@ class TestCardLayout(unittest.TestCase):
                           ("New species Eidos_1a2b3c4d test.\n\n<<ART:"
                            "Eidos_1a2b3c4d>>\n o o \n<</ART>>\nMeet it.",
                            13)):
-            r = vcard.render(body, 100, "vivarium", live=LIVE, dish=True,
+            r = vcard.render(body, 100, vacts.DISH_MARKER, live=LIVE, dish=True,
                              dish_cols=39, era=era)
             self.assertNotIn("white ring", r["text"])
             self.assertNotIn("ring =", r["text"])
@@ -107,7 +107,8 @@ class TestViv82Layout(unittest.TestCase):
     """VIV-82: the act-3 birth card geometry the user specified."""
 
     ACT3 = ("New species Eidos_1a2b3c4d · Chroma major, from your 'x' skill."
-            "\n\n<<ART:Eidos_1a2b3c4d>>\n\x1b[38;2;233;62;175m██\x1b[0m\n"
+            "\n\n\x1a\n\n"
+            "<<ART:Eidos_1a2b3c4d>>\n\x1b[38;2;233;62;175m██\x1b[0m\n"
             "\x1b[38;2;158;42;119m██\x1b[0m\n\x1b[38;2;97;26;73m██\x1b[0m\n"
             "    \x1b[38;2;233;62;175m██\x1b[0m\n  \x1b[38;2;158;42;119m██"
             "\x1b[0m\n\x1b[38;2;233;62;175m██\x1b[0m\n"
@@ -118,7 +119,7 @@ class TestViv82Layout(unittest.TestCase):
 
     def _render(self):
         import re as _re
-        r = vcard.render(self.ACT3, 100, "vivarium", live=LIVE, dish=True,
+        r = vcard.render(self.ACT3, 100, vacts.DISH_MARKER, live=LIVE, dish=True,
                          dish_cols=39, era=13)
         texts = [_re.sub(r"\x1b\[[0-9;]*m", "", ln).rstrip()
                  for ln in r["text"].split("\n")]
@@ -129,7 +130,7 @@ class TestViv82Layout(unittest.TestCase):
         # blank line, then the dish's top row. Pinned for BOTH cards.
         import re as _re
         for body, is_bang in ((BANG, True), (self.ACT3, False)):
-            r = vcard.render(body, 100, "vivarium", live=LIVE, dish=True,
+            r = vcard.render(body, 100, vacts.DISH_MARKER, live=LIVE, dish=True,
                              dish_cols=39, era=13)
             texts = [_re.sub(r"\x1b\[[0-9;]*m", "", ln).strip()
                      for ln in r["text"].split("\n")]
@@ -168,7 +169,7 @@ class TestViv86Act4UnderCensus(unittest.TestCase):
         base = ("New species Eidos_2504eba3 \u00b7 Oculata major, "
                 "from your 'probe-user-three' skill.")
         body = base + vacts.act4_for(res)
-        r = vcard.render(body, 100, "vivarium", live=LIVE, dish=True,
+        r = vcard.render(body, 100, vacts.DISH_MARKER, live=LIVE, dish=True,
                          dish_cols=39, era=18)
         texts = [_re.sub(r"\x1b\[[0-9;]*m", "", ln).rstrip()
                  for ln in r["text"].split("\n")]

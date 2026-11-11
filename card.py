@@ -105,6 +105,12 @@ def parse(body: str, marker: str) -> dict:
         head, tail = body[:m.start()], body[m.end():]
         art = m.group(2).split("\n")
         art_id = m.group(1)
+        # VIV-88: act-3's body is base + DISH_MARKER + art + copy — the
+        # marker predates the portrait and rides INSIDE the head, where
+        # it rendered as a phantom blank line and pushed the dish below
+        # the one-line gap the uniform law allows. The face is the seam;
+        # the marker is noise once the art exists.
+        head = head.replace(marker, "")
     else:
         head, _, tail = body.partition(marker)
     facts: dict = {"head": head.strip(), "tail": tail.strip(),
