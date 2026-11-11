@@ -76,20 +76,19 @@ FOOD_FLOOR_G, FOOD_TOP_G, FOOD_GAMMA = 50, 96, 0.75
 def food_rgb(f: float):
     """Green for a food value: 0 is poor soil, MAX_FOOD is rich.
 
-    VIV-100: quantized to the same four tiers the rich-ASCII map and the
-    gallery canvas read (· ░ ▒ ▓ breakpoints) — one visual language
-    everywhere, and the tier STEPS keep the terrain mottled even where a
-    continuous ramp would smear into flatness.
+    VIV-102: the user chose the vivid register (candidate 3 of the tone
+    menu) for BOTH surfaces. The PNG paints direct colors, so these are
+    the canvas's tier alphas pre-composited over the page background —
+    thin = ░@0.55, mid = ▒@0.80, rich = ▓@1.00 of the vivid lattice
+    (76,148,104). One visual language everywhere.
     """
     if f <= 0.01:
         return FOOD_EMPTY
     if f < 0.4:
-        return (28, 46, 34)      # ·   thin
+        return (16, 45, 32)      # ·   thin  = vivid ░ @ 0.55
     if f < 1.0:
-        return (30, 64, 42)      # ░   = the canvas's faint tier
-    if f < 1.8:
-        return (32, 82, 50)      # ▒   mid bloom
-    return (36, 96, 58)          # ▓   rich bloom — the dark ceiling
+        return (62, 120, 84)     # ░   mid   = vivid ▒ @ 0.80
+    return (76, 148, 104)        # ▒▓  rich bloom, full vivid
 
 
 

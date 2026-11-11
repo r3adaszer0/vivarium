@@ -275,7 +275,7 @@ def _grid_json(rich_map: str) -> str:
     parser tracks bg as well as fg, or every creature renders as lattice.
     """
     import re
-    fg = (60, 120, 84)                     # the lattice default
+    fg = (76, 148, 104)                    # the lattice default — VIV-102 vivid
     bg = None                              # creature blocks carry 48;2;
     rows = []
     for raw in (rich_map or "").splitlines():
@@ -288,7 +288,7 @@ def _grid_json(rich_map: str) -> str:
                 elif body.startswith("48;2;"):
                     bg = tuple(int(x) for x in body[5:].split(";"))[:3]
                 elif body in ("0", ""):
-                    fg = (60, 120, 84)
+                    fg = (76, 148, 104)
                     bg = None
                 continue
             for ch in tok:
@@ -302,7 +302,8 @@ def _grid_json(rich_map: str) -> str:
                     r, g, b, a = *fg, "7"
                 elif ch == "░":
                     r, g, b = max(fg[0] // 3, 8), max(fg[1] // 2, 18), fg[2] // 2
-                    a = "4"
+                    a = "5"        # VIV-102: faint food, its own tier —
+                                   # soil keeps its darker step
                 else:
                     r, g, b, a = 10, 30, 20, "4"
                 cells.append("%02x%02x%02x%s" % (r, g, b, a))
@@ -747,7 +748,7 @@ function dnaBars(genome){
     const rows=grid.split('|');
     const cellW=Math.ceil(cv.width/rows[0].split(',').length);
     const cellH=Math.ceil(cv.height/rows.length);
-    const tier={f:1,b:0.72,'7':0.48,'4':0.3};
+    const tier={f:1,b:1,'7':0.8,'5':0.55,'4':0.3};
     ctx.clearRect(0,0,cv.width,cv.height);
     rows.forEach((row,y)=>{
       row.split(',').forEach((hex,x)=>{
