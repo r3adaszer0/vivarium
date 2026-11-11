@@ -29,7 +29,7 @@ import os
 import shutil
 import sys
 import threading
-from http.server import HTTPServer, SimpleHTTPRequestHandler
+from http.server import ThreadingHTTPServer, SimpleHTTPRequestHandler
 from pathlib import Path
 from typing import Optional, Tuple
 
@@ -428,13 +428,19 @@ p{{font-size:0.8em;color:#9fc4ac;margin:6px 0 0}}
 def serve_gallery(media_dir: str, dish_map: str = "",
                   title: str = "The Vivarium",
                   port: int = 0, keep: bool = False,
-                  open_browser: bool = True, html: "str | None" = None) -> dict:
+                  open_browser: bool = True, html: "str | None" = None,
+                  dish_provider=None) -> dict:
     """Serve the media dir + dish on 127.0.0.1:<port> (ephemeral by default).
 
     Returns {url, port, thread}. The server dies when the process exits
     unless keep=True (a deliberate daemon). Binds localhost ONLY.
     `html` (VIV-89): a full page from gallery.build_page — when given it
     REPLACES the flat index; the caller owns all data gathering.
+    `dish_provider` (VIV-90): a zero-arg callable returning
+    {"tick", "alive", "grid"} — served fresh at /live/dish.json on every
+    request, so a page refresh asks the dish for its CURRENT tick. The
+    provider runs inside the caller's process (it sees the live dish);
+    any failure answers 503 and the page keeps its last dish.
     """
     media = Path(media_dir)
     if not media.is_dir():
@@ -456,7 +462,26 @@ def serve_gallery(media_dir: str, dish_map: str = "",
         def log_message(self, format, *args):    # silence request logging
             pass
 
-    httpd = HTTPServer(("127.0.0.1", port), _H)
+        def do_GET(self):
+            if dish_provider is not None and \
+                    self.path.split("?")[0] in ("/live/dish.json", "/live/dish"):
+                try:
+                    import json as _json
+                    body = _json.dumps(dish_provider()).encode("utf-8")
+                    self.send_response(200)
+                    self.send_header("Content-Type", "application/json")
+                    self.send_header("Cache-Control", "no-store")
+                    self.send_header("Content-Length", str(len(body)))
+                    self.end_headers()
+                    self.wfile.write(body)
+                except Exception:
+                    self.send_response(503)
+                    self.send_header("Content-Length", "0")
+                    self.end_headers()
+                return
+            super().do_GET()
+
+    httpd = ThreadingHTTPServer(("127.0.0.1", port), _H)
     actual = httpd.server_address[1]
     url = f"http://127.0.0.1:{actual}"
     t = threading.Thread(target=httpd.serve_forever, daemon=not keep)

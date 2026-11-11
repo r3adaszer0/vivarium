@@ -295,22 +295,6 @@ def _face_svg(genome: dict, dead: bool = False, size: int = 46) -> str:
             f'"http://www.w3.org/2000/svg">{"".join(rects)}</svg>')
 
 
-def _curve_svg(curve: list, width: int = 1040, height: int = 88) -> str:
-    """The REAL population curve as an SVG area path."""
-    pts = [(int(p.get("tick", 0)), int(p.get("population", 0))) for p in curve]
-    pts = pts[:: max(1, len(pts) // 400)] or [(0, 0)]
-    peak = max((v for _, v in pts), default=1) or 1
-    span = max((t for t, _ in pts), default=1) or 1
-    coords = [(round(t / span * (width - 2)) + 1,
-               round((height - 6) - v / peak * (height - 14)) + 4) for t, v in pts]
-    path = "M" + " L".join(f"{x},{y}" for x, y in coords)
-    area = f"{path} L{coords[-1][0]},{height - 2} L{coords[0][0]},{height - 2} Z"
-    return (f'<svg viewBox="0 0 {width} {height}" preserveAspectRatio="none">'
-            f'<path d="{area}" fill="{LIVE_DOT}" opacity="0.07"/>'
-            f'<path d="{path}" fill="none" stroke="{LIVE_DOT}" '
-            f'stroke-width="1.5" opacity=".9"/></svg>')
-
-
 _GEN_LABEL = (("forage", "forage"), ("sense", "sense"),
               ("metabolism_mult", "metab"), ("aggression", "aggr"),
               ("mutate", "mutate"), ("dispersal", "disperse"))
@@ -360,8 +344,12 @@ def _specimen(lineage: str, genome: dict, universe: str, day: str) -> str:
 
 # ── the page ──────────────────────────────────────────────────────────────────
 def build_page(media_dir: str, dish_map: str, title: str = "The Hermi Gallery",
-               st=None) -> str:
+               st=None, live_flag: bool = True) -> str:
     """Assemble the gallery from real plugin state.
+
+    `live_flag` (VIV-90): when the serving process can answer
+    /live/dish.json with a fresh dish per request, the canvas is marked
+    data-live and the page asks for a new dish on every load.
 
     `st` is the plugin state handle (`.get(key, default)`); everything it
     provides is real — nothing is invented here.
@@ -471,13 +459,9 @@ def build_page(media_dir: str, dish_map: str, title: str = "The Hermi Gallery",
     pulse = f"""<section id="pulse">
   <div class="kicker">The Pulse <b>· every universe this dish has known</b></div>
   <p class="sub">Each band is one universe — the living era sized by its births, the
-     closed ones by the fossils they left. The line is the dish's recorded population
-     history: boom, die-off, rebirth.</p>
+     closed ones by the fossils they left.</p>
   <div class="pulse"><div class="bands">{''.join(bands)}</div>
-  <div class="curve">{_curve_svg(curve) if curve else ''}</div>
-  <div class="legend"><span><i style="background:{LIVE_DOT}"></i>population</span>
-  <span><i style="background:{AMBER}"></i>current era</span>
-  <span style="margin-left:auto">hover a band · <kbd class="nav">←</kbd>
+  <div class="legend"><span style="margin-left:auto">hover a band · <kbd class="nav">←</kbd>
   <kbd class="nav">→</kbd> between universes</span></div></div>
 </section>"""
 
@@ -485,6 +469,7 @@ def build_page(media_dir: str, dish_map: str, title: str = "The Hermi Gallery",
     statgrid, dish_visual = "", ""
     if live and grid:
         dish_visual = (f'<canvas class="dish" id="dish" data-grid="{_esc(grid)}"'
+                       f'{" data-live" if live_flag else ""}'
                        f' width="768" height="240"></canvas>')
     elif newest_png:
         dish_visual = (f'<img class="dishpng" src="{_esc(newest_png["path"])}" '
@@ -494,8 +479,8 @@ def build_page(media_dir: str, dish_map: str, title: str = "The Hermi Gallery",
             'justify-content:center;color:#3d554a;font-size:12px">no dish archived yet</div>'
     if live:
         last = curve[-1] if curve else {}
-        census = (f'<div class="line"><b>tick {_esc(last.get("tick", "—"))}</b>'
-                  f'<span class="sep">·</span><b>{_esc(last.get("population", "—"))} alive</b>'
+        census = (f'<div class="line"><b id="census-tick">tick {_esc(last.get("tick", "—"))}</b>'
+                  f'<span class="sep">·</span><b id="census-alive">{_esc(last.get("population", "—"))} alive</b>'
                   f'<span class="sep">·</span><span class="hi">the dish is live</span></div>')
     else:
         last = curve[-1] if curve else {}
@@ -626,18 +611,34 @@ def build_page(media_dir: str, dish_map: str, title: str = "The Hermi Gallery",
 (function(){
   const cv=document.getElementById('dish');if(!cv)return;
   const ctx=cv.getContext('2d');
-  const rows=cv.dataset.grid.split('|');
-  const cellW=Math.ceil(cv.width/rows[0].split(',').length);
-  const cellH=Math.ceil(cv.height/rows.length);
-  const tier={f:1,b:0.72,'7':0.48,'4':0.3};
-  rows.forEach((row,y)=>{
-    row.split(',').forEach((hex,x)=>{
-      const r=parseInt(hex.slice(0,2),16),g=parseInt(hex.slice(2,4),16),
-            b=parseInt(hex.slice(4,6),16),a=tier[hex[6]]||0.3;
-      ctx.fillStyle='rgba('+r+','+g+','+b+','+a+')';
-      ctx.fillRect(x*cellW,y*cellH,Math.max(1,cellW-1),Math.max(1,cellH-1));
+  function drawDish(grid){
+    const rows=grid.split('|');
+    const cellW=Math.ceil(cv.width/rows[0].split(',').length);
+    const cellH=Math.ceil(cv.height/rows.length);
+    const tier={f:1,b:0.72,'7':0.48,'4':0.3};
+    ctx.clearRect(0,0,cv.width,cv.height);
+    rows.forEach((row,y)=>{
+      row.split(',').forEach((hex,x)=>{
+        const r=parseInt(hex.slice(0,2),16),g=parseInt(hex.slice(2,4),16),
+              b=parseInt(hex.slice(4,6),16),a=tier[hex[6]]||0.3;
+        ctx.fillStyle='rgba('+r+','+g+','+b+','+a+')';
+        ctx.fillRect(x*cellW,y*cellH,Math.max(1,cellW-1),Math.max(1,cellH-1));
+      });
     });
-  });
+  }
+  drawDish(cv.dataset.grid);
+  /* a refresh asks the dish for its current tick */
+  if(cv.dataset.live!==undefined){
+    fetch('/live/dish.json',{cache:'no-store'}).then(r=>r.ok?r.json():null)
+    .then(d=>{
+      if(!d||!d.grid)return;
+      cv.dataset.grid=d.grid;drawDish(d.grid);
+      const t=document.getElementById('census-tick'),
+            a=document.getElementById('census-alive');
+      if(t&&d.tick!=null)t.textContent='tick '+d.tick;
+      if(a&&d.alive!=null)a.textContent=d.alive+' alive';
+    }).catch(()=>{});
+  }
 })();
 /* search: filter the registry */
 (function(){

@@ -802,6 +802,7 @@ def _serve_text(keep: bool) -> str:
     # built from REAL state (registry, fossils, curve, media). Any failure
     # falls back to the flat page; serve must never break over the redesign.
     html = None
+    provider = None
     try:
         try:
             from . import gallery as vgal
@@ -809,10 +810,33 @@ def _serve_text(keep: bool) -> str:
             import gallery as vgal
         html = vgal.build_page(str(media), dish,
                                title="The Hermi Gallery", st=vstate.state())
+        # VIV-90: the live dish. Each page load (or refresh) asks the dish
+        # for its CURRENT tick; the provider re-renders the live world per
+        # request. Last-good cache: a torn read or a mid-tick race serves
+        # the previous frame instead of an error.
+        _last = {"tick": None, "alive": None, "grid": ""}
+
+        def _dish_provider():
+            try:
+                w = _world()
+                if w is None:
+                    return dict(_last)
+                st = vworld.stats(w)
+                out = {"tick": st.get("tick"), "alive": st.get("population"),
+                       "grid": vgal._grid_json(
+                           vworld.render_ascii_rich(w, cols=64, rows=24))}
+                if out["grid"]:
+                    _last.clear()
+                    _last.update(out)
+                return dict(_last)
+            except Exception:
+                return dict(_last)
+        provider = _dish_provider
     except Exception:
         html = None
     res = vterm.serve_gallery(media, dish_map=dish, keep=keep,
-                              open_browser=True, html=html)
+                              open_browser=True, html=html,
+                              dish_provider=provider)
     if "error" in res:
         return res["error"]
     lifetime = "stays up until Hermes exits (--keep)" if keep \

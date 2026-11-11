@@ -110,15 +110,28 @@ class TestChaptersAndPulse(unittest.TestCase):
         self.assertIn("A closed universe", html)
         self.assertIn("Eidos_8fd78ab1", html)
 
-    def test_pulse_bands_exist_and_curve_is_real_path(self):
+    def test_pulse_bands_exist_and_curve_is_gone(self):
+        """VIV-90: the population-curve diagram is retired (post-hackathon
+        redesign pending). The bands carry the story; no fake lines."""
         html = vgal.build_page("/nonexistent", RICH, st=_St(_state()))
         self.assertIn('class="band cur"', html)
-        self.assertIn("population", html)
-        self.assertIn("<path d=\"M", html)
+        self.assertNotIn("<path d=\"M", html)
+        self.assertNotIn("population history", html)
 
-    def test_no_curve_means_no_fake_curve(self):
-        html = vgal.build_page("/nonexistent", RICH, st=_St(_state(curve=[])))
-        self.assertNotIn('class="curve"', html.replace('class="curve">', ""))
+    def test_curve_data_is_ignored_not_rendered(self):
+        html = vgal.build_page("/nonexistent", RICH, st=_St(_state(curve=[
+            {"tick": t * 10, "population": t, "born": t} for t in range(50)])))
+        self.assertNotIn('class="curve"', html)
+        self.assertNotIn("<path d=\"M", html)
+
+    def test_live_flag_marks_the_canvas(self):
+        """VIV-90: the served page asks the dish for its current tick."""
+        html = vgal.build_page("/nonexistent", RICH, st=_St(_state()))
+        self.assertIn("data-live", html)
+        self.assertIn("/live/dish.json", html)
+        plain = vgal.build_page("/nonexistent", RICH, st=_St(_state()),
+                                live_flag=False)
+        self.assertNotIn("data-live", plain)
 
 
 class TestSelfContainment(unittest.TestCase):

@@ -10,6 +10,8 @@ import sys
 import tempfile
 import unittest
 import urllib.request
+import urllib.error
+from pathlib import Path
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -640,6 +642,58 @@ class TestMediaPref(unittest.TestCase):
         tools.set_media_pref("ascii")
         out2 = tools._cmd("restart")
         self.assertNotIn("images on", out2)
+
+
+class TestLiveDishEndpoint(unittest.TestCase):
+    """VIV-90: a page refresh asks the dish for its CURRENT tick."""
+
+    def _serve(self, provider):
+        import termrender as vterm
+        tmp = tempfile.mkdtemp()
+        Path(tmp, "keep.txt").write_text("x")
+        res = vterm.serve_gallery(tmp, dish_map="", title="t",
+                                  open_browser=False, dish_provider=provider)
+        self.assertNotIn("error", res)
+        self.addCleanup(res["server"].server_close)
+        self.addCleanup(res["thread"].join, timeout=2)
+        return res["url"]
+
+    def test_provider_answers_with_fresh_dish(self):
+        calls = []
+
+        def provider():
+            calls.append(1)
+            return {"tick": 1234, "alive": 42, "grid": "0a0f0df|0a0f0d7"}
+
+        url = self._serve(provider)
+        import urllib.request, json as _json
+        with urllib.request.urlopen(url + "/live/dish.json", timeout=5) as r:
+            data = _json.loads(r.read().decode())
+            self.assertEqual(r.headers.get("Cache-Control"), "no-store")
+        self.assertEqual(data["tick"], 1234)
+        self.assertEqual(data["alive"], 42)
+        self.assertEqual(len(calls), 1)   # fresh per request
+
+    def test_provider_failure_serves_503_page_keeps_last_dish(self):
+        def provider():
+            raise RuntimeError("mid-tick race")
+
+        url = self._serve(provider)
+        import urllib.request
+        try:
+            urllib.request.urlopen(url + "/live/dish.json", timeout=5)
+            self.fail("expected HTTP 503")
+        except urllib.error.HTTPError as e:
+            self.assertEqual(e.code, 503)
+
+    def test_without_provider_the_endpoint_is_404(self):
+        url = self._serve(None)
+        import urllib.request
+        try:
+            urllib.request.urlopen(url + "/live/dish.json", timeout=5)
+            self.fail("expected HTTP 404")
+        except urllib.error.HTTPError as e:
+            self.assertEqual(e.code, 404)
 
 
 if __name__ == "__main__":
