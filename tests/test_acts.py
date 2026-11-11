@@ -43,8 +43,15 @@ class TestActs(unittest.TestCase):
         out2 = A.birth_narration(self.s, "BASE", r, is_big_bang=False)
         self.assertIn("/vivarium export", out2)
         self.assertIn("/vivarium race", out2)
+        # VIV-74: the walkthrough ends at act 4, but the arrival CARD is
+        # now the ritual for every later birth: face + bars, one line of
+        # copy, no repeated export/race pitch.
         out3 = A.birth_narration(self.s, "BASE", r, is_big_bang=False)
-        self.assertEqual(out3, "BASE", "fourth birth is plain")
+        self.assertTrue(out3.startswith("BASE"), "fourth birth keeps the headline")
+        self.assertIn("<<ART:", out3, "fourth birth still shows the face")
+        self.assertIn("Survival was the filter", out3)
+        self.assertNotIn("/vivarium export", out3, "pitch never repeats")
+        self.assertNotIn("/vivarium race", out3, "pitch never repeats")
 
     def test_act3_honesty_about_not_first(self):
         r = {"eidos": "Eidos_1", "name": "a", "pod": 4, "tick": 10}

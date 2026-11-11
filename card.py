@@ -365,6 +365,14 @@ def render(body: str, cols: int, marker: str, live: dict | None = None,
             lines.append("")
         for ln in wrap(tail_text, cols - 2):
             lines.append(f"  {SOFT}{ln}{RST}")
+        # VIV-74: the census (tick / alive / lineages / top coloured) must
+        # ride EVERY arrival card, not only the two-column dish layout -
+        # on a narrow or non-painting surface the dish drops out and the
+        # numbers must not vanish with it.
+        if facts.get("art") or art_lines:
+            cap = _caption(live, "")
+            if cap:
+                lines.append(cap)
 
     lines.append("")
     lines += _command_table(cols)

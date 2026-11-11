@@ -160,13 +160,17 @@ def art_block(eidos: str, genome: dict | None = None,
     return f"\n{ART_OPEN}{eidos}>>\n" + "\n".join(lines) + f"\n{ART_CLOSE}\n"
 
 
-def act3_for(result: dict, arrival: bool = True) -> str:
+def act3_for(result: dict, arrival: bool = True, full: bool = False) -> str:
     """The arrival: a face, its numbers, and where it came from.
 
     The old copy opened with a rhetorical question ("Remember the
     promise?") and then apologised for not being the first species. Both
     belong to the Big Bang, which already said the roster was seeded; an
     arrival card should introduce the arrival.
+
+    `full=True` is the act-4 walkthrough birth: the complete export/race
+    pitch. Every later arrival (VIV-74) is the same CARD with one line
+    of copy instead.
     """
     eidos = result.get("eidos", "?")
     name = result.get("name", "")
@@ -188,7 +192,11 @@ def act3_for(result: dict, arrival: bool = True) -> str:
     if not arrival:
         # Later acts already told the birth story; the face and the arena
         # copy are what is new. No registry rows, no 'gave birth' line.
-        return art_block(eidos, genome, result) + "\n" + act4_text().strip()
+        # VIV-74: routine arrivals (post-walkthrough) carry ONE line of
+        # copy, not the full act-4 pitch again.
+        if full:
+            return art_block(eidos, genome, result) + act4_text()
+        return art_block(eidos, genome, result) + act4_text(short=True)
     src = f" from your '{name}' skill" if name else ""
     return (
         art_block(eidos, genome, result)
@@ -198,7 +206,17 @@ def act3_for(result: dict, arrival: bool = True) -> str:
         "Watch it: /vivarium clip")
 
 
-def act4_text() -> str:
+def act4_text(short: bool = False) -> str:
+    """The act-4 copy.
+
+    `short=True` (VIV-74, routine arrivals after the walkthrough) keeps
+    one line: survival as the filter. The export/race pitch told its
+    story once at act 4; repeating it on every birth turned the ritual
+    card into a rerun.
+    """
+    if short:
+        return ("\n\nSome lineages thrived, some are gone. Survival was "
+                "the filter; what remains is strong.")
     return (
         "\n\n" + DISH_MARKER + "\n\n"
         "Your dish has been running for a while now. Some lineages "
@@ -217,8 +235,12 @@ def act4_text() -> str:
 
 
 def act4_for(result: dict) -> str:
-    """Act 4 with the newborn's face, like act 3: every birth deserves one."""
-    return act3_for(result, arrival=False)
+    """Act 4 with the newborn's face, like act 3: every birth deserves one.
+
+    The walkthrough birth keeps the FULL pitch (short=False) - this is
+    the one time the export/race story is told.
+    """
+    return act3_for(result, arrival=False, full=True)
 
 
 def act_codex_text(discovery_label: str) -> str:
@@ -249,7 +271,9 @@ def birth_narration(s, base: str, result: dict, is_big_bang: bool) -> str:
     """The single wiring point for birth narrations.
 
     Big Bang (act 2), second birth (act 3), third birth (act 4); later
-    births get the plain announcement. narration-off: bare line only.
+    births get the full arrival card too (VIV-74: face + attribute bars;
+    the walkthrough PROSE stays one-time, the card is the ritual).
+    narration-off: bare line only.
     """
     acts = _acts(s)
     after_bang = acts.get("_births_since_bang", 0)
@@ -292,7 +316,10 @@ def birth_narration(s, base: str, result: dict, is_big_bang: bool) -> str:
         return base + text
     acts["_births_since_bang"] = after_bang + 1
     _save()
-    return base
+    # VIV-74: after the walkthrough, EVERY birth still shows the newborn:
+    # face + attribute bars + the census line under the dish. The card
+    # renders it as an arrival card; the walkthrough prose stays one-time.
+    return base + "\n" + act3_for(result, arrival=False)
 
 
 def codex_narration(s, line: str, label: str) -> str:
