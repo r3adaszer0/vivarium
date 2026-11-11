@@ -159,9 +159,14 @@ class TestChaptersAndPulse(unittest.TestCase):
         self.assertIn(f'id="cert-{m.group(1)}"', html)
 
     def test_no_births_no_latest_card(self):
-        """A fresh install has no births -> no featured card, no crash."""
+        """A fresh install has no births -> no featured card, no crash.
+
+        VIV-101: asserted on the DOM marker, not the copy — the live-morph
+        script legitimately mentions "Latest birth" as the title it will
+        write when a birth DOES arrive."""
         html = vgal.build_page("/nonexistent", RICH, st=_St(_state(births={})))
-        self.assertNotIn("Latest birth", html)
+        self.assertNotIn('class="latest"', html)
+        self.assertNotIn('class="latest"', html.split("<script>")[0])
 
     def test_pulse_section_is_gone(self):
         html = vgal.build_page("/nonexistent", RICH, st=_St(_state()))
@@ -394,6 +399,18 @@ class TestLivingEraKinds(unittest.TestCase):
         self.assertIn('data-births="2"', html)
         self.assertIn('id="newbirths"', html)
         self.assertIn("births_total", html)
+
+    def test_featured_card_morphs_live(self):
+        """VIV-101: the poll carries the newest birth; the card morphs in
+        place — the face SVG comes from the server renderer, the bars from
+        the shared dnaBars builder."""
+        html = vgal.build_page("/nonexistent", RICH, st=_St(_state()))
+        self.assertIn("function dnaBars(", html)
+        self.assertIn("if(d.latest&&d.latest.eidos)", html)
+        self.assertIn("d.latest.face_svg", html)
+        self.assertIn("dnaBars(d.latest.genome)", html)
+        # the glyph dialog shares the builder instead of duplicating it
+        self.assertIn("dnaBars(g.genome)", html)
 
     def test_status_button_bringing_the_current_dish(self):
         html = vgal.build_page("/nonexistent", RICH, st=_St(_state()))

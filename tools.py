@@ -836,6 +836,48 @@ def _serve_text(keep: bool) -> str:
                                                     color=True)),
                        "status": st,
                        "births_total": len(vstate.state().get("births", {}))}
+                # VIV-101: the featured card's live payload. The newest
+                # birth — selected exactly as build_page selects it — with
+                # its face SVG from the ONE server renderer, so the page
+                # morphs the card in place instead of duplicating the
+                # pixel-art face in JavaScript.
+                _births = vstate.state().get("births", {}) or {}
+                latest = None
+                if _births:
+                    def _lkey(kv):
+                        try:
+                            era_v = int(kv[1].get("era", 0))
+                        except (TypeError, ValueError):
+                            era_v = 0
+                        return (era_v, str(kv[1].get("day", "")))
+                    try:
+                        _sk, _rec = max(_births.items(), key=_lkey)
+                    except (AttributeError, TypeError):
+                        _sk, _rec = None, None
+                    if _rec and _rec.get("eidos"):
+                        _gen = _rec.get("genome") or {}
+                        _eidos = str(_rec.get("eidos"))
+                        _hex = _eidos.replace("Eidos_", "")
+                        try:
+                            try:
+                                from . import identity as _vid
+                            except ImportError:  # pragma: no cover
+                                import identity as _vid
+                            _g, _e, _c = _vid.name_of(_gen)
+                            _name = f"{_g} {_e}"
+                        except Exception:
+                            _name = "unnamed strain"
+                        _extinct = {
+                            str(f.get("lineage", "")).replace("Eidos_", "")
+                            for f in (vstate.state().get("fossils") or [])}
+                        try:
+                            _face = vgal._face_svg(_gen, _hex in _extinct, 64)
+                        except Exception:
+                            _face = ""
+                        latest = {"eidos": _eidos, "era": _rec.get("era"),
+                                  "skill": _sk, "name": _name,
+                                  "genome": _gen, "face_svg": _face}
+                out["latest"] = latest
                 if out["grid"]:
                     _last.clear()
                     _last.update(out)

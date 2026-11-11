@@ -727,6 +727,18 @@ def build_page(media_dir: str, dish_map: str, title: str = "The Hermi Gallery",
 </footer>"""
 
     script = """<script>
+function dnaBars(genome){
+  /* the six DNA trait bars from a genome dict — shared by the featured
+     card's live morph (VIV-101) and the glyph-stats dialog (VIV-99) */
+  const G=[['forage','forage'],['sense','sense'],['metab','metabolism_mult'],
+           ['aggr','aggression'],['mutate','mutate'],['disperse','dispersal']];
+  return G.map(p=>{
+    const v=Number((genome||{})[p[1]]||0);
+    return '<span>'+p[0]+'</span><span class="track"><span class="fill" '+
+      'style="width:'+Math.max(3,Math.min(100,v/3*100))+'%"></span></span>'+
+      '<span class="v">'+v.toFixed(2)+'</span>';
+  }).join('');
+}
 /* the dish: server-parsed SGR grid -> pixel canvas */
 (function(){
   const cv=document.getElementById('dish');if(!cv)return;
@@ -767,6 +779,29 @@ def build_page(media_dir: str, dish_map: str, title: str = "The Hermi Gallery",
         nb.hidden=false;
         nb.innerHTML=(diff>0?diff+' new':'registry changed')+
           ' — <a onclick="location.reload()">reload</a>';
+      }
+      /* VIV-101: the featured card has the dish's heartbeat — when a poll
+         sees a newer birth, the card morphs in place. The face SVG comes
+         from the same server renderer; the bars from dnaBars. */
+      if(d.latest&&d.latest.eidos){
+        const card=document.querySelector('a.latest');
+        if(card){
+          const hex=String(d.latest.eidos).replace('Eidos_','');
+          const href=card.getAttribute('href')||'';
+          if(href.indexOf(hex)<0){
+            card.setAttribute('href','#cert-'+hex);
+            const face=card.querySelector('.face');
+            if(face&&d.latest.face_svg)face.innerHTML=d.latest.face_svg;
+            const t=card.querySelector('.meta .t');
+            if(t&&d.latest.name)t.textContent='Latest birth · '+d.latest.name;
+            const m=card.querySelector('.meta .d:not(.see)');
+            if(m)m.textContent=d.latest.eidos+' · era '+
+              (d.latest.era!=null?d.latest.era:'?')+
+              ' · from skill “'+(d.latest.skill||'')+'”';
+            const gl=card.querySelector('.genes');
+            if(gl&&d.latest.genome)gl.innerHTML=dnaBars(d.latest.genome);
+          }
+        }
       }
     };
     const fetchDish=()=>{
@@ -870,14 +905,7 @@ def build_page(media_dir: str, dish_map: str, title: str = "The Hermi Gallery",
         .then(r=>r.ok?r.json():r.json().then(j=>Promise.reject(j)))
         .then(g=>{
           if(!g||!g.genome)throw new Error('no genome');
-          const G=[['forage','forage'],['sense','sense'],['metab','metabolism_mult'],
-                   ['aggr','aggression'],['mutate','mutate'],['disperse','dispersal']];
-          const bars=G.map(p=>{
-            const v=Number(g.genome[p[1]]||0);
-            return '<span>'+p[0]+'</span><span class="track"><span class="fill" '+
-              'style="width:'+Math.max(3,Math.min(100,v/3*100))+'%"></span></span>'+
-              '<span class="v">'+v.toFixed(2)+'</span>';
-          }).join('');
+          const bars=dnaBars(g.genome);
           const where=(g.source==='dish'?' · living in the dish now':' · from skill “'+g.skill+'”');
           body.innerHTML='<div class="t">'+g.eidos+' · '+g.alive+' alive'+where+'</div>'+
             '<img src="'+s.querySelector('img').src+'" alt="" '+
