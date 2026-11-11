@@ -84,6 +84,68 @@ agent learns introduces a new species.
 | **iTerm2 and sixel terminals** | untested |
 | **Your browser** | `/vivarium serve` turns the dish into a private local web page: the live dish, the registry and every certificate, served only on your machine (127.0.0.1) |
 
+Pure Python stdlib, zero dependencies.
+
+## Meet the Hermi
+
+A Hermi is a creature of the dish: a 7x7 pixel face, a binomial name,
+a colour it inherits from its lineage, and a genome of seven genes that
+decides how it lives.
+
+**Where it comes from.** When your agent learns a skill, the skill's
+content is hashed, keyed by your universe key, and read as a genome:
+four bytes for each of seven genes, plus the hue that paints it. The
+same skill grows the same species in any universe, on any machine.
+Deterministic, private.
+
+**Its genes.** Six genes evolve, one is fixed. Forage sets how fast a
+Hermi gathers food. Sense sets how far ahead it sees a bloom. Metabolism
+sets how fast it burns what it eats. Aggression decides who wins a
+contested cell. Mutate sets how far its children drift from it.
+Dispersal decides whether it stays in a crowded cell or sets out for
+open ground. Hue is the seventh gene, and it is fixed: inherited
+exactly, never jittered, the colour of its lineage on the dish.
+
+**How many.** Seven genes of four bytes each: 224 bits, about 2.7 x
+10^67 possible Hermi. That is more possible Hermi than there are atoms
+on Earth. No two different skills, anywhere, ever, will grow the same
+species twice. And they are sourced from everywhere your agent has
+already been: the Big Bang seeds a species from every skill installed
+at genesis, and each new skill introduces one more, one unique.
+
+**How they evolve.** A Hermi that eats splits its energy into children;
+a Hermi that starves dies. With every birth the genes drift, so the
+children are never exact copies: a little faster to forage, a little
+slower to burn, a little bolder in a crowd. The dish decides which
+drifts survive. Lineages rise, dominate for an age, and go extinct,
+and the fossils keep the record of every one of them.
+
+**The physics.** Food regrows logistically and diffuses to its
+neighbours, so blooms travel across the dish like weather. A tool call
+ticks the world about six ticks; a learned skill punctuates it with a
+speciation event. Time ticks; skills punctuate.
+
+<div align="center">
+<table border="0" cellspacing="0" cellpadding="0">
+<tr>
+<td align="center"><img src="docs/assets/glyph_bff77f92.png" width="130" alt="Venefica ferox"><br><sub><b>Venefica ferox</b><br>Eidos_bff77f92</sub></td>
+<td align="center"><img src="docs/assets/glyph_ef543f71.png" width="130" alt="Foragia tenuis"><br><sub><b>Foragia tenuis</b><br>Eidos_ef543f71</sub></td>
+<td align="center"><img src="docs/assets/glyph_01ff7d80.png" width="130" alt="Venefica major"><br><sub><b>Venefica major</b><br>Eidos_01ff7d80</sub></td>
+<td align="center"><img src="docs/assets/glyph_e45f9549.png" width="130" alt="Vivax minor"><br><sub><b>Vivax minor</b><br>Eidos_e45f9549</sub></td>
+</tr>
+<tr>
+<td align="center"><img src="docs/assets/glyph_e38187eb.png" width="130" alt="Foragia vagans"><br><sub><b>Foragia vagans</b><br>Eidos_e38187eb</sub></td>
+<td align="center"><img src="docs/assets/glyph_08f3e7f9.png" width="130" alt="Chroma minor"><br><sub><b>Chroma minor</b><br>Eidos_08f3e7f9</sub></td>
+<td align="center"><img src="docs/assets/glyph_f8f2a937.png" width="130" alt="Foragia minor"><br><sub><b>Foragia minor</b><br>Eidos_f8f2a937</sub></td>
+<td align="center"><img src="docs/assets/glyph_d5fc014b.png" width="130" alt="Chroma robusta"><br><sub><b>Chroma robusta</b><br>Eidos_d5fc014b</sub></td>
+</tr>
+</table>
+</div>
+
+Deep-dive documents: [the Compendium](docs/vivarium_compendium.pdf) (design,
+math, comparisons to cellular automata and related work) and the
+[plain-language user guide](docs/user_guide.pdf).
+
 ## What you can do
 
 | Command | Effect |
@@ -102,16 +164,6 @@ agent learns introduces a new species.
 | `/vivarium start` | welcome briefing + the universe view |
 | `/vivarium staleness` | is the living world going stale? |
 | `/vivarium restart` | end the era (with a farewell picture); the next skill births a new universe |
-
-Every species gets a **7×7 mirrored glyph** and a binomial name derived
-deterministically from its genome — the same genome grows the same face in any
-renderer:
-
-<p align="center">
-  <img src="docs/assets/glyph_c88c94.png" alt="Mutabilis minor" width="120">&nbsp;
-  <img src="docs/assets/glyph_2f3fa9.png" alt="Chroma ferox" width="120">&nbsp;
-  <img src="docs/assets/glyph_da4824.png" alt="Foragia vagans" width="120">
-</p>
 
 ## The Vivarium Codex
 
@@ -174,32 +226,6 @@ The same universe, seen differently depending on where you talk to your agent:
 On any surface, the walkthrough adapts: inline paint where the host can
 paint, native attachments where the gateway can attach, paths + the rich map
 everywhere else.
-
-## How it works (short version)
-
-- **Food** regrows logistically and diffuses to neighbors — weather-like
-  blooms and barren fronts travel across the dish.
-- **Creatures** carry six evolvable genes (forage, aggression, metabolism,
-  sense, mutation rate, dispersal) driving real dynamics: contested
-  feeding, live metabolic drain, conservation-split reproduction, and a
-  decision to leave a crowded cell instead of sharing it. Eat → reproduce;
-  starve → die.
-- **Hue is not a gene, it is a name tag.** A species' colour is derived
-  from its lineage id and inherited exactly, so one lineage is one colour
-  on the dish and the colour you see is the family you can count. Nothing
-  selects on colour; it never drifts.
-- **Skills → species:** `SHA-256` over skill content (keyed by your universe
-  key for private skills; a public domain-separated digest for stock skills)
-  selects 192 bits of genome. Deterministic, private, collision-safe.
-- **Two clocks:** time ticks (a tool call ≈ 6 ticks); skills punctuate
-  (speciation events). *Time ticks; skills punctuate.*
-- **Deterministic per seed:** the same seed and actions reproduce the same
-  history, so challenge duels are verifiable.
-- **Zero dependencies** — pure Python stdlib.
-
-Deep-dive documents: [the Compendium](docs/vivarium_compendium.pdf) (design,
-math, comparisons to cellular automata and related work) and the
-[plain-language user guide](docs/user_guide.pdf).
 
 ## Research
 
