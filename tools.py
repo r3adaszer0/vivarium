@@ -734,6 +734,23 @@ def _doctor_text() -> str:
         lines.append(f"graphics: {g} [{trace}]")
     lines.append(f"media_pref: {s.get('media_pref', 'auto')} "
                  f"voice: {vstate.voice_mode()}")
+    # VIV-78: deps honesty — the dish/cards/paints are stdlib-only; only
+    # the optional clip engine wants Pillow/imageio/numpy. Probe lazily
+    # so a fresh install sees exactly what it would gain.
+    try:
+        import importlib.util as _ilu
+        _pil_ok = _ilu.find_spec("PIL") is not None
+        _ff_ok = shutil.which("ffmpeg") is not None
+        if _pil_ok and _ff_ok:
+            lines.append("deps: dish=stdlib (no installs needed) "
+                         "clip=ready")
+        else:
+            _missing = [n for n, ok in (("pillow", _pil_ok),
+                                        ("ffmpeg", _ff_ok)) if not ok]
+            lines.append("deps: dish=stdlib (no installs needed) "
+                         "clip=missing " + "+".join(_missing))
+    except Exception:
+        pass
     # feature fingerprint: which build is actually loaded
     feats = []
     import inspect as _insp
@@ -1154,6 +1171,14 @@ def _clip_text(rest: list) -> str:
         return ("ffmpeg is required to encode the clip but is not on "
                 "this machine's PATH. The dish still lives — install "
                 "ffmpeg and try again.")
+    except ImportError:
+        # VIV-78: clips are the ONLY optional-dep feature. The dish, the
+        # cards and the paints are stdlib-only; say exactly what to add.
+        return ("🎥 The clip engine is the one optional extra: it needs "
+                "Pillow (imageio/numpy for the small clip). The dish "
+                "itself never does. Install into Hermes's runtime:\n"
+                "  uv pip install --python \"$(hermes --print-runtime-"
+                "command chat | cut -d' ' -f1)\" pillow numpy imageio")
     res = {8: "", 15: " · 720p", 23: " · 1080p"}[cell_px]
     return (f"🎥 Clip written: {path}\n"
             f"  {ticks} ticks of the dish at tick {start_tick}{res}"
