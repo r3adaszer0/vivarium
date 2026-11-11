@@ -125,7 +125,7 @@ border-top:1px solid var(--line);padding-top:34px}
 .rail{align-self:start;text-align:left;padding-left:2px}
 .rail .num{font-size:44px;font-weight:600;color:var(--ink);letter-spacing:-.04em;line-height:1}
 .rail .when{font-size:10.5px;color:var(--dimink);margin-top:8px;line-height:1.6;
-word-break:break-all}
+white-space:nowrap}
 .rail .badge{display:inline-block;margin-top:10px;font-size:9.5px;letter-spacing:.14em;
 text-transform:uppercase;padding:3px 8px;border-radius:3px;border:1px solid}
 .rail .badge.bang{color:var(--amber);border-color:#4a3c1e;background:#1a1608}
@@ -597,7 +597,7 @@ def build_page(media_dir: str, dish_map: str, title: str = "The Hermi Gallery",
                        f'{cert_html}</div></div>')
     cur_chapter = f"""<div class="chapter" id="u{_esc(key_fp)}">
   <div class="rail"><div class="num">{_esc(era)}</div>
-    <div class="when">began {_esc(genesis_day) or "—"}</div>
+    <div class="when">began<br>{_esc(genesis_day) or "—"}</div>
     <div class="badge {'bang' if live else 'dead'}">{'the living era' if live else 'dormant'}</div>
     <div class="tally"><span class="up">{len(births)} born</span> ·
       <span class="dn">{len(fossils)} fossil lines</span></div>
@@ -614,12 +614,13 @@ def build_page(media_dir: str, dish_map: str, title: str = "The Hermi Gallery",
                       s["key"], f.get("day", ""), cert_hexes)
             for f in fossils if f.get("universe") == s["key"])
         days = sorted(s["days"])
-        span = f'{days[0]} — {days[-1]}' if len(days) > 1 else (days[0] if days else "—")
+        span = (f'{_esc(days[0])}<br>&#8594; {_esc(days[-1])}' if len(days) > 1
+                else (_esc(days[0]) if days else "—"))
         closed_chapters.append(f"""<div class="chapter" id="u{_esc(s["key"])}">
   <div class="rail"><div class="num" style="color:var(--dimink)">·</div>
-    <div class="when">{_esc(span)}</div><div class="badge dead">closed</div>
+    <div class="when">{span}</div><div class="badge dead">closed</div>
     <div class="tally"><span class="dn">{s["n"]} fossils</span></div>
-    <div class="when" style="margin-top:8px">universe {_esc(s["key"][:8])}</div></div>
+    <div class="when" style="margin-top:8px">universe<br>{_esc(s["key"][:8])}</div></div>
   <div><div class="block"><div class="bt" id="u{_esc(s["key"])}-fallen">The fallen of {_esc(s["key"][:8])}</div>
       <div class="fallen"><div class="shelf">{shelf}</div></div></div></div></div>""")
 
