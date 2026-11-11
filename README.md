@@ -128,10 +128,10 @@ speciation event. Time ticks; skills punctuate.
 <div align="center">
 <table border="0" cellspacing="0" cellpadding="0">
 <tr>
-<td align="center"><img src="docs/assets/glyph_bff77f92.png" width="130" alt="Venefica ferox"><br><sub><b>Venefica ferox</b><br>Eidos_bff77f92</sub></td>
-<td align="center"><img src="docs/assets/glyph_ef543f71.png" width="130" alt="Foragia tenuis"><br><sub><b>Foragia tenuis</b><br>Eidos_ef543f71</sub></td>
-<td align="center"><img src="docs/assets/glyph_01ff7d80.png" width="130" alt="Venefica major"><br><sub><b>Venefica major</b><br>Eidos_01ff7d80</sub></td>
-<td align="center"><img src="docs/assets/glyph_e45f9549.png" width="130" alt="Vivax minor"><br><sub><b>Vivax minor</b><br>Eidos_e45f9549</sub></td>
+<td align="center"><img src="docs/assets/glyph_c2df1e99.png" width="130" alt="Oculata minor"><br><sub><b>Oculata minor</b><br>Eidos_c2df1e99</sub></td>
+<td align="center"><img src="docs/assets/glyph_8acf7239.png" width="130" alt="Vivax ferox"><br><sub><b>Vivax ferox</b><br>Eidos_8acf7239</sub></td>
+<td align="center"><img src="docs/assets/glyph_62bf3b8f.png" width="130" alt="Venefica serena"><br><sub><b>Venefica serena</b><br>Eidos_62bf3b8f</sub></td>
+<td align="center"><img src="docs/assets/glyph_6b584af1.png" width="130" alt="Chroma pinguis"><br><sub><b>Chroma pinguis</b><br>Eidos_6b584af1</sub></td>
 </tr>
 <tr>
 <td align="center"><img src="docs/assets/glyph_e38187eb.png" width="130" alt="Foragia vagans"><br><sub><b>Foragia vagans</b><br>Eidos_e38187eb</sub></td>
