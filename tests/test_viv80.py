@@ -123,13 +123,24 @@ class TestViv82Layout(unittest.TestCase):
                  for ln in r["text"].split("\n")]
         return r, texts
 
-    def test_no_line_between_headline_and_dish(self):
-        r, texts = self._render()
-        self.assertTrue(r["has_dish"])
-        head_i = next(i for i, t in enumerate(texts)
-                      if t.startswith("New species"))
-        # the dish's top row is the row right after the headline: no air
-        self.assertEqual(r["climb"], len(texts) - 2 - head_i)
+    def test_one_line_gap_between_text_and_dish(self):
+        # VIV-84, the UNIFORM LAW: any text above the dish -> exactly ONE
+        # blank line, then the dish's top row. Pinned for BOTH cards.
+        import re as _re
+        for body, is_bang in ((BANG, True), (self.ACT3, False)):
+            r = vcard.render(body, 100, "vivarium", live=LIVE, dish=True,
+                             dish_cols=39, era=13)
+            texts = [_re.sub(r"\x1b\[[0-9;]*m", "", ln).strip()
+                     for ln in r["text"].split("\n")]
+            anchor = (max(i for i, t in enumerate(texts)
+                          if t.startswith("The Hadean die-off"))
+                      if is_bang else
+                      next(i for i, t in enumerate(texts)
+                           if t.startswith("New species")))
+            dish_top = (len(texts) - 1) - r["climb"]
+            self.assertEqual(dish_top - anchor, 2,
+                             "one blank line, then the dish's top row")
+            self.assertEqual(texts[anchor + 1], "", "the single blank")
 
     def test_face_starts_on_the_dish_top_row(self):
         r, texts = self._render()
@@ -137,9 +148,11 @@ class TestViv82Layout(unittest.TestCase):
                       if t.startswith("New species"))
         dish_top = len(texts) - 1 - r["climb"]
         # the face's first content row sits on the dish's first row
+        # (one blank line below the headline, per the VIV-84 law)
         self.assertGreater(head_i, 0)
-        self.assertIn("█", texts[head_i + 1])
-        self.assertEqual(head_i + 1, dish_top)
+        self.assertEqual(texts[head_i + 1], "", "the uniform one-line gap")
+        self.assertIn("█", texts[dish_top])
+        self.assertEqual(head_i + 2, dish_top)
 
 
 class TestShowRelay(unittest.TestCase):

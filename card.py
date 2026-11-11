@@ -309,12 +309,10 @@ def render(body: str, cols: int, marker: str, live: dict | None = None,
     else:
         art_lines, art_eidos, tail_text = split_art(tail_text)
     two_col = dish and bool(tail_text) and cols >= dish_cols + MIN_GUTTER
-    if two_col and lines and lines[-1] == "":
-        # VIV-82: act-3 wants the dish DIRECTLY under the headline — one
-        # line less between the words and the picture. The blank was the
-        # act-2 air; act-2 keeps it (the bang branch adds its own), the
-        # birth card trades it for a tighter lock between text and image.
-        lines.pop()
+    # VIV-84, THE UNIFORM LAW (user): whenever text sits above the dish,
+    # the dish starts ONE line below it — always, every card, no per-act
+    # exceptions. The head block's trailing blank IS that gap; act-2's
+    # stack relies on it too. No card pops it, no card adds a second.
     spacer_at = len(lines) if two_col else None
     bang_dish_at = None
     if is_bang and dish and spacer_at is None:
