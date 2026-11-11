@@ -73,6 +73,17 @@ skill your Hermes agent learns triggers the **Big Bang**. From then on,
 using your agent advances the time of the world, and each new skill your
 agent learns introduces a new species.
 
+**Where it has been tested:**
+
+| Surface | Status |
+|---|---|
+| **kitty** | fully tested |
+| **ghostty** | fully tested |
+| **Matrix** | works; the dish arrives where a skill is born, but choosing a specific channel is not supported yet |
+| **Hermes Desktop** | works, without the full paint quality of a graphics terminal |
+| **iTerm2 and sixel terminals** | untested |
+| **Your browser** | `/vivarium serve` turns the dish into a private local web page: the live dish, the registry and every certificate, served only on your machine (127.0.0.1) |
+
 ## What you can do
 
 | Command | Effect |
