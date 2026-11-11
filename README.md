@@ -1,4 +1,4 @@
-# 🧬 Vivarium — a living world inside your Hermes agent
+# 🧬 Vivarium - a living world inside your Hermes agent
 
 <div align="center">
 <table border="0" cellspacing="0" cellpadding="0">
@@ -25,11 +25,11 @@
 Vivarium is a Hermes Agent plugin that hosts an **artificial-life
 living world** on a 48×48 cellular-automaton dish: food blooms and spreads like
 weather, and genome-carrying creatures forage, reproduce, mutate, and go
-extinct on their own — even while you're away.
+extinct on their own, even while you're away.
 
 The twist: **your real work feeds it.** Every tool call your agent makes drops
 nutrients into the dish. A busy coding day causes a population boom; a lazy
-Sunday is a famine. The dish is a living mirror of how much — and how hard —
+Sunday is a famine. The dish is a living mirror of how much, and how hard,
 you've been using your agent. And when your agent *learns a new skill*, that
 skill's content is hashed into a genome: **a brand-new species is born from
 the actual work your agent does.**
@@ -42,14 +42,14 @@ the actual work your agent does.**
   event is the creation of your universe key, outside the simulation. The
   same skills always produce the same species.
 - **Mathematically sound.** Every mechanism is a measurable constant with a
-  documented role — carrying capacity, energy conservation with friction,
+  documented role: carrying capacity, energy conservation with friction,
   logistic regrowth. Nothing is tuned by vibes.
-- **Genetic.** Every Hermi carries a six-gene genome — forage, sense,
-  metabolism, aggression, mutation rate, dispersal — inherited with
+- **Genetic.** Every Hermi carries a six-gene genome (forage, sense,
+  metabolism, aggression, mutation rate, dispersal) inherited with
   mutation from its parents, and every species descends from a skill your
   agent actually learned. The face, the name and the colour are all read
   off the genes.
-- **Private.** Species derive from keyed hashes of your skill *content* —
+- **Private.** Species derive from keyed hashes of your skill *content*:
   never names, never raw content. Your universe key stays on your machine;
   shared artifacts carry only Eidos IDs and fingerprints.
 
@@ -200,4 +200,4 @@ Conway's Game of Life catalogues its still lifes and oscillators.
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+MIT - see [LICENSE](LICENSE).
