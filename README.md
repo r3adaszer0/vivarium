@@ -1,8 +1,26 @@
 # 🧬 Vivarium — a living world inside your Hermes agent
 
-<p align="center">
-  <img src="docs/assets/dish_render.png" alt="The Vivarium dish" width="480">
-</p>
+<div align="center">
+<table border="0" cellspacing="0" cellpadding="0">
+<tr>
+<td valign="middle">
+  <img src="docs/assets/glyph_bff77f92.png" width="150" alt="Venefica ferox"><br>
+  <sub><b>Venefica ferox</b><br>Eidos_bff77f92</sub><br><br>
+  <img src="docs/assets/glyph_e45f9549.png" width="150" alt="Vivax minor"><br>
+  <sub><b>Vivax minor</b><br>Eidos_e45f9549</sub>
+</td>
+<td valign="middle" align="center">
+  <img src="docs/assets/dish_hero.png" width="420" alt="The Vivarium dish">
+</td>
+<td valign="middle">
+  <img src="docs/assets/glyph_ef543f71.png" width="150" alt="Foragia tenuis"><br>
+  <sub><b>Foragia tenuis</b><br>Eidos_ef543f71</sub><br><br>
+  <img src="docs/assets/glyph_01ff7d80.png" width="150" alt="Venefica major"><br>
+  <sub><b>Venefica major</b><br>Eidos_01ff7d80</sub>
+</td>
+</tr>
+</table>
+</div>
 
 Vivarium is a Hermes Agent plugin that hosts a **persistent artificial-life
 living world**. A 48×48 cellular-automaton dish: food blooms and spreads like
