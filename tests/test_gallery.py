@@ -163,9 +163,36 @@ class TestSelfContainment(unittest.TestCase):
 
     def test_privacy_promises_are_in_the_page(self):
         html = vgal.build_page("/nonexistent", RICH, st=_St(_state()))
-        self.assertIn("127.0.0.1 only", html)
-        self.assertIn("never leaves this machine", html)
+        self.assertIn("127.0.0.1 - private", html)
         self.assertIn("deterministic by seed", html)
+
+    def test_masthead_is_navigation_only(self):
+        """VIV-93: the masthead carries the brand, the lock, the era links
+        and the search — no fact chips, no wordmark, no duplicates."""
+        html = vgal.build_page("/nonexistent", RICH, st=_St(_state()))
+        self.assertIn("Vivarium — The Hermi Gallery", html)
+        self.assertNotIn("hermes keeps the dish", html)
+        self.assertNotIn('class="chips"', html)
+        self.assertNotIn("universes closed", html)
+        # ONE era label: the NOW kicker carries era+status+seed; the dish
+        # has no overlay and no plate.
+        now_sec = html.split('id="now"')[1].split("</section>")[0]
+        self.assertIn("Era 20", now_sec)
+        self.assertIn("seed 2e987e96", now_sec)
+        self.assertNotIn("dish-title", now_sec)
+        self.assertNotIn("the living dish", now_sec)
+        self.assertEqual(html.count("Era 20 · live"), 0)  # the chip is gone
+
+    def test_hash_row_overflow_marker(self):
+        """VIV-93: many closed universes -> the +N marker, without counts."""
+        st = _state()
+        st["fossils"] = list(st["fossils"]) + [
+            {"lineage": f"Eidos_aaaa{i:04x}", "genome": dict(st["fossils"][0]["genome"]),
+             "universe": f"key{i:024x}", "day": "2026-11-10"}
+            for i in range(12)]
+        html = vgal.build_page("/nonexistent", RICH, st=_St(st))
+        self.assertIn("more — scroll the row", html)
+        self.assertNotIn("<sup", html)
 
 
 class TestServeGalleryHtmlOverride(unittest.TestCase):
@@ -224,8 +251,8 @@ class TestAnyUser(unittest.TestCase):
         html = vgal.build_page("/nonexistent", "", st=st)
         self.assertIn("The Hermi Gallery", html)
         self.assertIn("Era 1", html)
-        self.assertIn("0 fossils", html)
-        self.assertIn("0 births", html)
+        self.assertIn("fossils <b>0</b>", html)
+        self.assertIn("births recorded <b>0</b>", html)
         self.assertIn('id="ua1b2c3d4"', html)
         self.assertIn("No clips filmed in this era yet", html)
         self.assertNotIn('class="cert"', html)      # no registry yet — honest

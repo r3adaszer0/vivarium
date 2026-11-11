@@ -48,12 +48,17 @@ body{background:var(--bg);color:var(--ink);font-family:var(--mono);font-size:14p
 line-height:1.5;margin:0;-webkit-font-smoothing:antialiased}
 .wrap{max-width:1180px;margin:0 auto;padding:0 28px}
 header{padding:38px 0 22px;border-bottom:1px solid var(--line)}
-.wordmark{font-size:13px;letter-spacing:.24em;color:var(--mut);text-transform:uppercase}
-.wordmark b{color:var(--ink);font-weight:600}
-.rule{display:flex;align-items:center;gap:14px;margin-top:10px}
-.rule h1{font-size:30px;font-weight:600;letter-spacing:-.01em;margin:0}
-.rule .tick{flex:1;height:1px;background:var(--line)}
-.chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px;align-items:center}
+.brandrow{display:flex;justify-content:space-between;align-items:center;gap:14px}
+.brandrow h1{font-size:30px;font-weight:600;letter-spacing:-.01em;margin:0}
+.chip.mini{font-size:9.5px;padding:3px 8px;letter-spacing:.04em}
+.hairline{height:1px;background:var(--line);margin-top:12px}
+.toprow{display:flex;align-items:center;gap:16px;margin-top:4px}
+.eraswrap{position:relative;flex:1;min-width:0}
+.eraswrap::after{content:"";position:absolute;right:0;top:0;bottom:0;width:46px;
+background:linear-gradient(90deg,transparent,var(--bg) 82%%);pointer-events:none}
+.eraswrap .more{position:absolute;right:4px;top:50%%;transform:translateY(-50%%);
+font-size:9.5px;color:var(--dimink);background:var(--bg);padding:2px 7px;z-index:2;
+white-space:nowrap}
 .chip{font-size:11px;letter-spacing:.06em;color:var(--mut);border:1px solid var(--line);
 border-radius:4px;padding:4px 9px;background:var(--panel)}
 .chip .dot{display:inline-block;width:7px;height:7px;border-radius:50%%;margin-right:6px;
@@ -73,22 +78,25 @@ nav.eras{display:flex;gap:6px;overflow-x:auto;padding:12px 0 0;scrollbar-width:n
 nav.eras::-webkit-scrollbar{display:none}
 nav.eras a{color:var(--dimink);text-decoration:none;font-size:11px;padding:4px 9px;
 border:1px solid transparent;border-radius:4px;white-space:nowrap}
-nav.eras a:hover{color:var(--ink);border-color:var(--line)}
+nav.eras a:hover{color:var(--ink);border-color:var(--line);
+text-decoration:underline;text-underline-offset:3px}
 nav.eras a.cur{color:var(--amber);border-color:#4a3c1e;background:#1a1608}
 section{padding:46px 0 8px}
 .kicker{font-size:11px;letter-spacing:.28em;color:var(--dimink);text-transform:uppercase}
 .kicker b{color:var(--mut);font-weight:500}
+.kdot{display:inline-block;width:7px;height:7px;border-radius:50%%;margin-right:8px;
+background:var(--dimink);vertical-align:1px}
+.kdot.live{background:%(LIVE)s;box-shadow:0 0 6px %(LIVE)s88;
+animation:beat 2.4s ease-in-out infinite}
+.seedtag{margin-left:16px;color:var(--acc);font-family:var(--mono);
+text-transform:none;letter-spacing:.06em;font-size:10.5px}
+.chapter:target{box-shadow:0 0 0 1.5px var(--acc),0 0 18px %(ACC)s33;border-radius:8px}
 .sub{color:var(--mut);font-size:12.5px;margin:6px 0 0;max-width:640px}
 .nowsec{display:grid;grid-template-columns:minmax(0,420px) 1fr;gap:26px;margin-top:22px}
 .dishwrap{position:relative;border:1px solid var(--line);border-radius:8px;background:#060a08;
 padding:14px;overflow:hidden}
-.dishwrap .dish-title{position:absolute;top:14px;left:16px;font-size:10px;letter-spacing:.2em;
-color:var(--dimink);text-transform:uppercase;z-index:2}
 canvas.dish{width:100%%;height:auto;display:block;border-radius:4px;image-rendering:pixelated}
 img.dishpng{width:100%%;display:block;border-radius:4px;image-rendering:pixelated}
-.plate{position:absolute;left:14px;bottom:14px;font-size:10.5px;background:#0b0f0dcc;
-border:1px solid #4a2a38;border-radius:4px;padding:3px 8px;color:#ffd7e2;white-space:nowrap}
-.plate small{color:#b58496;margin-left:6px}
 .nowside{display:flex;flex-direction:column;gap:14px}
 .census{border:1px solid var(--line);border-radius:8px;background:var(--panel);padding:16px 18px}
 .census .line{font-size:13px;color:var(--mut)}
@@ -446,19 +454,21 @@ def build_page(media_dir: str, dish_map: str, title: str = "The Hermi Gallery",
     nav = "".join(
         f'<a href="#u{_esc(k)}"{" class=\"cur\"" if cur else ""}>{_esc(lbl)}</a>'
         for k, lbl, cur in nav_items)
+    # the masthead is navigation only (VIV-93): title, lock, era links,
+    # search. Facts live where they are used — era/status/seed at NOW,
+    # births/fossils in the statgrid.
+    _visible = 9
+    _hidden = max(0, len(nav_items) - _visible)
+    _more = (f'<span class="more">+{_hidden} more — scroll the row</span>'
+             if _hidden else "")
     head = f"""<header id="top">
-  <div class="wordmark"><b>vivarium</b> — hermes keeps the dish</div>
-  <div class="rule"><h1>{_esc(title)}</h1><div class="tick"></div></div>
-  <div class="chips">
-    <span class="chip {'live' if live else 'dorm'}"><span class="dot"></span>Era {_esc(era)} · {_esc(status)}</span>
-    <span class="chip key">seed {_esc(key_fp)}</span>
-    <span class="chip">{len(fossils)} fossils</span>
-    <span class="chip">{len(births)} births</span>
-    <span class="chip lock">&#128274;&nbsp;127.0.0.1 only — never leaves this machine</span>
+  <div class="brandrow"><h1>Vivarium — {_esc(title)}</h1>
+    <span class="chip lock mini">&#128274;127.0.0.1 - private</span></div>
+  <div class="hairline"></div>
+  <div class="toprow"><span class="eraswrap"><nav class="eras"
+    aria-label="universes">{nav}</nav>{_more}</span>
     <span class="search"><input id="q" placeholder="search eidos, skill, species…"
-      aria-label="search"><kbd>/</kbd></span>
-  </div>
-  <nav class="eras" aria-label="universes">{nav}</nav>
+      aria-label="search"><kbd>/</kbd></span></div>
 </header>"""
 
 
@@ -494,7 +504,7 @@ def build_page(media_dir: str, dish_map: str, title: str = "The Hermi Gallery",
     now_sec = f"""<div class="census">{census}
   <div class="statgrid">
     <span>births recorded <b>{len(births)}</b></span><span>peak <b>{peak}</b></span>
-    <span>fossils <b>{len(fossils)}</b></span><span>universes closed <b>{len(closed_list)}</b></span>
+    <span>fossils <b>{len(fossils)}</b></span>
   </div>
   <div class="sleepline">the dish is alive in silence — it speaks only when something is born.</div>
 </div>"""
@@ -516,12 +526,16 @@ def build_page(media_dir: str, dish_map: str, title: str = "The Hermi Gallery",
         pair = _newest()
         if pair and isinstance(pair[1], dict) and pair[1].get("eidos"):
             latest = _latest_species(pair[0], pair[1], extinct_hexes)
+    # VIV-93: ONE era label. The kicker IS the era badge — status and seed
+    # live here, the dish carries no overlay and no plate.
+    era_kicker = (f'<div class="kicker">'
+                  f'<span class="kdot{" live" if live else ""}"></span>'
+                  f'Era {_esc(era)} <b>· {_esc(status)}</b>'
+                  f'<span class="seedtag">seed {_esc(key_fp)}</span></div>')
     now = f"""<section id="now">
-  <div class="kicker">Now <b>· the dish as it stands</b></div>
+  {era_kicker}
   <div class="nowsec">
-    <div class="dishwrap"><div class="dish-title">Era {_esc(era)} ·
-      {_esc(status)}</div>{dish_visual}
-      <div class="plate">the living dish<small>era {_esc(era)}</small></div></div>
+    <div class="dishwrap">{dish_visual}</div>
     <div class="nowside">{now_sec}{latest}</div>
   </div>
 </section>"""
