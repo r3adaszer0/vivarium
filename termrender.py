@@ -428,22 +428,25 @@ p{{font-size:0.8em;color:#9fc4ac;margin:6px 0 0}}
 def serve_gallery(media_dir: str, dish_map: str = "",
                   title: str = "The Vivarium",
                   port: int = 0, keep: bool = False,
-                  open_browser: bool = True) -> dict:
+                  open_browser: bool = True, html: "str | None" = None) -> dict:
     """Serve the media dir + dish on 127.0.0.1:<port> (ephemeral by default).
 
     Returns {url, port, thread}. The server dies when the process exits
     unless keep=True (a deliberate daemon). Binds localhost ONLY.
+    `html` (VIV-89): a full page from gallery.build_page — when given it
+    REPLACES the flat index; the caller owns all data gathering.
     """
     media = Path(media_dir)
     if not media.is_dir():
         return {"error": f"no media directory at {media_dir}"}
-    # build the index over existing artifacts (no new renders, no state)
-    entries = []
-    for p in sorted(media.glob("*")):
-        if p.suffix in (".png", ".mp4") and p.name != "index.html":
-            caption = p.stem.replace("_", " ").replace("-", " ")
-            entries.append({"file": p.name, "caption": caption})
-    html = _gallery_html(entries, dish_map, title)
+    if html is None:
+        # build the index over existing artifacts (no new renders, no state)
+        entries = []
+        for p in sorted(media.glob("*")):
+            if p.suffix in (".png", ".mp4") and p.name != "index.html":
+                caption = p.stem.replace("_", " ").replace("-", " ")
+                entries.append({"file": p.name, "caption": caption})
+        html = _gallery_html(entries, dish_map, title)
     (media / "index.html").write_text(html, encoding="utf-8")
 
     class _H(SimpleHTTPRequestHandler):

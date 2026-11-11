@@ -794,11 +794,25 @@ def _serve_text(keep: bool) -> str:
                 "Use /vivarium codex first.")
     try:
         w = _world()
-        dish = vworld.render_ascii(w)
+        dish = (vworld.render_ascii_rich(w, cols=64, rows=24)
+                if w is not None else "")
     except Exception:
         dish = ""
+    # VIV-89: the Hermi Gallery — the serve page as a naturalist's ledger,
+    # built from REAL state (registry, fossils, curve, media). Any failure
+    # falls back to the flat page; serve must never break over the redesign.
+    html = None
+    try:
+        try:
+            from . import gallery as vgal
+        except ImportError:  # pragma: no cover
+            import gallery as vgal
+        html = vgal.build_page(str(media), dish,
+                               title="The Hermi Gallery", st=vstate.state())
+    except Exception:
+        html = None
     res = vterm.serve_gallery(media, dish_map=dish, keep=keep,
-                              open_browser=True)
+                              open_browser=True, html=html)
     if "error" in res:
         return res["error"]
     lifetime = "stays up until Hermes exits (--keep)" if keep \
