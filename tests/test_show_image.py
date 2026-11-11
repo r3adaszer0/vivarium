@@ -70,16 +70,17 @@ class ShowDrawsTheSameFace(unittest.TestCase):
         text = T._cmd(f"show {self.eidos}")
         rows = text.split("\n")
         spacer_rows = self.painted[0]["rows"]
-        # title, one blank (the face sits a row down, per VIV-64),
+        # title, TWO blanks (the face sits a row lower per VIV-82),
         # the spacer block, then the stats directly beneath (VIV-66)
         self.assertEqual(rows[1], "")
-        self.assertTrue(all(r.strip() == "" for r in rows[2:2 + spacer_rows]))
-        self.assertIn("forage", rows[2 + spacer_rows])
+        self.assertEqual(rows[2], "")
+        self.assertTrue(all(r.strip() == "" for r in rows[3:3 + spacer_rows]))
+        self.assertIn("forage", rows[3 + spacer_rows])
 
     def test_trail_rows_cover_every_line_after_the_image(self):
         self._class("kitty")
         text = T._cmd(f"show {self.eidos}")
-        after = text.split("\n")[2 + self.painted[0]["rows"]:]
+        after = text.split("\n")[3 + self.painted[0]["rows"]:]
         self.assertEqual(self.painted[0]["trail"], len(after))
 
     def test_plain_terminal_still_gets_the_character_face(self):

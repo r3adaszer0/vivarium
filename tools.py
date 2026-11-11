@@ -1285,10 +1285,11 @@ def _show_text(rest: list) -> str:
                 vstate.request_paint("show", extra={
                     "path": path, "res_rows": res_rows,
                     "trail": len(after)})
-            # one blank line above the reserved block: the face drops a row
-            # and clears the headline. Provenance rides the card, not the
-            # title - the title names the creature and nothing else.
-            return head + "\n\n" + spacer + "\n" + rest_text
+            # VIV-82: the face sits one line lower — the user asked for a
+            # clear row of air between the headline and the glyph image on
+            # the show card. Provenance rides the card, not the title - the
+            # title names the creature and nothing else.
+            return head + "\n\n\n" + spacer + "\n" + rest_text
     card = vident.species_card(eidos, genome, vident.color_for(genome["hue"]),
                                lineage_count=count,
                                founding_skill=name or "",

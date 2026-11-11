@@ -309,11 +309,12 @@ def render(body: str, cols: int, marker: str, live: dict | None = None,
     else:
         art_lines, art_eidos, tail_text = split_art(tail_text)
     two_col = dish and bool(tail_text) and cols >= dish_cols + MIN_GUTTER
-    # VIV-80: the blank under the headline STAYS — the user asked for one
-    # empty terminal line between the copy and the picture (act 2: after
-    # the die-off line, before the dish). It reads as air on a one-column
-    # card, but above the dish it is the breathing room that separates
-    # words from image.
+    if two_col and lines and lines[-1] == "":
+        # VIV-82: act-3 wants the dish DIRECTLY under the headline — one
+        # line less between the words and the picture. The blank was the
+        # act-2 air; act-2 keeps it (the bang branch adds its own), the
+        # birth card trades it for a tighter lock between text and image.
+        lines.pop()
     spacer_at = len(lines) if two_col else None
     bang_dish_at = None
     if is_bang and dish and spacer_at is None:
@@ -336,15 +337,10 @@ def render(body: str, cols: int, marker: str, live: dict | None = None,
         right = cols - dish_cols - 4 - TEXT_INSET
         body_lines: list[str] = []
         if art_lines:
-            # The face sits at the top of the column, above the copy, so
-            # the first thing read is the creature and the second is
-            # where it is. Centered against the dish block: the face
-            # hanging at the very top while the dish starts lower reads
-            # as a stamp glued to a letter; the middle of the art should
-            # meet the middle of the dish.
-            art_h = len(art_lines)
-            pad = max(0, (dish_rows - art_h) // 2)
-            body_lines += [("", True) for _ in range(pad)]
+            # VIV-82: the face's first row = the dish's first row. The old
+            # centering pad made the Hermi float mid-column while the dish
+            # started higher; the user wants the two pictures locked at
+            # the same height — the creature and its dish meet at the top.
             body_lines += [(ln, True) for ln in art_lines]
             body_lines.append(("", True))
         for i, para in enumerate(p for p in tail_text.split("\n") if p.strip()):
@@ -357,9 +353,10 @@ def render(body: str, cols: int, marker: str, live: dict | None = None,
             body_lines += [(ln, False)
                            for ln in styled_paragraph(para, right, lead=i < 2)]
         block = max(dish_rows, len(body_lines))
-        # centre the copy beside the dish; with the art centered too, the
-        # whole column reads as one object between two equal margins.
-        top_pad = 1 if dish_rows > len(body_lines) else 0
+        # VIV-82: the copy-only column keeps its one-row offset (air above
+        # bare text), but an art-led column starts EXACTLY at the dish's
+        # top row — that alignment is the point of the two-column card.
+        top_pad = 1 if (dish_rows > len(body_lines) and not art_lines) else 0
         pad = "  " + " " * (dish_cols + TEXT_INSET)
         for i in range(block):
             j = i - top_pad

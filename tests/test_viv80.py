@@ -105,6 +105,46 @@ class TestCardLayout(unittest.TestCase):
         self.assertLessEqual(first_content, 1)
 
 
+class TestViv82Layout(unittest.TestCase):
+    """VIV-82: the act-3 birth card geometry the user specified."""
+
+    ACT3 = ("New species Eidos_1a2b3c4d · Chroma major, from your 'x' skill."
+            "\n\n<<ART:Eidos_1a2b3c4d>>\n\x1b[38;2;233;62;175m██\x1b[0m\n"
+            "\x1b[38;2;158;42;119m██\x1b[0m\n\x1b[38;2;97;26;73m██\x1b[0m\n"
+            "    \x1b[38;2;233;62;175m██\x1b[0m\n  \x1b[38;2;158;42;119m██"
+            "\x1b[0m\n\x1b[38;2;233;62;175m██\x1b[0m\n"
+            "\x1b[38;2;233;62;175m██\x1b[0m\n<</ART>>\n\n"
+            "A new Hermes skill gave birth to a new species.\n\n"
+            "Meet it: /vivarium show Eidos_1a2b3c4d\n\n"
+            "Watch it: /vivarium clip")
+
+    def _render(self):
+        import re as _re
+        r = vcard.render(self.ACT3, 100, "vivarium", live=LIVE, dish=True,
+                         dish_cols=39, era=13)
+        texts = [_re.sub(r"\x1b\[[0-9;]*m", "", ln).rstrip()
+                 for ln in r["text"].split("\n")]
+        return r, texts
+
+    def test_no_line_between_headline_and_dish(self):
+        r, texts = self._render()
+        self.assertTrue(r["has_dish"])
+        head_i = next(i for i, t in enumerate(texts)
+                      if t.startswith("New species"))
+        # the dish's top row is the row right after the headline: no air
+        self.assertEqual(r["climb"], len(texts) - 2 - head_i)
+
+    def test_face_starts_on_the_dish_top_row(self):
+        r, texts = self._render()
+        head_i = next(i for i, t in enumerate(texts)
+                      if t.startswith("New species"))
+        dish_top = len(texts) - 1 - r["climb"]
+        # the face's first content row sits on the dish's first row
+        self.assertGreater(head_i, 0)
+        self.assertIn("█", texts[head_i + 1])
+        self.assertEqual(head_i + 1, dish_top)
+
+
 class TestShowRelay(unittest.TestCase):
     def setUp(self):
         self.s = FakeState()
