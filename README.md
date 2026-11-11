@@ -10,7 +10,7 @@
   <sub><b>Vivax minor</b><br>Eidos_e45f9549</sub>
 </td>
 <td valign="middle" align="center">
-  <img src="docs/assets/dish_hero.png" width="420" alt="The Vivarium dish">
+  <img src="docs/assets/dish_genesis.gif" width="420" alt="The Vivarium dish, from genesis: twelve species, one dish, seven seconds of natural selection">
 </td>
 <td valign="middle">
   <img src="docs/assets/glyph_ef543f71.png" width="150" alt="Foragia tenuis"><br>
