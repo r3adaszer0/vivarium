@@ -42,13 +42,8 @@ CHUNK = 4096          # kitty protocol: base64 chunks of 4096 bytes
 
 
 # ── capability detection ─────────────────────────────────────────────────────
-def detect_graphics(env: Optional[dict] = None) -> str:
-    """Return 'kitty' | 'iterm2' | 'sixel' | 'none'.
-
-    Conservative by design: env evidence only, no terminal queries (which
-    can hang pipes). Callers may override with force= for tests.
-    """
-    env = dict(os.environ if env is None else env)
+def _classify_env(env: dict) -> str:
+    """Classify one env mapping: 'kitty' | 'iterm2' | 'sixel' | 'none'."""
     term = env.get("TERM", "")
     if env.get("KITTY_WINDOW_ID") or "kitty" in term:
         return "kitty"
@@ -58,6 +53,85 @@ def detect_graphics(env: Optional[dict] = None) -> str:
     if "sixel" in term or env.get("TERM_PROGRAM") in ("WezTerm",) \
             or "foot" in term:
         return "sixel"
+    return "none"
+
+
+def _proc_environ(pid: int) -> dict:
+    """Read one /proc environ (NUL-separated; same-UID processes only)."""
+    from pathlib import Path
+    try:
+        raw = Path(f"/proc/{int(pid)}/environ").read_bytes()
+    except (OSError, ValueError):
+        return {}
+    out: dict[str, str] = {}
+    for chunk in raw.split(b"\0"):
+        if not chunk or b"=" not in chunk:
+            continue
+        k, _, v = chunk.partition(b"=")
+        out[k.decode("utf-8", "replace")] = v.decode("utf-8", "replace")
+    return out
+
+
+def _parent_pid(pid: int) -> int:
+    """PPID from /proc/<pid>/stat. comm may contain spaces, so parse the
+    numeric fields AFTER the closing paren: [0]=state, [1]=ppid."""
+    from pathlib import Path
+    try:
+        stat = Path(f"/proc/{int(pid)}/stat").read_text("utf-8", "replace")
+        fields = stat[stat.rfind(")") + 2:].split()
+        return int(fields[1])
+    except (OSError, ValueError, IndexError):
+        return 0
+
+
+def _detect_from_ancestors(max_up: int = 2, environ_of=_proc_environ,
+                           parent_of=_parent_pid, has_ctty=None) -> str:
+    """VIV-77: capability from the SURFACE, not the (stripped) child env.
+
+    The TUI runs slash commands in a shadow worker whose environment is
+    deliberately scrubbed of TERMINAL_* residue (served_profile_child_env)
+    — yet the worker keeps the TUI's controlling terminal: /dev/tty IS the
+    real kitty pty. The terminal identity therefore still lives in the
+    nearest ancestor that kept its env (worker -> TUI). Walk at most
+    max_up ancestors, and only while THIS process actually owns a ctty —
+    a detached gateway must never inherit its launcher's shell env and
+    paint into a surface it does not sit on.
+    """
+    if has_ctty is None:
+        try:
+            fd = os.open("/dev/tty", os.O_RDWR)
+            os.close(fd)
+        except OSError:
+            return "none"
+    elif not has_ctty:
+        return "none"
+    pid = parent_of(os.getpid())
+    for _ in range(max_up):
+        if pid <= 1:
+            break
+        res = _classify_env(environ_of(pid))
+        if res != "none":
+            return res
+        pid = parent_of(pid)
+    return "none"
+
+
+def detect_graphics(env: Optional[dict] = None) -> str:
+    """Return 'kitty' | 'iterm2' | 'sixel' | 'none'.
+
+    Conservative by design: env evidence only, no terminal queries (which
+    can hang pipes). Callers may override with force= for tests.
+    VIV-77: with no explicit env, a child whose own environment was
+    scrubbed (TUI slash worker) falls back to the nearest ancestor that
+    still has terminal env — the paint surface (/dev/tty) is shared with
+    that ancestor, so its identity is the honest one.
+    """
+    own = dict(os.environ if env is None else env)
+    res = _classify_env(own)
+    if res != "none":
+        return res
+    if env is None:            # live detection only; explicit envs stay pure
+        return _detect_from_ancestors()
     return "none"
 
 

@@ -45,6 +45,50 @@ class TestDetection(unittest.TestCase):
         self.assertEqual(T.detect_graphics({"TERM": "xterm+sixel"}), "sixel")
 
 
+class TestAncestorDetection(unittest.TestCase):
+    """VIV-77: the TUI slash worker's env is scrubbed of TERMINAL_* vars
+    (served_profile_child_env), yet it keeps the TUI's ctty. Capability
+    must come from the nearest ancestor that still has terminal env."""
+
+    def test_explicit_env_never_walks(self):
+        # env passed explicitly: pure function of that env (pre-update law)
+        self.assertEqual(T.detect_graphics({}), "none")
+
+    def test_walk_finds_parent_env(self):
+        self.assertEqual(T._detect_from_ancestors(
+            environ_of=lambda pid: {"TERM": "xterm-kitty"} if pid == 4242 else {},
+            parent_of=lambda pid: 4242 if pid != 4242 else 1,
+            has_ctty=True), "kitty")
+
+    def test_walk_stops_without_ctty(self):
+        seen = []
+        self.assertEqual(T._detect_from_ancestors(
+            environ_of=lambda pid: seen.append(pid) or {},
+            parent_of=lambda pid: 4242, has_ctty=False), "none")
+        self.assertEqual(seen, [])   # no surface -> no /proc reads at all
+
+    def test_walk_respects_max_up(self):
+        env_of = lambda pid: {"KITTY_WINDOW_ID": "1"} if pid == 7 else {}  # noqa: E731
+        par_of = lambda pid: 7 if pid == 5 else 5                          # noqa: E731
+        self.assertEqual(T._detect_from_ancestors(
+            max_up=1, environ_of=env_of, parent_of=par_of, has_ctty=True), "none")
+        self.assertEqual(T._detect_from_ancestors(
+            max_up=2, environ_of=env_of, parent_of=par_of, has_ctty=True), "kitty")
+
+    def test_walk_none_without_terminal_env(self):
+        self.assertEqual(T._detect_from_ancestors(
+            environ_of=lambda pid: {"PATH": "/bin"},
+            parent_of=lambda pid: 4242, has_ctty=True), "none")
+
+    def test_live_detection_consults_walk(self):
+        old = T._detect_from_ancestors
+        T._detect_from_ancestors = lambda **kw: "kitty"
+        try:
+            self.assertEqual(T.detect_graphics(), "kitty")   # env=None path
+        finally:
+            T._detect_from_ancestors = old
+
+
 class TestEscapes(unittest.TestCase):
     def setUp(self):
         self.path, self.png = _png()
