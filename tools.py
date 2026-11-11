@@ -498,7 +498,7 @@ def _cmd(raw_args: str) -> str:
                             from . import card as vcard
                         except ImportError:  # pragma: no cover
                             import card as vcard
-                        panel = vcard.status_panel(stats, res_rows + 4,
+                        panel = vcard.status_panel(stats, res_rows + 3,
                                                    gutter=res_cols + 17)
                         # The panel IS the summary; the prose line would
                         # duplicate every number. The dish paints over the
