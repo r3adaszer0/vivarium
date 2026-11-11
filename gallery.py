@@ -79,23 +79,6 @@ section{padding:46px 0 8px}
 .kicker{font-size:11px;letter-spacing:.28em;color:var(--dimink);text-transform:uppercase}
 .kicker b{color:var(--mut);font-weight:500}
 .sub{color:var(--mut);font-size:12.5px;margin:6px 0 0;max-width:640px}
-.pulse{margin-top:22px;border:1px solid var(--line);border-radius:8px;background:var(--panel);
-padding:18px 18px 14px;overflow:hidden}
-.bands{display:flex;gap:3px;align-items:flex-end;height:64px}
-.band{position:relative;border-radius:3px 3px 0 0;background:var(--raise);
-border:1px solid var(--line);border-bottom:0;display:flex;align-items:flex-end;
-justify-content:center;cursor:pointer;transition:border-color .15s,background .15s;text-decoration:none}
-.band:hover{background:#1b3125;border-color:#35594a}
-.band.cur{background:#231d0d;border-color:#6b5628}
-.band .n{font-size:10px;color:var(--dimink);padding-bottom:5px}
-.band.cur .n{color:var(--amber)}
-.band .c{position:absolute;top:-20px;left:50%%;transform:translateX(-50%%);font-size:10px;
-color:var(--dimink);white-space:nowrap;opacity:0;transition:opacity .15s}
-.band:hover .c{opacity:1}
-.curve{margin-top:18px}
-.curve svg{width:100%%;height:88px;display:block}
-.legend{display:flex;gap:18px;margin-top:8px;font-size:10.5px;color:var(--dimink)}
-.legend i{display:inline-block;width:14px;height:2px;vertical-align:middle;margin-right:6px}
 .nowsec{display:grid;grid-template-columns:minmax(0,420px) 1fr;gap:26px;margin-top:22px}
 .dishwrap{position:relative;border:1px solid var(--line);border-radius:8px;background:#060a08;
 padding:14px;overflow:hidden}
@@ -443,27 +426,6 @@ def build_page(media_dir: str, dish_map: str, title: str = "The Hermi Gallery",
   <nav class="eras" aria-label="universes">{nav}</nav>
 </header>"""
 
-    # ── the pulse ──
-    maxn = max([len(births)] + [s["n"] for s in closed_list] or [1]) or 1
-    bands = []
-    cur_band = (f'<a class="band cur" href="#u{key_fp}" title="era {era} · '
-                f'{len(births)} births" style="flex:{max(len(births), 1)}">'
-                f'<span class="c">{len(births)} births</span><span class="n">era {era}</span></a>')
-    bands.append(cur_band)
-    for s in closed_list:
-        bands.append(
-            f'<a class="band" href="#u{_esc(s["key"])}" title="{_esc(s["key"])} · '
-            f'{s["n"]} fossils" style="flex:{max(s["n"], 1)}">'
-            f'<span class="c">{s["n"]} fossils</span><span class="n">'
-            f'{_esc(s["key"][:8])}</span></a>')
-    pulse = f"""<section id="pulse">
-  <div class="kicker">The Pulse <b>· every universe this dish has known</b></div>
-  <p class="sub">Each band is one universe — the living era sized by its births, the
-     closed ones by the fossils they left.</p>
-  <div class="pulse"><div class="bands">{''.join(bands)}</div>
-  <div class="legend"><span style="margin-left:auto">hover a band · <kbd class="nav">←</kbd>
-  <kbd class="nav">→</kbd> between universes</span></div></div>
-</section>"""
 
     # ── now ──
     statgrid, dish_visual = "", ""
@@ -627,17 +589,21 @@ def build_page(media_dir: str, dish_map: str, title: str = "The Hermi Gallery",
     });
   }
   drawDish(cv.dataset.grid);
-  /* a refresh asks the dish for its current tick */
+  /* a refresh asks the dish for its current tick; so does a slow poll —
+     the page stays a live window on the dish while Hermes works */
   if(cv.dataset.live!==undefined){
-    fetch('/live/dish.json',{cache:'no-store'}).then(r=>r.ok?r.json():null)
-    .then(d=>{
-      if(!d||!d.grid)return;
-      cv.dataset.grid=d.grid;drawDish(d.grid);
-      const t=document.getElementById('census-tick'),
-            a=document.getElementById('census-alive');
-      if(t&&d.tick!=null)t.textContent='tick '+d.tick;
-      if(a&&d.alive!=null)a.textContent=d.alive+' alive';
-    }).catch(()=>{});
+    const askDish=()=>{
+      fetch('/live/dish.json',{cache:'no-store'}).then(r=>r.ok?r.json():r.json().then(j=>Promise.reject(j)))
+      .then(d=>{
+        if(!d||!d.grid)return;
+        cv.dataset.grid=d.grid;drawDish(d.grid);
+        const t=document.getElementById('census-tick'),
+              a=document.getElementById('census-alive');
+        if(t&&d.tick!=null)t.textContent='tick '+d.tick;
+        if(a&&d.alive!=null)a.textContent=d.alive+' alive';
+      }).catch(e=>{console.warn('[vivarium] live dish:',e&&e.error||e)});
+    };
+    askDish();setInterval(askDish,4000);
   }
 })();
 /* search: filter the registry */
@@ -680,6 +646,6 @@ def build_page(media_dir: str, dish_map: str, title: str = "The Hermi Gallery",
     return f"""<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{_esc(title)}</title><style>{css}</style></head><body><div class="wrap">
-{head}{pulse}{now}{chapters}{appendix}{footer}
+{head}{now}{chapters}{appendix}{footer}
 </div><dialog id="theater"><div id="theaterBody"></div></dialog>{script}
 </body></html>"""

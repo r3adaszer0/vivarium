@@ -474,10 +474,15 @@ def serve_gallery(media_dir: str, dish_map: str = "",
                     self.send_header("Content-Length", str(len(body)))
                     self.end_headers()
                     self.wfile.write(body)
-                except Exception:
+                except Exception as exc:
+                    import json as _json
+                    body = _json.dumps({"error": f"{type(exc).__name__}: {exc}"}).encode("utf-8")
                     self.send_response(503)
-                    self.send_header("Content-Length", "0")
+                    self.send_header("Content-Type", "application/json")
+                    self.send_header("Cache-Control", "no-store")
+                    self.send_header("Content-Length", str(len(body)))
                     self.end_headers()
+                    self.wfile.write(body)
                 return
             super().do_GET()
 

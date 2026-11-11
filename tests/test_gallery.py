@@ -110,13 +110,16 @@ class TestChaptersAndPulse(unittest.TestCase):
         self.assertIn("A closed universe", html)
         self.assertIn("Eidos_8fd78ab1", html)
 
-    def test_pulse_bands_exist_and_curve_is_gone(self):
-        """VIV-90: the population-curve diagram is retired (post-hackathon
-        redesign pending). The bands carry the story; no fake lines."""
+    def test_pulse_section_is_gone(self):
+        """VIV-90b: the user called the pulse a duplicate of the masthead's
+        universe nav — the whole section is removed."""
         html = vgal.build_page("/nonexistent", RICH, st=_St(_state()))
-        self.assertIn('class="band cur"', html)
+        self.assertNotIn('id="pulse"', html)
+        self.assertNotIn("The Pulse", html)
         self.assertNotIn("<path d=\"M", html)
         self.assertNotIn("population history", html)
+        # the masthead nav still carries every universe
+        self.assertIn('class="eras"', html)
 
     def test_curve_data_is_ignored_not_rendered(self):
         html = vgal.build_page("/nonexistent", RICH, st=_St(_state(curve=[

@@ -820,7 +820,9 @@ def _serve_text(keep: bool) -> str:
             try:
                 w = _world()
                 if w is None:
-                    return dict(_last)
+                    if _last["grid"]:
+                        return dict(_last)
+                    raise RuntimeError("no live world to render")
                 st = vworld.stats(w)
                 out = {"tick": st.get("tick"), "alive": st.get("population"),
                        "grid": vgal._grid_json(
@@ -828,9 +830,13 @@ def _serve_text(keep: bool) -> str:
                 if out["grid"]:
                     _last.clear()
                     _last.update(out)
+                else:
+                    raise RuntimeError("empty grid rendered")
                 return dict(_last)
             except Exception:
-                return dict(_last)
+                if _last["grid"]:
+                    return dict(_last)      # keep serving the last good dish
+                raise                        # never succeeded: make it VISIBLE
         provider = _dish_provider
     except Exception:
         html = None
