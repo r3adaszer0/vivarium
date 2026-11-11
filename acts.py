@@ -206,13 +206,13 @@ def act3_for(result: dict, arrival: bool = True, full: bool = False) -> str:
     # under the dish, and the stat panel beside the face carries the
     # numbers. Copy here is one line: who this is, and the two commands.
     if not arrival:
-        # Later acts already told the birth story; the face and the arena
-        # copy are what is new. No registry rows, no 'gave birth' line.
-        # VIV-74: routine arrivals (post-walkthrough) carry ONE line of
-        # copy, not the full act-4 pitch again.
-        if full:
-            return art_block(eidos, genome, result) + act4_text()
-        return art_block(eidos, genome, result) + act4_text(short=True)
+        # VIV-85: the routine arrival is the RITUAL CARD — the user's
+        # act-4 spec (id, name, dish, face + attributes, census,
+        # commands) with NO prose. This function used to return act-4's
+        # survival line here, which is exactly the act-3/act-4 narration
+        # mix the user flagged: act-4's words riding act-3's card on
+        # every birth. The walkthrough belongs to act4_for alone.
+        return art_block(eidos, genome, result)
     src = f" from your '{name}' skill" if name else ""
     return (
         art_block(eidos, genome, result)
@@ -251,12 +251,16 @@ def act4_text(short: bool = False) -> str:
 
 
 def act4_for(result: dict) -> str:
-    """Act 4 with the newborn's face, like act 3: every birth deserves one.
+    """Act 4 with the newborn's face: the ONE-TIME walkthrough.
 
-    The walkthrough birth keeps the FULL pitch (short=False) - this is
+    VIV-85: act-4's narration lives HERE and nowhere else — act3_for no
+    longer returns it for routine arrivals (that was the mix the user
+    flagged). The walkthrough birth keeps the FULL pitch (short=False):
     the one time the export/race story is told.
     """
-    return act3_for(result, arrival=False, full=True)
+    eidos = result.get("eidos", "?")
+    genome = result.get("genome") or {}
+    return art_block(eidos, genome, result) + act4_text()
 
 
 def act_codex_text(discovery_label: str) -> str:

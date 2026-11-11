@@ -49,7 +49,9 @@ class TestActs(unittest.TestCase):
         out3 = A.birth_narration(self.s, "BASE", r, is_big_bang=False)
         self.assertTrue(out3.startswith("BASE"), "fourth birth keeps the headline")
         self.assertIn("<<ART:", out3, "fourth birth still shows the face")
-        self.assertIn("Survival was the filter", out3)
+        # VIV-85: the ritual card carries NO act-4 prose — the survival
+        # line belongs to act 4 alone (the narration mix the user flagged)
+        self.assertNotIn("Survival was the filter", out3)
         self.assertNotIn("/vivarium export", out3, "pitch never repeats")
         self.assertNotIn("/vivarium race", out3, "pitch never repeats")
 

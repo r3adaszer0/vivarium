@@ -308,7 +308,8 @@ def render(body: str, cols: int, marker: str, live: dict | None = None,
         art_lines, art_eidos = facts["art"], facts.get("art_id", "")
     else:
         art_lines, art_eidos, tail_text = split_art(tail_text)
-    two_col = dish and bool(tail_text) and cols >= dish_cols + MIN_GUTTER
+    two_col = dish and (bool(tail_text) or bool(art_lines)) \
+        and cols >= dish_cols + MIN_GUTTER
     # VIV-84, THE UNIFORM LAW (user): whenever text sits above the dish,
     # the dish starts ONE line below it — always, every card, no per-act
     # exceptions. The head block's trailing blank IS that gap; act-2's
@@ -372,13 +373,17 @@ def render(body: str, cols: int, marker: str, live: dict | None = None,
         cap = _caption(live, note)
         if cap:
             lines.append(cap)
-    elif tail_text:
+    elif tail_text or art_lines:
+        # VIV-85: a face-only body (the ritual card, no prose) must still
+        # print its art block in one-column mode — the old gate dropped
+        # the face whenever the tail was empty.
         for ln in art_lines:
             lines.append("  " + ln)
         if art_lines:
             lines.append("")
-        for ln in wrap(tail_text, cols - 2):
-            lines.append(f"  {SOFT}{ln}{RST}")
+        if tail_text:
+            for ln in wrap(tail_text, cols - 2):
+                lines.append(f"  {SOFT}{ln}{RST}")
         # VIV-74: the census (tick / alive / lineages / top coloured) must
         # ride EVERY arrival card, not only the two-column dish layout -
         # on a narrow or non-painting surface the dish drops out and the
