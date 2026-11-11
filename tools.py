@@ -521,7 +521,11 @@ def _cmd(raw_args: str) -> str:
                             body += f"\n\n{' ' * (res_cols + 17)}  {stale}"
                         if vterm.detect_graphics() in ("kitty", "iterm2",
                                                        "sixel"):
-                            vterm.paint_over(path, res_rows, 0, delay=0.4)
+                            # VIV-87: the image top aligns with the TUI's
+                            # tool-indicator row (the ⚙ the user sees) —
+                            # one row higher than the default 3-row climb.
+                            vterm.paint_over(path, res_rows, 0, delay=0.4,
+                                             extra_climb=4)
                         else:
                             # VIV-77b: headless surface — hand the paint
                             # to whichever process sits on a terminal.

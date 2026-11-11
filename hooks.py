@@ -453,7 +453,9 @@ def _paint_status_relay() -> None:
             return
         size = vterm.png_size(path) or (342, 339)
         res_rows = max(1, _math.ceil(size[1] / vterm.CELL_H))
-        vterm.paint_over(path, res_rows, 0, delay=0.0)
+        # VIV-87: same one-row lift as the direct slash paint — the image
+        # top aligns with the TUI's tool-indicator row (⚙), both paths.
+        vterm.paint_over(path, res_rows, 0, delay=0.0, extra_climb=4)
     except Exception:
         pass
 
