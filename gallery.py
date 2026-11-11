@@ -48,7 +48,8 @@ body{background:var(--bg);color:var(--ink);font-family:var(--mono);font-size:14p
 line-height:1.5;margin:0;-webkit-font-smoothing:antialiased}
 .wrap{max-width:1180px;margin:0 auto;padding:0 28px}
 header{padding:38px 0 22px;border-bottom:1px solid var(--line)}
-.brandrow{display:flex;justify-content:space-between;align-items:center;gap:14px}
+.brandrow{display:flex;align-items:center;gap:14px}
+.brandrow .search{min-width:272px;max-width:320px}
 .brandrow h1{font-size:30px;font-weight:600;letter-spacing:-.01em;margin:0}
 .chip.mini{font-size:9.5px;padding:3px 8px;letter-spacing:.04em}
 .hairline{height:1px;background:var(--line);margin-top:12px}
@@ -478,13 +479,13 @@ def build_page(media_dir: str, dish_map: str, title: str = "The Hermi Gallery",
              if _hidden else "")
     head = f"""<header id="top">
   <div class="brandrow"><h1>Vivarium — {_esc(title)}</h1>
+    <span class="search"><input id="q" placeholder="search the registry…"
+      aria-label="search"><kbd>/</kbd></span>
     <span class="chip lock mini">&#128274;127.0.0.1 - private</span></div>
   <div class="hairline"></div>
-  <div class="toprow"><span class="eraswrap"><nav class="eras"
-    aria-label="universes">{nav}</nav></span>{_more}
-    <a class="reglink" href="#chapters">the registry of Hermi &#8595;</a>
-    <span class="search"><input id="q" placeholder="search eidos, skill, species…"
-      aria-label="search"><kbd>/</kbd></span></div>
+  <div class="toprow"><a class="reglink" href="#chapters">the registry of Hermi &#8595;</a>
+    <span class="eraswrap"><nav class="eras"
+    aria-label="universes">{nav}</nav></span>{_more}</div>
 </header>"""
 
 
