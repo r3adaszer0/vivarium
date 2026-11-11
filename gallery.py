@@ -101,12 +101,15 @@ margin-top:12px;font-size:12px;color:var(--mut)}
 .sleepline{margin-top:14px;font-size:12px;color:var(--dimink);font-style:italic;
 font-family:var(--serif)}
 .latest{display:flex;gap:12px;align-items:center;border:1px solid var(--line);border-radius:8px;
-background:var(--panel);padding:12px}
-.latest video{width:118px;height:76px;border-radius:5px;flex:none;object-fit:cover;
-background:#060a08}
+background:var(--panel);padding:12px;text-decoration:none}
+.latest .face{flex:none;width:64px;display:block}
+.latest .face svg{display:block;width:64px;height:64px}
 .latest .meta{min-width:0}
-.latest .meta .t{font-size:12.5px;color:var(--ink)}
-.latest .meta .d{font-size:11px;color:var(--dimink);margin-top:3px}
+.latest .meta .t{font-size:12.5px;color:var(--ink);display:block}
+.latest .meta .d{font-size:11px;color:var(--dimink);margin-top:3px;display:block;
+white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.latest .meta .d.see{color:var(--acc)}
+.latest .meta .d.chip-line{font-family:var(--mono);letter-spacing:.02em}
 .chapter{display:grid;grid-template-columns:96px minmax(0,1fr);gap:0;margin-top:14px;
 border-top:1px solid var(--line);padding-top:34px}
 .rail{align-self:start;text-align:left;padding-left:2px}
@@ -311,7 +314,7 @@ def _cert(skill: str, e: dict, extinct_hexes: frozenset) -> str:
     chip = " ".join(f"{_GEN_KEY.get(k, k[:3])}:{float(v):.2f}"
                     for k, v in gen.items() if k != "hue")
     q = _esc(skill) + " " + _esc(eidos) + " " + _esc(nm)
-    return (f'<div class="cert" data-search="{q}">'
+    return (f'<div class="cert" id="cert-{_esc(hexid)}" data-search="{q}">'
             f'<div class="top"><div class="face">{_face_svg(gen, dead)}</div>'
             f'<div class="id"><div class="nm">{_esc(nm)}</div>'
             f'<div class="ei">{_esc(eidos)}</div>'
@@ -324,6 +327,31 @@ def _cert(skill: str, e: dict, extinct_hexes: frozenset) -> str:
             f'<span class="cp" data-chip="{_esc(chip)}" '
             f'onclick="navigator.clipboard&&navigator.clipboard.writeText'
             f'(this.dataset.chip)">copy</span></div></div>')
+
+
+def _latest_species(skill: str, e: dict, extinct_hexes: frozenset) -> str:
+    """The newest birth, featured in NOW (VIV-92): face, name, genome chip,
+    provenance — linked to its full certificate below."""
+    gen = e.get("genome") or {}
+    eidos = e.get("eidos", "")
+    hexid = eidos.replace("Eidos_", "")
+    dead = hexid in extinct_hexes
+    try:
+        genus, epithet, _common = vid.name_of(gen)
+        nm = f"{genus} {epithet}"
+    except Exception:
+        nm = "unnamed strain"
+    chip = " ".join(f"{_GEN_KEY.get(k, k[:3])}:{float(v):.2f}"
+                    for k, v in gen.items() if k != "hue")
+    return (f'<a class="latest" href="#cert-{_esc(hexid)}">'
+            f'<span class="face">{_face_svg(gen, dead, 64)}</span>'
+            f'<span class="meta">'
+            f'<span class="t">Latest birth · {_esc(nm)}</span>'
+            f'<span class="d">{_esc(eidos)} · era {_esc(e.get("era", "?"))} '
+            f'· from skill “{_esc(skill)}”</span>'
+            f'<span class="d chip-line">{_esc(chip)}</span>'
+            f'<span class="d see">see its certificate ↓</span>'
+            f'</span></a>')
 
 
 def _specimen(lineage: str, genome: dict, universe: str, day: str) -> str:
@@ -470,15 +498,24 @@ def build_page(media_dir: str, dish_map: str, title: str = "The Hermi Gallery",
   </div>
   <div class="sleepline">the dish is alive in silence — it speaks only when something is born.</div>
 </div>"""
-    if clips:
-        c0 = clips[-1]
-        latest = (f'<div class="latest"><video src="{_esc(c0["path"])}" muted '
-                  f'preload="metadata"></video><div class="meta">'
-                  f'<div class="t">Latest clip · {_esc(c0["name"])}</div>'
-                  f'<div class="d">click any clip below to watch — served from this machine only</div>'
-                  f'</div></div>')
-    else:
-        latest = ""
+    # VIV-92: the featured card in NOW is the latest BORN SPECIES, not the
+    # latest clip — the filmstrip below still holds every clip.
+    latest = ""
+    if births:
+        def _newest():
+            def key(kv):
+                try:
+                    era_v = int(kv[1].get("era", 0))
+                except (TypeError, ValueError):
+                    era_v = 0
+                return (era_v, str(kv[1].get("day", "")))
+            try:
+                return max(births.items(), key=key)
+            except (AttributeError, TypeError):
+                return None
+        pair = _newest()
+        if pair and isinstance(pair[1], dict) and pair[1].get("eidos"):
+            latest = _latest_species(pair[0], pair[1], extinct_hexes)
     now = f"""<section id="now">
   <div class="kicker">Now <b>· the dish as it stands</b></div>
   <div class="nowsec">

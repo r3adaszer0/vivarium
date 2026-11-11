@@ -110,9 +110,27 @@ class TestChaptersAndPulse(unittest.TestCase):
         self.assertIn("A closed universe", html)
         self.assertIn("Eidos_8fd78ab1", html)
 
+    def test_latest_birth_replaces_latest_clip(self):
+        """VIV-92: NOW features the newest born SPECIES — face, name,
+        provenance, chip — linked to its certificate. No clip card."""
+        html = vgal.build_page("/nonexistent", RICH, st=_St(_state()))
+        self.assertIn("Latest birth", html)
+        self.assertNotIn("Latest clip", html)
+        import re as _re
+        now_sec = html.split('id="now"')[1].split("</section>")[0]
+        m = _re.search(r'href="#cert-([0-9a-f]+)"', now_sec)
+        self.assertTrue(m, "the featured card must link to a certificate")
+        # the linked eidos is the one the card actually names
+        self.assertIn(f"Eidos_{m.group(1)}", now_sec)
+        # its certificate is anchorable
+        self.assertIn(f'id="cert-{m.group(1)}"', html)
+
+    def test_no_births_no_latest_card(self):
+        """A fresh install has no births -> no featured card, no crash."""
+        html = vgal.build_page("/nonexistent", RICH, st=_St(_state(births={})))
+        self.assertNotIn("Latest birth", html)
+
     def test_pulse_section_is_gone(self):
-        """VIV-90b: the user called the pulse a duplicate of the masthead's
-        universe nav — the whole section is removed."""
         html = vgal.build_page("/nonexistent", RICH, st=_St(_state()))
         self.assertNotIn('id="pulse"', html)
         self.assertNotIn("The Pulse", html)
