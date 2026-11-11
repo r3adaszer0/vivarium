@@ -142,10 +142,6 @@ speciation event. Time ticks; skills punctuate.
 </table>
 </div>
 
-Deep-dive documents: [the Compendium](docs/vivarium_compendium.pdf) (design,
-math, comparisons to cellular automata and related work) and the
-[plain-language user guide](docs/user_guide.pdf).
-
 ## What you can do
 
 | Command | Effect |
