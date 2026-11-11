@@ -208,6 +208,14 @@ def _on_pre_llm_call(session_id: str = "", user_message: str = "",
     """
     try:
         _TURN_OPEN["open"] = True        # VIV-79: cards must not paint mid-turn
+        try:
+            import time as _t
+            # VIV-81: bracket the turn in SHARED state — the TUI's poller
+            # runs in another process and must see this turn too.
+            vstate.state().set("agent_turn_open", True)
+            vstate.state().set("agent_turn_open_at", _t.time())
+        except Exception:
+            pass
         if vstate.peek_milestone() is not None:
             line = vstate.pop_milestone() or ""
             tail = ""
@@ -273,6 +281,10 @@ def _on_stream_end(**_):
     """
     import time as _t
     _TURN_OPEN["open"] = False   # VIV-79: the turn closed; cards may paint
+    try:
+        vstate.state().set("agent_turn_open", False)   # VIV-81: clear the shared gate
+    except Exception:
+        pass
     _capture_pt_app()
     if _PICTURE_PENDING.get("armed"):
         # a little slack: the TUI is still painting the final message
@@ -303,6 +315,33 @@ def _can_paint() -> bool:
 
 _PAINT_RELAY: dict = {"started": False}
 _TURN_OPEN: dict = {"open": False}   # VIV-79: a turn is streaming; cards wait
+_TURN_STALE_S = 300.0                # VIV-81: a crashed turn must not wedge cards
+
+
+def _card_claim_allowed(vst) -> bool:
+    """VIV-81: the card gate is CROSS-PROCESS now.
+
+    The skill turn runs in the gateway; the TUI's poller lives in another
+    process whose own _TURN_OPEN is always False — so the TUI claimed and
+    painted cards while the gateway's reply was still streaming (the
+    exact "vivarium fires before Hermes finishes" the user kept hitting).
+    pre_llm_call/post_llm_call now bracket the turn in SHARED state
+    (agent_turn_open), and every process's poller consults it. A stale
+    open flag (a crashed turn that never closed) yields after the cap so
+    a wedge can never strand the queue forever.
+    """
+    if _TURN_OPEN.get("open"):
+        return False
+    try:
+        st = vst.state()
+        if st.get("agent_turn_open"):
+            import time as _t
+            opened_at = float(st.get("agent_turn_open_at") or 0.0)
+            if _t.time() - opened_at < _TURN_STALE_S:
+                return False
+    except Exception:
+        pass
+    return True
 
 
 def _ensure_paint_relay() -> None:
@@ -348,7 +387,8 @@ def _ensure_paint_relay() -> None:
                 # BETTER: card+image as one payload between turns, no
                 # one-turn delay, nothing lost. Never mid-turn: the agent's
                 # reply is still streaming; the beat waits for the gap.
-                if _TURN_OPEN.get("open"):
+                # VIV-81: "mid-turn" is now judged cross-process.
+                if not _card_claim_allowed(vst):
                     continue
                 line = vst.pop_milestone()
                 if line:

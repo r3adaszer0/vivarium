@@ -49,6 +49,34 @@ class TestCardRelay(unittest.TestCase):
         self.assertIn("New species", line)
         self.assertIn("<<ART:Eidos_1a2b3c4d>>", line)   # the face survives
 
+    def test_pre_llm_opens_the_SHARED_turn_gate(self):
+        # VIV-81: the gateway runs the turn, the TUI's poller claims cards
+        # in another process — the gate must live in shared state, or the
+        # TUI paints the card while the gateway's reply is still streaming
+        vhooks._on_pre_llm_call()
+        self.assertTrue(self.store.get("agent_turn_open"))
+        self.assertGreater(float(self.store.get("agent_turn_open_at") or 0), 0)
+
+    def test_post_llm_closes_the_SHARED_turn_gate(self):
+        self.store["agent_turn_open"] = True
+        vhooks._on_stream_end()
+        self.assertFalse(self.store.get("agent_turn_open"))
+
+    def test_poller_waits_while_another_process_turn_is_open(self):
+        import time as _t
+        vhooks._TURN_OPEN["open"] = False   # isolate from earlier pre_llm tests
+        self.store["agent_turn_open"] = True
+        self.store["agent_turn_open_at"] = _t.time()
+        self.assertFalse(vhooks._card_claim_allowed(vstate))
+        # stale (a crashed turn that never closed): yield after the cap
+        self.store["agent_turn_open_at"] = _t.time() - 400.0
+        self.assertTrue(vhooks._card_claim_allowed(vstate))
+
+    def test_poller_claims_in_a_real_turn_gap(self):
+        vhooks._TURN_OPEN["open"] = False   # isolate from earlier pre_llm tests
+        self.store["agent_turn_open"] = False
+        self.assertTrue(vhooks._card_claim_allowed(vstate))
+
     def test_pre_llm_wrapper_adds_attach_directive_for_cards(self):
         vhooks._deliver_beat("New species Eidos_1a2b3c4d from your skill.")
         inj = vhooks._on_pre_llm_call() or {}
