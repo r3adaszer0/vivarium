@@ -131,20 +131,29 @@ text-transform:uppercase;padding:3px 8px;border-radius:3px;border:1px solid}
 .rail .badge.bang{color:var(--amber);border-color:#4a3c1e;background:#1a1608}
 .rail .badge.div{color:var(--acc);border-color:#1e3a52;background:#0b1620}
 .rail .badge.dead{color:var(--dimink);border-color:var(--line)}
-.rail .tally{margin-top:12px;font-size:11px;color:var(--mut)}
+.rail .tally{margin-top:12px;font-size:10px;color:var(--mut);white-space:nowrap;
+line-height:1.8}
 .rail .tally .up{color:%(LIVE)s}.rail .tally .dn{color:var(--rose)}
 .chead{margin-bottom:20px}
 .chead h2{font-size:19px;font-weight:600;margin:0;letter-spacing:-.01em}
 .chead p{color:var(--mut);font-size:12.5px;margin:6px 0 0;max-width:620px}
 .block{margin-top:26px}
-.block .bt{font-size:10.5px;letter-spacing:.22em;color:var(--dimink);text-transform:uppercase;
+.block .bt{font-size:10.5px;letter-spacing:.22em;color:var(--mut);text-transform:uppercase;
 display:flex;align-items:center;gap:12px}
 .block .bt:after{content:"";flex:1;height:1px;background:var(--line)}
 .snaprow{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-top:14px}
 .snap{border:1px solid var(--line);border-radius:7px;background:#060a08;overflow:hidden}
 .snap img{width:100%%;display:block;image-rendering:pixelated;cursor:zoom-in}
-.snap .cap{display:flex;justify-content:space-between;font-size:10px;color:var(--dimink);
+.snap .cap{display:flex;justify-content:space-between;font-size:10px;color:var(--mut);
 padding:7px 9px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.snap.glyph{background:#0b120e}
+.kindbar{display:flex;gap:6px;margin-top:12px}
+.kind{font-family:var(--mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;
+color:var(--dimink);background:none;border:1px solid var(--line);border-radius:4px;
+padding:3px 10px;cursor:pointer}
+.kind:hover{color:var(--ink);border-color:#35594a}
+.kind.on{color:var(--amber);border-color:#4a3c1e;background:#1a1608}
+.block.hide{display:none}
 .film{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-top:14px}
 .clip{border:1px solid var(--line);border-radius:7px;overflow:hidden;background:var(--panel);
 cursor:pointer;transition:border-color .15s,transform .15s}
@@ -571,22 +580,43 @@ def build_page(media_dir: str, dish_map: str, title: str = "The Hermi Gallery",
         f'<path d="M8 5v14l11-7z"/></svg></div></div>'
         f'<div class="cl"><span>{_esc(f["name"])}</span><small>clip</small></div></div>'
         for f in clips)
-    era_snaps = "".join(
-        f'<div class="snap"><img src="{_esc(f["path"])}" alt="{_esc(f["name"])}" '
-        f'loading="lazy"><div class="cap"><span>{_esc(f["name"])}</span>'
-        f'<span>{_time.strftime("%H:%M", _time.localtime(f["mtime"]))}</span></div></div>'
-        for f in snaps)
+    def _snap(f, glyph=False):
+        # VIV-96: alt="" — the caption below carries the name; alt text on a
+        # lazy-loading image paints white boxes over the grid. The time gets
+        # an honest "at" prefix and the full date on hover.
+        t = _time.strftime("%H:%M", _time.localtime(f["mtime"]))
+        full = _time.strftime("%Y-%m-%d %H:%M", _time.localtime(f["mtime"]))
+        cls = ' class="snap glyph"' if glyph else ' class="snap"'
+        return (f'<div{cls}><img src="{_esc(f["path"])}" alt="" loading="lazy">'
+                f'<div class="cap"><span>{_esc(f["name"])}</span>'
+                f'<span title="{full}">at {t}</span></div></div>')
+
+    dish_snaps = [f for f in snaps if not f["name"].startswith("glyph")]
+    glyph_snaps = [f for f in snaps if f["name"].startswith("glyph")]
 
     cur_blocks = ""
-    if era_snaps:
-        cur_blocks += (f'<div class="block"><div class="bt">The dish &amp; artifacts '
-                       f'· this era</div><div class="snaprow">{era_snaps}</div></div>')
-    if era_clips:
-        cur_blocks += (f'<div class="block"><div class="bt">The filmstrip · clips '
-                       f'from this era</div><div class="film">{era_clips}</div></div>')
-    else:
-        cur_blocks += (f'<div class="block"><div class="bt">The filmstrip · clips '
-                       f'from this era</div><div class="film"><div class="app" '
+    if dish_snaps:
+        cur_blocks += (f'<div class="block" data-kind="dishes"><div class="bt">The dish '
+                       f'&amp; snapshots · this era</div><div class="snaprow">'
+                       + "".join(_snap(f) for f in dish_snaps) + '</div></div>')
+    if glyph_snaps:
+        cur_blocks += (f'<div class="block" data-kind="glyphs"><div class="bt">Hermi glyphs'
+                       f' · this era</div><div class="snaprow">'
+                       + "".join(_snap(f, True) for f in glyph_snaps) + '</div></div>')
+    if clips:
+        cur_blocks += (f'<div class="block" data-kind="clips"><div class="bt">The filmstrip '
+                       f'· clips from this era</div><div class="film">{era_clips}</div></div>')
+    # VIV-96: filter the living era by kind — chips only for kinds that exist.
+    _have = [k for k, ok in (("dishes", dish_snaps), ("glyphs", glyph_snaps),
+                             ("clips", clips)) if ok]
+    if len(_have) >= 2:
+        chips = '<button class="kind on" data-kind="all">all</button>' + "".join(
+            f'<button class="kind" data-kind="{k}">{k}</button>' for k in _have)
+        cur_blocks = (f'<div class="kindbar" role="group" '
+                      f'aria-label="filter artifacts">{chips}</div>' + cur_blocks)
+    if not clips:
+        cur_blocks += (f'<div class="block" data-kind="clips"><div class="bt">The filmstrip '
+                       f'· clips from this era</div><div class="film"><div class="app" '
                        f'style="grid-column:1/-1;padding:14px">No clips filmed in '
                        f'this era yet — <a style="color:var(--mut)" href="#">'
                        f'/vivarium clip</a> films the live dish, and it lands here.'
@@ -599,13 +629,10 @@ def build_page(media_dir: str, dish_map: str, title: str = "The Hermi Gallery",
   <div class="rail"><div class="num">{_esc(era)}</div>
     <div class="when">began<br>{_esc(genesis_day) or "—"}</div>
     <div class="badge {'bang' if live else 'dead'}">{'the living era' if live else 'dormant'}</div>
-    <div class="tally"><span class="up">{len(births)} born</span> ·
+    <div class="tally"><span class="up">{len(births)} born</span><br>
       <span class="dn">{len(fossils)} fossil lines</span></div>
     <div class="when" style="margin-top:8px">seed {_esc(key_fp)}</div></div>
-  <div><div class="chead"><h2>The living ledger</h2>
-    <p>Every skill that ever ran put one seed in this universe's soil; the registry
-       below is the complete birth record of era {_esc(era)}.</p></div>
-    {cur_blocks}</div></div>"""
+  <div>{cur_blocks}</div></div>"""
 
     closed_chapters = []
     for s in closed_list:
@@ -625,9 +652,8 @@ def build_page(media_dir: str, dish_map: str, title: str = "The Hermi Gallery",
       <div class="fallen"><div class="shelf">{shelf}</div></div></div></div></div>""")
 
     chapters = f"""<section id="chapters">
-  <div class="kicker">The Chapters <b>· every era keeps its own shelf</b></div>
-  <p class="sub">Dishes are snapshots, clips are filmstrips, births are certificates.
-     Nothing is deleted on restart — a new era simply opens the next page of the ledger.</p>
+  <div class="kicker">The Chapters <b>· dishes are snapshots, clips are
+    filmstrips, births are certificates</b></div>
   {cur_chapter}{''.join(closed_chapters)}
 </section>"""
 
@@ -720,6 +746,18 @@ def build_page(media_dir: str, dish_map: str, title: str = "The Hermi Gallery",
       i=Math.min(anchors.length-1,Math.max(0,i+(e.key==='ArrowRight'?1:-1)));
       anchors[i].scrollIntoView({block:'start'});
     }
+  });
+})();
+/* filter the living era by kind: all / dishes / glyphs / clips */
+(function(){
+  const bar=document.querySelector('.kindbar');if(!bar)return;
+  const ch=document.querySelector('#chapters .chapter');
+  const blocks=[...ch.querySelectorAll('.block[data-kind]')];
+  bar.addEventListener('click',e=>{
+    const b=e.target.closest('.kind');if(!b)return;
+    bar.querySelectorAll('.kind').forEach(k=>k.classList.toggle('on',k===b));
+    const k=b.dataset.kind;
+    blocks.forEach(bl=>bl.classList.toggle('hide',k!=='all'&&bl.dataset.kind!==k));
   });
 })();
 </script>"""

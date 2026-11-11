@@ -142,6 +142,7 @@ class TestChaptersAndPulse(unittest.TestCase):
         self.assertIn('class="reglink" href="#chapters"', html)
         self.assertIn("the registry of Hermi", html)
 
+
     def test_latest_birth_replaces_latest_clip(self):
         """VIV-92: NOW features the newest born SPECIES — face, name,
         provenance, chip — linked to its certificate. No clip card."""
@@ -316,3 +317,57 @@ class TestAnyUser(unittest.TestCase):
 
 if __name__ == "__main__":  # pragma: no cover
     unittest.main()
+
+class TestLivingEraKinds(unittest.TestCase):
+    """VIV-96: the living era's artifacts are grouped by kind, framed,
+    honestly timed, and filterable — dishes / glyphs / clips."""
+
+    def _media(self, tmp):
+        import time as _t
+        for name in ("era20_final_1.png", "era20_final_2.png",
+                     "glyph_ab12cd34.png", "glyph_ef56ab78.png", "clip_1.mp4"):
+            p = os.path.join(tmp, name)
+            open(p, "wb").write(b"x")
+            os.utime(p, (_t.time(), _t.time()))
+
+    def test_snaps_grouped_glyphs_framed(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmp:
+            self._media(tmp)
+            html = vgal.build_page(tmp, RICH, st=_St(_state()))
+        self.assertIn('data-kind="dishes"', html)
+        self.assertIn('data-kind="glyphs"', html)
+        self.assertIn('data-kind="clips"', html)
+        self.assertIn('class="snap glyph"', html)
+        d = html.split('<div class="block" data-kind="dishes">')[1].split("</div></div>")[0]
+        g = html.split('<div class="block" data-kind="glyphs">')[1].split("</div></div>")[0]
+        self.assertIn("era20_final_1.png", d)
+        self.assertNotIn("glyph_ab12cd34.png", d)
+        self.assertIn("glyph_ab12cd34.png", g)
+
+    def test_kindbar_filter_chips(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmp:
+            self._media(tmp)
+            html = vgal.build_page(tmp, RICH, st=_St(_state()))
+        self.assertIn('class="kindbar"', html)
+        self.assertIn('data-kind="all"', html)
+        self.assertIn(">glyphs</button>", html)
+        self.assertIn(">clips</button>", html)
+
+    def test_snap_clean_alt_and_honest_time(self):
+        import tempfile, re
+        with tempfile.TemporaryDirectory() as tmp:
+            self._media(tmp)
+            html = vgal.build_page(tmp, RICH, st=_St(_state()))
+        self.assertIn('alt=""', html)
+        self.assertRegex(html, r'title="\d{4}-\d\d-\d\d \d\d:\d\d">at \d\d:\d\d<')
+
+    def test_one_sentence_of_narration(self):
+        import re as _re
+        html = _re.sub(r"\s+", " ", vgal.build_page("/nonexistent", RICH, st=_St(_state())))
+        self.assertIn("dishes are snapshots, clips are filmstrips, "
+                      "births are certificates", html)
+        self.assertNotIn("Nothing is deleted on restart", html)
+        self.assertNotIn("Every skill that ever ran", html)
+        self.assertNotIn("The living ledger", html)
