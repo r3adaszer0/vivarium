@@ -107,8 +107,40 @@ class TestChaptersAndPulse(unittest.TestCase):
     def test_every_fossil_universe_keeps_its_shelf(self):
         html = vgal.build_page("/nonexistent", RICH, st=_St(_state()))
         self.assertIn('id="u124f0d54"', html)
-        self.assertIn("A closed universe", html)
+        # VIV-94: the intro paragraph is gone — the gray faces already say
+        # "dead"; the shelf heading carries the fallen anchor id.
+        self.assertIn('id="u124f0d54-fallen"', html)
+        self.assertIn("The fallen of 124f0d54", html)
+        self.assertNotIn("not archived", html)
         self.assertIn("Eidos_8fd78ab1", html)
+
+    def test_closed_chips_land_at_the_fallen_no_glow(self):
+        """VIV-94: a hash chip anchors to #u<key>-fallen; the living era
+        chip keeps its chapter anchor; no :target glow is styled."""
+        html = vgal.build_page("/nonexistent", RICH, st=_St(_state()))
+        self.assertIn('href="#u124f0d54-fallen"', html)
+        self.assertIn('href="#u2e987e96"', html)
+        self.assertNotIn(":target", html)
+
+    def test_fallen_hermi_link_to_their_certificates(self):
+        """VIV-94: a fallen specimen is an anchor to its cert — but ONLY
+        when the certificate exists on the page (a fossil older than the
+        births registry has no cert; a dead link would be a broken promise)."""
+        html = vgal.build_page("/nonexistent", RICH, st=_St(_state()))
+        self.assertIn('class="spec" href="#cert-ef543f71"', html)
+        self.assertIn('id="cert-ef543f71"', html)
+        st = _state()
+        st["fossils"] = list(st["fossils"]) + [
+            {"lineage": "Eidos_ffffffff", "genome": dict(st["fossils"][0]["genome"]),
+             "universe": st["fossils"][0]["universe"], "day": "2026-11-10"}]
+        html2 = vgal.build_page("/nonexistent", RICH, st=_St(st))
+        self.assertIn('<div class="spec">', html2)
+        self.assertNotIn("cert-ffffffff", html2)
+
+    def test_registry_link_in_the_top_row(self):
+        html = vgal.build_page("/nonexistent", RICH, st=_St(_state()))
+        self.assertIn('class="reglink" href="#chapters"', html)
+        self.assertIn("the registry of Hermi", html)
 
     def test_latest_birth_replaces_latest_clip(self):
         """VIV-92: NOW features the newest born SPECIES — face, name,

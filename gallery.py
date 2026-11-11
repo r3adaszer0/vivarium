@@ -58,6 +58,9 @@ header{padding:38px 0 22px;border-bottom:1px solid var(--line)}
 background:linear-gradient(90deg,transparent,var(--bg) 82%%);pointer-events:none}
 .toprow .more{flex:none;font-size:10px;color:var(--acc);white-space:nowrap;
 padding:3px 2px}
+.toprow .reglink{flex:none;color:var(--acc);font-size:11px;letter-spacing:.06em;
+text-decoration:none;white-space:nowrap}
+.toprow .reglink:hover{text-decoration:underline;text-underline-offset:3px}
 .chip{font-size:11px;letter-spacing:.06em;color:var(--mut);border:1px solid var(--line);
 border-radius:4px;padding:4px 9px;background:var(--panel)}
 .chip .dot{display:inline-block;width:7px;height:7px;border-radius:50%%;margin-right:6px;
@@ -89,7 +92,6 @@ background:var(--dimink);vertical-align:1px}
 animation:beat 2.4s ease-in-out infinite}
 .seedtag{margin-left:16px;color:var(--acc);font-family:var(--mono);
 text-transform:none;letter-spacing:.06em;font-size:10.5px}
-.chapter:target{box-shadow:0 0 0 1.5px var(--acc),0 0 18px %(ACC)s33;border-radius:8px}
 .sub{color:var(--mut);font-size:12.5px;margin:6px 0 0;max-width:640px}
 .nowsec{display:grid;grid-template-columns:minmax(0,420px) 1fr;gap:26px;margin-top:22px}
 .dishwrap{position:relative;border:1px solid var(--line);border-radius:8px;background:#060a08;
@@ -190,11 +192,13 @@ padding:16px}
 .shelf{display:flex;gap:10px;overflow-x:auto;padding-bottom:6px}
 .shelf::-webkit-scrollbar{height:8px}
 .shelf::-webkit-scrollbar-thumb{background:#22392e;border-radius:4px}
-.spec{flex:none;width:118px;border:1px solid var(--line);border-radius:6px;background:#0c120f;
-padding:10px;text-align:center}
+.spec{flex:none;width:118px;border:1px solid var(--line);border-radius:6px;background:#0c120f;padding:10px;text-align:center}
 .spec svg{width:56px;height:56px;image-rendering:pixelated}
 .spec .ln{font-size:9.5px;color:var(--dimink);margin-top:7px;word-break:break-all}
 .spec .un{font-size:9px;color:#3d554a;margin-top:3px}
+a.spec{text-decoration:none;color:inherit}
+a.spec:hover{border-color:#35594a}
+a.spec:hover .ln{color:var(--acc);text-decoration:underline;text-underline-offset:3px}
 .appendix{margin-top:10px;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
 .app{border:1px solid var(--line);border-radius:6px;background:var(--panel);padding:8px;
 font-size:10px;color:var(--dimink)}
@@ -361,10 +365,19 @@ def _latest_species(skill: str, e: dict, extinct_hexes: frozenset) -> str:
             f'</span></a>')
 
 
-def _specimen(lineage: str, genome: dict, universe: str, day: str) -> str:
-    return (f'<div class="spec">{_face_svg(genome or {}, True, 56)}'
+def _specimen(lineage: str, genome: dict, universe: str, day: str,
+              cert_hexes: frozenset = frozenset()) -> str:
+    # VIV-94: a fallen Hermi links to its certificate — but only when the
+    # certificate actually exists on this page (a fossil older than the
+    # births registry has no cert; a dead link would be a broken promise).
+    hexid = lineage.replace("Eidos_", "") if lineage else ""
+    if hexid in cert_hexes:
+        open_tag, close_tag = (f'<a class="spec" href="#cert-{_esc(hexid)}">', "</a>")
+    else:
+        open_tag, close_tag = '<div class="spec">', "</div>"
+    return (f'{open_tag}{_face_svg(genome or {}, True, 56)}'
             f'<div class="ln">{_esc(lineage)}</div>'
-            f'<div class="un">universe {_esc(universe[:8])} · {_esc(day)}</div></div>')
+            f'<div class="un">universe {_esc(universe[:8])} · {_esc(day)}</div>{close_tag}')
 
 
 # ── the page ──────────────────────────────────────────────────────────────────
@@ -448,11 +461,14 @@ def build_page(media_dir: str, dish_map: str, title: str = "The Hermi Gallery",
     grid = _grid_json(dish_map)
 
     # ── masthead ──
-    nav_items = [(key_fp, f"era {era}", True)] + [
-        (s["key"], s["key"][:8], False) for s in closed_list]
+    # VIV-94: a closed-universe chip lands at THE FALLEN of that universe
+    # (the specimen shelf), not the chapter top; the living era chip keeps
+    # its chapter anchor. No arrival glow — arriving is quiet.
+    nav_items = [(f"#u{_esc(key_fp)}", f"era {era}", True)] + [
+        (f"#u{_esc(s['key'])}-fallen", s["key"][:8], False) for s in closed_list]
     nav = "".join(
-        f'<a href="#u{_esc(k)}"{" class=\"cur\"" if cur else ""}>{_esc(lbl)}</a>'
-        for k, lbl, cur in nav_items)
+        f'<a href="{href}"{" class=\"cur\"" if cur else ""}>{_esc(lbl)}</a>'
+        for href, lbl, cur in nav_items)
     # the masthead is navigation only (VIV-93): title, lock, era links,
     # search. Facts live where they are used — era/status/seed at NOW,
     # births/fossils in the statgrid.
@@ -466,6 +482,7 @@ def build_page(media_dir: str, dish_map: str, title: str = "The Hermi Gallery",
   <div class="hairline"></div>
   <div class="toprow"><span class="eraswrap"><nav class="eras"
     aria-label="universes">{nav}</nav></span>{_more}
+    <a class="reglink" href="#chapters">the registry of Hermi &#8595;</a>
     <span class="search"><input id="q" placeholder="search eidos, skill, species…"
       aria-label="search"><kbd>/</kbd></span></div>
 </header>"""
@@ -541,6 +558,9 @@ def build_page(media_dir: str, dish_map: str, title: str = "The Hermi Gallery",
 
     # ── chapters ──
     # current universe first, then the closed ones (fossil keys)
+    cert_hexes = frozenset(
+        str(e.get("eidos", "")).replace("Eidos_", "")
+        for e in births.values() if isinstance(e, dict))
     cert_html = "".join(_cert(skill, e, extinct_hexes)
                         for skill, e in births.items() if isinstance(e, dict))
     era_clips = "".join(
@@ -590,7 +610,7 @@ def build_page(media_dir: str, dish_map: str, title: str = "The Hermi Gallery",
     for s in closed_list:
         shelf = "".join(
             _specimen(f.get("lineage", "?"), f.get("genome") or {},
-                      s["key"], f.get("day", ""))
+                      s["key"], f.get("day", ""), cert_hexes)
             for f in fossils if f.get("universe") == s["key"])
         days = sorted(s["days"])
         span = f'{days[0]} — {days[-1]}' if len(days) > 1 else (days[0] if days else "—")
@@ -599,10 +619,7 @@ def build_page(media_dir: str, dish_map: str, title: str = "The Hermi Gallery",
     <div class="when">{_esc(span)}</div><div class="badge dead">closed</div>
     <div class="tally"><span class="dn">{s["n"]} fossils</span></div>
     <div class="when" style="margin-top:8px">universe {_esc(s["key"][:8])}</div></div>
-  <div><div class="chead"><h2>A closed universe</h2>
-    <p>Its dish is not archived — what survives is the fossil record: every
-       lineage that ever died there, with its genome, kept on purpose.</p></div>
-    <div class="block"><div class="bt">The fallen of {_esc(s["key"][:8])}</div>
+  <div><div class="block"><div class="bt" id="u{_esc(s["key"])}-fallen">The fallen of {_esc(s["key"][:8])}</div>
       <div class="fallen"><div class="shelf">{shelf}</div></div></div></div></div>""")
 
     chapters = f"""<section id="chapters">
