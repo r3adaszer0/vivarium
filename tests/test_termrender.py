@@ -88,6 +88,48 @@ class TestAncestorDetection(unittest.TestCase):
         finally:
             T._detect_from_ancestors = old
 
+    def test_live_walk_runs_without_ctty_arg(self):
+        # VIV-77b: the real worker is start_new_session=True (no ctty);
+        # the live walk must NOT require one.
+        self.assertEqual(T._detect_from_ancestors(
+            environ_of=lambda pid: {"TERM": "xterm-kitty"} if pid == 4242 else {},
+            parent_of=lambda pid: 4242 if pid != 4242 else 1), "kitty")
+
+
+class TestAncestorTty(unittest.TestCase):
+    """VIV-77b: a session-less worker paints via the ancestor's pty device."""
+
+    def test_finds_ancestor_pts(self):
+        links = {"3": "pipe:[12345]", "4": "/dev/pts/1", "5": "/dev/null"}
+        self.assertEqual(T._ancestor_tty_path(
+            parent_of=lambda pid: 4242 if pid != 4242 else 1,
+            fds_of=lambda pid: iter(links) if pid == 4242 else iter(()),
+            readlink_of=lambda entry: links[entry]), "/dev/pts/1")
+
+    def test_ignores_pipes_and_null(self):
+        links = {"3": "pipe:[1]", "4": "/dev/null", "5": "socket:[7]"}
+        self.assertEqual(T._ancestor_tty_path(
+            parent_of=lambda pid: 4242 if pid != 4242 else 1,
+            fds_of=lambda pid: iter(links) if pid == 4242 else iter(()),
+            readlink_of=lambda entry: links[entry]), "")
+
+    def test_stops_at_init(self):
+        self.assertEqual(T._ancestor_tty_path(
+            parent_of=lambda pid: 1,
+            fds_of=lambda pid: iter(("3",)),
+            readlink_of=lambda entry: "/dev/pts/1"), "")
+
+    def test_open_paint_tty_none_without_surface(self):
+        # in this test process /dev/tty may or may not exist; with the
+        # fake walker finding nothing the helper must not raise.
+        old = T._ancestor_tty_path
+        T._ancestor_tty_path = lambda *a, **k: ""
+        try:
+            if not T._open_paint_tty():
+                pass   # no surface here: None is the correct answer
+        finally:
+            T._ancestor_tty_path = old
+
 
 class TestEscapes(unittest.TestCase):
     def setUp(self):

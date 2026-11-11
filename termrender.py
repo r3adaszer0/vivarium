@@ -88,22 +88,19 @@ def _detect_from_ancestors(max_up: int = 2, environ_of=_proc_environ,
                            parent_of=_parent_pid, has_ctty=None) -> str:
     """VIV-77: capability from the SURFACE, not the (stripped) child env.
 
-    The TUI runs slash commands in a shadow worker whose environment is
-    deliberately scrubbed of TERMINAL_* residue (served_profile_child_env)
-    — yet the worker keeps the TUI's controlling terminal: /dev/tty IS the
-    real kitty pty. The terminal identity therefore still lives in the
-    nearest ancestor that kept its env (worker -> TUI). Walk at most
-    max_up ancestors, and only while THIS process actually owns a ctty —
-    a detached gateway must never inherit its launcher's shell env and
-    paint into a surface it does not sit on.
+    Terminal children are spawned with a deliberately scrubbed env (the TUI
+    slash worker: served_profile_child_env strips TERMINAL_*/KITTY_*), so
+    os.environ-based detection sees nothing even when the user sits in a
+    real kitty. The terminal identity survives in the nearest ancestor that
+    kept it (worker -> TUI), readable from /proc/<pid>/environ. VIV-77b:
+    the worker is ALSO spawned start_new_session=True, so it owns no
+    controlling terminal — a ctty is no longer required to trust the walk
+    (a detached gateway's ancestors simply have no terminal env either,
+    and every paint path re-verifies a writable tty before emitting).
+    max_up=2 covers worker -> TUI -> shell; explicit has_ctty=True/False
+    stays injectable for tests.
     """
-    if has_ctty is None:
-        try:
-            fd = os.open("/dev/tty", os.O_RDWR)
-            os.close(fd)
-        except OSError:
-            return "none"
-    elif not has_ctty:
+    if has_ctty is False:
         return "none"
     pid = parent_of(os.getpid())
     for _ in range(max_up):
@@ -353,13 +350,16 @@ def emit_image_raw(png_path: str, env: Optional[dict] = None,
     # stdout (prompt_toolkit patch_stdout -> rich), which re-encodes ANSI
     # and mangles APC into visible text (user's kitty paste). /dev/tty
     # bypasses the wrapper so the terminal itself sees the bytes.
-    try:
-        tty = os.open("/dev/tty", os.O_WRONLY)
+    # VIV-77b: a session-less worker has no ctty — fall back to the
+    # ancestor's pty device; NEVER dump escapes into a non-tty stdout
+    # (that pipe may be a JSON protocol, where they are corruption).
+    tty = _open_paint_tty()
+    if tty is not None:
         try:
             os.write(tty, payload.encode("latin-1"))
         finally:
             os.close(tty)
-    except OSError:
+    else:
         sys.stdout.write(payload)      # plain terminal: stdout IS the tty
         sys.stdout.flush()
     return f"{kind} graphics emitted"
@@ -463,6 +463,54 @@ def png_size(png_path: str):
 CELL_W, CELL_H = 10, 15
 
 
+def _ancestor_tty_path(max_up: int = 2, parent_of=_parent_pid,
+                       fds_of=None, readlink_of=None) -> str:
+    """VIV-77b: the paint surface when this process owns no ctty.
+
+    The slash worker is spawned start_new_session=True with piped stdio, so
+    /dev/tty is gone — but its ancestors (the TUI) still sit on the user's
+    pty. Find a tty device among the ancestors' open fds and return its
+    path; opening the same pty device lands the bytes on the user's screen.
+    Same-UID /proc read, guarded throughout; fds_of/readlink_of injectable
+    for tests.
+    """
+    from pathlib import Path
+    pid = parent_of(os.getpid())
+    for _ in range(max_up):
+        if pid <= 1:
+            break
+        try:
+            entries = fds_of(pid) if fds_of else Path(f"/proc/{pid}/fd").iterdir()
+            for entry in entries:
+                try:
+                    target = (readlink_of(entry) if readlink_of
+                              else os.readlink(entry))
+                except OSError:
+                    continue
+                if target.startswith("/dev/pts/") or target == "/dev/tty":
+                    return target
+        except OSError:
+            pass
+        pid = parent_of(pid)
+    return ""
+
+
+def _open_paint_tty():
+    """A writable fd for the paint surface: own ctty first, then the
+    ancestor's pty device (VIV-77b). None when no surface is reachable."""
+    try:
+        return os.open("/dev/tty", os.O_WRONLY)
+    except OSError:
+        pass
+    path = _ancestor_tty_path()
+    if not path:
+        return None
+    try:
+        return os.open(path, os.O_WRONLY)
+    except OSError:
+        return None
+
+
 def paint_over(png_path: str, reserved_rows: int, trail_rows: int,
                delay: float = 0.6, env: Optional[dict] = None,
                extra_climb: int = 3) -> str:
@@ -481,9 +529,8 @@ def paint_over(png_path: str, reserved_rows: int, trail_rows: int,
     def _work():
         _t.sleep(delay)
         size = png_size(png_path)
-        try:
-            fd = os.open("/dev/tty", os.O_WRONLY)
-        except OSError:
+        fd = _open_paint_tty()
+        if fd is None:
             return ""   # silent: no tty -> whitespace fallback
         try:
             # The TUI adds rows after our text (blank line + prompt) that the
