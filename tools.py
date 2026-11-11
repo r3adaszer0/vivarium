@@ -819,7 +819,7 @@ def _serve_text(keep: bool) -> str:
         # the previous frame instead of an error.
         _last = {"tick": None, "alive": None, "grid": ""}
 
-        def _dish_provider():
+        def _dish_provider(fresh: bool = False):
             try:
                 w = _world()
                 if w is None:
@@ -830,7 +830,8 @@ def _serve_text(keep: bool) -> str:
                 out = {"tick": st.get("tick"), "alive": st.get("population"),
                        "grid": vgal._grid_json(
                            vworld.render_ascii_rich(w, cols=w.w, rows=w.h,
-                                                    color=True))}
+                                                    color=True)),
+                       "status": st}
                 if out["grid"]:
                     _last.clear()
                     _last.update(out)
@@ -838,9 +839,9 @@ def _serve_text(keep: bool) -> str:
                     raise RuntimeError("empty grid rendered")
                 return dict(_last)
             except Exception:
-                if _last["grid"]:
+                if _last["grid"] and not fresh:
                     return dict(_last)      # keep serving the last good dish
-                raise                        # never succeeded: make it VISIBLE
+                raise                        # fresh asks for the truth
         provider = _dish_provider
     except Exception:
         html = None

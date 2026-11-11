@@ -231,6 +231,17 @@ max-width:900px;width:92vw;padding:14px}
 dialog::backdrop{background:#000c}
 dialog video{width:100%%;border-radius:6px;background:#000}
 dialog .t{font-size:12px;color:var(--mut);margin-bottom:10px}
+.sw{font-family:var(--mono)}
+.sw .row{display:flex;gap:14px;font-size:12.5px;padding:7px 0;
+border-bottom:1px dashed #1a2c22;align-items:baseline}
+.sw .row:last-child{border-bottom:0}
+.sw .k{color:var(--dimink);width:92px;flex:none;text-transform:uppercase;
+letter-spacing:.14em;font-size:9.5px}
+.sw .v{color:var(--ink);min-width:0}
+.sw .v .dim{color:var(--mut)}
+.sw .lins{margin-top:5px;display:flex;flex-wrap:wrap;gap:4px 14px}
+.sw .lin{font-size:11px;color:var(--mut)}
+.sw .lin b{color:var(--acc);font-weight:500}
 @media (max-width:960px){.nowsec{grid-template-columns:1fr}
 .chapter{grid-template-columns:1fr}
 .rail{display:flex;gap:16px;align-items:baseline;flex-wrap:wrap}
@@ -525,8 +536,8 @@ def build_page(media_dir: str, dish_map: str, title: str = "The Hermi Gallery",
         census = (f'<div class="line"><b id="census-tick">tick {_esc(last.get("tick", "—"))}</b>'
                   f'<span class="sep">·</span><b id="census-alive">{_esc(last.get("population", "—"))} alive</b>'
                   f'<span class="sep">·</span><span class="hi">the dish is live</span>'
-                  f'<button class="rf" id="dish-refresh" title="bring the current dish"'
-                  f' aria-label="refresh the dish">&#10227; refresh</button></div>')
+                  f'<button class="rf" id="status-btn" title="bring the current dish and status"'
+                  f' aria-label="show the dish status">status</button></div>')
     else:
         last = curve[-1] if curve else {}
         census = (f'<div class="line"><b>tick {_esc(last.get("tick", "—"))}</b>'
@@ -723,13 +734,7 @@ def build_page(media_dir: str, dish_map: str, title: str = "The Hermi Gallery",
     let timer=null;
     const schedule=ms=>{if(timer)clearInterval(timer);timer=setInterval(fetchDish,ms)};
     fetchDish();schedule(4000);
-    /* the refresh button: bring the current dish on demand */
-    const rf=document.getElementById('dish-refresh');
-    if(rf)rf.addEventListener('click',()=>{
-      if(rf.classList.contains('busy'))return;
-      rf.classList.add('busy');
-      fetchDish().finally(()=>{rf.classList.remove('busy');schedule(4000)});
-    });
+    window.__applyDish=applyDish;   /* the status button redraws with its fresh frame */
   }
 })();
 /* search: filter the registry */
@@ -779,11 +784,55 @@ def build_page(media_dir: str, dish_map: str, title: str = "The Hermi Gallery",
     blocks.forEach(bl=>bl.classList.toggle('hide',k!=='all'&&bl.dataset.kind!==k));
   });
 })();
+/* status: one request brings a fresh dish and the full status panel */
+(function(){
+  const btn=document.getElementById('status-btn');if(!btn)return;
+  const dlg=document.getElementById('statusdlg'),body=document.getElementById('statusBody');
+  const esc=x=>String(x).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+  window.__statusPanel=d=>{
+    if(!d||!d.status)return '<div class="app" style="padding:14px">no status in the dish response</div>';
+    const s=d.status,a=s.ages||{};
+    const lin=(s.lineages||[]).map(p=>'<span class="lin"><b>'+esc(p[0])+'</b> ×'+p[1]+'</span>').join('');
+    const rows=[
+      ['state','tick '+esc(s.tick)+' · '+esc(s.population)+' alive · peak '+esc(s.peak)],
+      ['balance','born '+esc(s.born)+' · died '+esc(s.died)],
+      ['energy','avg '+esc(s.avg_energy)],
+      ['lineages',esc(s.lineages_total)+' alive · top '+esc((s.lineages||[]).length)+' coloured'+
+        (s.grey?' · <span class="dim">'+esc(s.grey)+' grey</span>':''),lin],
+      ['ages',esc(a.newborns||0)+' newborn · '+esc(a.young||0)+' young · '+esc(a.adults||0)+
+        ' adult · '+esc(a.elders||0)+' elder · avg '+esc(a.avg_age)+
+        (a.verdict?' · <span class="dim">'+esc(a.verdict)+'</span>':'')]
+    ];
+    return '<div class="sw">'+rows.map(r=>'<div class="row"><div class="k">'+r[0]+
+      '</div><div class="v">'+r[1]+(r[2]?'<div class="lins">'+r[2]+'</div>':'')+
+      '</div></div>').join('')+'</div>';
+  };
+  btn.addEventListener('click',()=>{
+    if(btn.classList.contains('busy'))return;
+    btn.classList.add('busy');
+    fetch('/live/dish.json?fresh=1',{cache:'no-store'})
+      .then(r=>r.ok?r.json():r.json().then(j=>Promise.reject(j)))
+      .then(d=>{
+        if(d&&d.grid&&window.__applyDish)window.__applyDish(d);  /* redraw the dish */
+        body.innerHTML='<div class="t">the dish status · served from 127.0.0.1 only</div>'+
+          window.__statusPanel(d);
+        dlg.showModal();
+      })
+      .catch(e=>{
+        body.innerHTML='<div class="t">the dish status</div><div class="app" style="padding:14px">'+
+          esc((e&&e.error)||'status unavailable — the dish has not been rendered yet')+'</div>';
+        dlg.showModal();
+      })
+      .finally(()=>btn.classList.remove('busy'));
+  });
+  dlg.addEventListener('close',()=>{body.innerHTML=''});
+})();
 </script>"""
 
     return f"""<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{_esc(title)}</title><style>{css}</style></head><body><div class="wrap">
 {head}{now}{chapters}{appendix}{footer}
-</div><dialog id="theater"><div id="theaterBody"></div></dialog>{script}
+</div><dialog id="theater"><div id="theaterBody"></div></dialog>
+<dialog id="statusdlg"><div id="statusBody"></div></dialog>{script}
 </body></html>"""

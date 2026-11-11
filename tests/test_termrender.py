@@ -686,6 +686,35 @@ class TestLiveDishEndpoint(unittest.TestCase):
         except urllib.error.HTTPError as e:
             self.assertEqual(e.code, 503)
 
+    def test_fresh_flag_reaches_the_provider(self):
+        """VIV-98: the status button asks for the truth, not the cache."""
+        seen = []
+
+        def provider(fresh=False):
+            seen.append(fresh)
+            return {"tick": 1, "alive": 1, "grid": "0a0f0df",
+                    "status": {"tick": 1, "population": 1}}
+
+        url = self._serve(provider)
+        import urllib.request, json as _json
+        with urllib.request.urlopen(url + "/live/dish.json?fresh=1", timeout=5) as r:
+            data = _json.loads(r.read().decode())
+        self.assertEqual(seen, [True])
+        self.assertIn("status", data)
+        with urllib.request.urlopen(url + "/live/dish.json", timeout=5) as r:
+            _json.loads(r.read().decode())
+        self.assertEqual(seen, [True, False])
+
+    def test_zero_arg_provider_still_served(self):
+        def provider():
+            return {"tick": 7, "alive": 3, "grid": "0a0f0df"}
+
+        url = self._serve(provider)
+        import urllib.request, json as _json
+        with urllib.request.urlopen(url + "/live/dish.json?fresh=1", timeout=5) as r:
+            data = _json.loads(r.read().decode())
+        self.assertEqual(data["tick"], 7)
+
     def test_without_provider_the_endpoint_is_404(self):
         url = self._serve(None)
         import urllib.request

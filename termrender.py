@@ -436,11 +436,14 @@ def serve_gallery(media_dir: str, dish_map: str = "",
     unless keep=True (a deliberate daemon). Binds localhost ONLY.
     `html` (VIV-89): a full page from gallery.build_page — when given it
     REPLACES the flat index; the caller owns all data gathering.
-    `dish_provider` (VIV-90): a zero-arg callable returning
+    `dish_provider` (VIV-90): a callable returning
     {"tick", "alive", "grid"} — served fresh at /live/dish.json on every
-    request, so a page refresh asks the dish for its CURRENT tick. The
-    provider runs inside the caller's process (it sees the live dish);
-    any failure answers 503 and the page keeps its last dish.
+    request, so a page refresh asks the dish for its CURRENT tick. It may
+    accept fresh=False (VIV-98): with fresh=1 the provider must NOT fall
+    back to a cached frame — a failed render surfaces as 503, because a
+    status request exists to bring the truth. The provider runs inside
+    the caller's process (it sees the live dish); any failure answers
+    503 and the page keeps its last dish.
     """
     media = Path(media_dir)
     if not media.is_dir():
@@ -467,7 +470,11 @@ def serve_gallery(media_dir: str, dish_map: str = "",
                     self.path.split("?")[0] in ("/live/dish.json", "/live/dish"):
                 try:
                     import json as _json
-                    body = _json.dumps(dish_provider()).encode("utf-8")
+                    fresh = "fresh=1" in self.path
+                    try:
+                        body = _json.dumps(dish_provider(fresh=fresh)).encode("utf-8")
+                    except TypeError:      # a provider that takes no args
+                        body = _json.dumps(dish_provider()).encode("utf-8")
                     self.send_response(200)
                     self.send_header("Content-Type", "application/json")
                     self.send_header("Cache-Control", "no-store")
