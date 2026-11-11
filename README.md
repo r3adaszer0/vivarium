@@ -191,21 +191,6 @@ recovers on a fixed period, the way one recent universe measured about
 evidence, and enters them into the Vivarium Codex, the same way
 Conway's Game of Life catalogues its still lifes and oscillators.
 
-## Try it
-
-```text
-/vivarium status
-/vivarium feed 2.0        # a feast
-/vivarium release         # fresh founders
-/vivarium import VIV1eyJ...
-```
-
-## Status
-
-v0.1.0 — under active development for the
-[Nous Research Hermes Agent Plugin Hackathon](https://x.com/NousResearch)
-(Nov 2026). 183 tests green. Contributions and challenge-code duels welcome.
-
 ## License
 
 MIT — see [LICENSE](LICENSE).
