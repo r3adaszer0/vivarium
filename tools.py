@@ -721,8 +721,17 @@ def _doctor_text() -> str:
                      f"peak={getattr(w, 'peak_population', '?')}")
     else:
         lines.append("world: none (dormant)")
-    lines.append(f"graphics: {vterm.detect_graphics()} "
-                 f"[{vterm.explain_graphics()}]")
+    g = vterm.detect_graphics()
+    trace = vterm.explain_graphics()
+    if g == "none" and "walk=none" in trace and "atty=-" in trace:
+        # VIV-77c: a fully headless host (no TERM, no tty in the whole
+        # ancestry) is the CORRECT state for gateway-side sessions — the
+        # dish paints via the terminal relay, so say that instead of a
+        # bare "none" that reads as broken.
+        lines.append(f"graphics: none (headless host — the dish paints "
+                     f"via the terminal relay) [{trace}]")
+    else:
+        lines.append(f"graphics: {g} [{trace}]")
     lines.append(f"media_pref: {s.get('media_pref', 'auto')} "
                  f"voice: {vstate.voice_mode()}")
     # feature fingerprint: which build is actually loaded
