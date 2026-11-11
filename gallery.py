@@ -54,11 +54,10 @@ header{padding:38px 0 22px;border-bottom:1px solid var(--line)}
 .hairline{height:1px;background:var(--line);margin-top:12px}
 .toprow{display:flex;align-items:center;gap:16px;margin-top:4px}
 .eraswrap{position:relative;flex:1;min-width:0}
-.eraswrap::after{content:"";position:absolute;right:0;top:0;bottom:0;width:46px;
+.eraswrap::after{content:"";position:absolute;right:0;top:0;bottom:0;width:36px;
 background:linear-gradient(90deg,transparent,var(--bg) 82%%);pointer-events:none}
-.eraswrap .more{position:absolute;right:4px;top:50%%;transform:translateY(-50%%);
-font-size:9.5px;color:var(--dimink);background:var(--bg);padding:2px 7px;z-index:2;
-white-space:nowrap}
+.toprow .more{flex:none;font-size:10px;color:var(--acc);white-space:nowrap;
+padding:3px 2px}
 .chip{font-size:11px;letter-spacing:.06em;color:var(--mut);border:1px solid var(--line);
 border-radius:4px;padding:4px 9px;background:var(--panel)}
 .chip .dot{display:inline-block;width:7px;height:7px;border-radius:50%%;margin-right:6px;
@@ -459,14 +458,14 @@ def build_page(media_dir: str, dish_map: str, title: str = "The Hermi Gallery",
     # births/fossils in the statgrid.
     _visible = 9
     _hidden = max(0, len(nav_items) - _visible)
-    _more = (f'<span class="more">+{_hidden} more — scroll the row</span>'
+    _more = (f'<span class="more" title="scroll the row">+{_hidden} more &#8594;</span>'
              if _hidden else "")
     head = f"""<header id="top">
   <div class="brandrow"><h1>Vivarium — {_esc(title)}</h1>
     <span class="chip lock mini">&#128274;127.0.0.1 - private</span></div>
   <div class="hairline"></div>
   <div class="toprow"><span class="eraswrap"><nav class="eras"
-    aria-label="universes">{nav}</nav>{_more}</span>
+    aria-label="universes">{nav}</nav></span>{_more}
     <span class="search"><input id="q" placeholder="search eidos, skill, species…"
       aria-label="search"><kbd>/</kbd></span></div>
 </header>"""

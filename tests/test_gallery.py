@@ -191,7 +191,7 @@ class TestSelfContainment(unittest.TestCase):
              "universe": f"key{i:024x}", "day": "2026-11-10"}
             for i in range(12)]
         html = vgal.build_page("/nonexistent", RICH, st=_St(st))
-        self.assertIn("more — scroll the row", html)
+        self.assertIn("+5 more", html)
         self.assertNotIn("<sup", html)
 
 
