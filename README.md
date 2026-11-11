@@ -44,11 +44,11 @@ the actual work your agent does.**
 - **Mathematically sound.** Every mechanism is a measurable constant with a
   documented role: carrying capacity, energy conservation with friction,
   logistic regrowth. Nothing is tuned by vibes.
-- **Genetic.** Every Hermi carries a six-gene genome (forage, sense,
-  metabolism, aggression, mutation rate, dispersal) inherited with
-  mutation from its parents, and every species descends from a skill your
-  agent actually learned. The face, the name and the colour are all read
-  off the genes.
+- **Genetic.** Every Hermi carries a genome of six evolvable genes (forage,
+  sense, metabolism, aggression, mutation rate, dispersal) plus the fixed
+  hue, inherited with mutation from its parents, and every species
+  descends from a skill your agent actually learned. The face, the name
+  and the colour are all read off the genes.
 - **Private.** Species derive from keyed hashes of your skill *content*:
   never names, never raw content. Your universe key stays on your machine;
   shared artifacts carry only Eidos IDs and fingerprints.
@@ -82,9 +82,9 @@ agent learns introduces a new species.
 | **Matrix** | works; the dish arrives where a skill is born, but choosing a specific channel is not supported yet |
 | **Hermes Desktop** | works, without the full paint quality of a graphics terminal |
 | **iTerm2 and sixel terminals** | untested |
-| **Your browser** | `/vivarium serve` turns the dish into a private local web page: the live dish, the registry and every certificate, served only on your machine (127.0.0.1) |
+| **Your browser** | works; `/vivarium serve` serves the whole gallery privately on 127.0.0.1 |
 
-Pure Python stdlib, zero dependencies.
+Pure Python stdlib, zero dependencies, 369 tests green.
 
 ## Meet the Hermi
 
@@ -106,8 +106,8 @@ Dispersal decides whether it stays in a crowded cell or sets out for
 open ground. Hue is the seventh gene, and it is fixed: inherited
 exactly, never jittered, the colour of its lineage on the dish.
 
-**How many.** Seven genes of four bytes each: 224 bits, about 2.7 x
-10^67 possible Hermi. That is more possible Hermi than there are atoms
+**How many.** Seven genes of four bytes each: 224 bits, about 2.7×10⁶⁷
+possible Hermi. That is more possible Hermi than there are atoms
 on Earth. No two different skills, anywhere, ever, will grow the same
 species twice. And they are sourced from everywhere your agent has
 already been: the Big Bang seeds a species from every skill installed
@@ -193,6 +193,22 @@ recovers on a fixed period, the way one recent universe measured about
 140 ticks. The simulation discovers them itself, confirms them with
 evidence, and enters them into the Vivarium Codex, the same way
 Conway's Game of Life catalogues its still lifes and oscillators.
+
+## Mathematical roots
+
+None of the physics here is invented. The dish leans on established
+ground: the [Game of Life](https://en.wikipedia.org/wiki/Conway%27s_Game_of_Life)
+for the cellular-automaton foundation and its still lifes and
+oscillators; [logistic growth](https://en.wikipedia.org/wiki/Logistic_function)
+and [diffusion](https://en.wikipedia.org/wiki/Diffusion_equation) for
+the food layer; [consumer-resource dynamics](https://en.wikipedia.org/wiki/Lotka%E2%80%93Volterra_equations)
+for the ecology of eating, starving and reproducing;
+[island biogeography](https://en.wikipedia.org/wiki/Insular_biogeography)
+for how lineages rise, crowd and go extinct on a bounded dish;
+[Fisher's fundamental theorem](https://en.wikipedia.org/wiki/Fisher%27s_fundamental_theorem_of_natural_selection)
+for what selection does to variance; and
+[Wolfram's work on elementary cellular automata](https://en.wikipedia.org/wiki/Elementary_cellular_automaton)
+for why a fully deterministic world can still be unpredictable.
 
 ## License
 
