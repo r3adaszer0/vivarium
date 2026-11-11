@@ -711,7 +711,8 @@ def _doctor_text() -> str:
                      f"peak={getattr(w, 'peak_population', '?')}")
     else:
         lines.append("world: none (dormant)")
-    lines.append(f"graphics: {vterm.detect_graphics()}")
+    lines.append(f"graphics: {vterm.detect_graphics()} "
+                 f"[{vterm.explain_graphics()}]")
     lines.append(f"media_pref: {s.get('media_pref', 'auto')} "
                  f"voice: {vstate.voice_mode()}")
     # feature fingerprint: which build is actually loaded

@@ -132,6 +132,30 @@ def detect_graphics(env: Optional[dict] = None) -> str:
     return "none"
 
 
+def explain_graphics() -> str:
+    """VIV-77b diagnostic trace for /vivarium doctor: how the live answer
+    was reached, so a paste can never be ambiguous again. Format:
+    'own=none walk=kitty@4242 atty=/dev/pts/1' (walk=kitty means the
+    ancestor walk found the terminal identity; atty= the paint device
+    found among the ancestors' fds)."""
+    own = dict(os.environ)
+    own_term = own.get("TERM") or "-"
+    own_res = _classify_env(own)
+    walk = "off" if own_res != "none" else _detect_from_ancestors()
+    walk_pid = ""
+    if walk != "none":
+        pid = _parent_pid(os.getpid())
+        for _ in range(2):
+            if pid <= 1:
+                break
+            if _classify_env(_proc_environ(pid)) != "none":
+                walk_pid = f"@{pid}"
+                break
+            pid = _parent_pid(pid)
+    atty = _ancestor_tty_path() or "-"
+    return f"own={own_res}(TERM={own_term}) walk={walk}{walk_pid} atty={atty}"
+
+
 # ── escape emitters (byte-exact, verified) ───────────────────────────────────
 def _kitty_escape(png: bytes, img_id: int = 1) -> bytes:
     """PNG → kitty APC escape, chunked at 4096 b64 bytes.
