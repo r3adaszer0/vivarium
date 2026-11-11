@@ -55,20 +55,23 @@ the actual work your agent does.**
 
 ## Install
 
-Requires [Hermes Agent](https://hermes-agent.nousresearch.com/docs). Clone
-this plugin into your Hermes plugins directory and restart:
+Requires [Hermes Agent](https://hermes-agent.nousresearch.com/docs).
 
 ```bash
 git clone https://github.com/r3adaszer0/vivarium.git \
   ~/.hermes/plugins/vivarium
-# then restart Hermes — the plugin loads and the dish awaits its first skill
 ```
 
-Your universe starts **dormant** — the dish is empty and silent. The first
-skill your agent learns triggers the Big Bang: species are seeded from every
-skill installed at that moment (the shared founding kit plus your own), and
-the dish comes alive. Until then, using your agent banks nothing — the world
-begins the day it's born.
+Then start Hermes and say:
+
+```text
+/vivarium start
+```
+
+Your universe starts **dormant**, the dish is empty and silent. The next
+skill your Hermes agent learns triggers the **Big Bang**. From then on,
+using your agent advances the time of the world, and each new skill your
+agent learns introduces a new species.
 
 ## What you can do
 
