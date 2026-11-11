@@ -175,5 +175,51 @@ class TestFallback(unittest.TestCase):
         self.assertIn("the dish sleeps", html)
 
 
+class TestAnyUser(unittest.TestCase):
+    """VIV-89 follow-up: the gallery must work for ANY install.
+
+    Nothing on the page may be keyed to one machine's registry — the
+    whole page is derived from the state handle that is passed in.
+    """
+
+    def test_fresh_install_renders_a_valid_page(self):
+        # a brand-new user: era 1, no births, no fossils, no curve, no media
+        st = _St({"births": {}, "fossils": [], "curve": [],
+                  "universe": {"era": 1, "status": "live", "key_fp": "a1b2c3d4",
+                               "genesis": {"skill": "seed:demo", "day": "2026-11-11"}}})
+        html = vgal.build_page("/nonexistent", "", st=st)
+        self.assertIn("The Hermi Gallery", html)
+        self.assertIn("Era 1", html)
+        self.assertIn("0 fossils", html)
+        self.assertIn("0 births", html)
+        self.assertIn('id="ua1b2c3d4"', html)
+        self.assertIn("No clips filmed in this era yet", html)
+        self.assertNotIn('class="cert"', html)      # no registry yet — honest
+        self.assertNotIn('class="spec"', html)      # no fallen yet
+
+    def test_a_foreign_registry_names_its_own_species(self):
+        # someone else's universe: different skills, genomes, keys
+        g1 = {"forage": 0.4, "sense": 3.0, "metabolism_mult": 0.9,
+              "aggression": 2.2, "mutate": 0.5, "dispersal": 1.4, "hue": 0.5}
+        st = _St({"births": {"totally-other-skill": {"eidos": "Eidos_aaaabbbb",
+                                                     "day": "2026-10-01",
+                                                     "era": 3, "genome": g1}},
+                  "fossils": [{"lineage": "Eidos_ccccdddd", "genome": g1,
+                               "universe": "ffffffff", "day": "2026-09-30"}],
+                  "curve": [{"tick": 10, "population": 12, "born": 12}],
+                  "universe": {"era": 3, "status": "live", "key_fp": "ffffffff",
+                               "genesis": {"day": "2026-10-01"}}})
+        html = vgal.build_page("/nonexistent", "", st=st)
+        genus, epithet, _ = vid.name_of(g1)
+        self.assertIn(f"{genus} {epithet}", html)
+        self.assertIn("totally-other-skill", html)
+        self.assertIn('id="uffffffff"', html)
+        self.assertIn("Eidos_aaaabbbb", html)
+        # nothing from THIS machine's registry leaks into their page
+        self.assertNotIn("Eidos_ef543f71", html)
+        self.assertNotIn("2e987e96", html)
+        self.assertNotIn("airtable", html)
+
+
 if __name__ == "__main__":  # pragma: no cover
     unittest.main()
