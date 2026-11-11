@@ -165,7 +165,7 @@ math, comparisons to cellular automata and related work) and the
 | `/vivarium staleness` | is the living world going stale? |
 | `/vivarium restart` | end the era (with a farewell picture); the next skill births a new universe |
 
-## The gallery on your machine
+## Hermi Gallery
 
 `/vivarium serve` turns your dish into a private web gallery. The live
 dish, the registry of every species with its face and genes, the
@@ -173,6 +173,13 @@ fossils, each picture answering a click. Zoom in anywhere, any time:
 the simulation is deterministic, so any past moment re-renders exactly.
 Served only on your machine: no CDN, no external fonts, every byte from
 127.0.0.1.
+
+<div align="center">
+<table border="0" cellspacing="0" cellpadding="0"><tr>
+<td align="center"><img src="docs/assets/gallery_dashboard.png" width="420" alt="The live dish and census"></td>
+<td align="center"><img src="docs/assets/gallery_registry.png" width="420" alt="The registry: every Hermi ever born"></td>
+</tr></table>
+</div>
 
 ## Extras: worlds that play against each other
 
