@@ -475,8 +475,7 @@ def _cmd(raw_args: str) -> str:
             from . import termrender as vterm
         except ImportError:  # pragma: no cover
             import termrender as vterm
-        if _universe_live() and media_pref() != "ascii" and \
-                vterm.detect_graphics() in ("kitty", "iterm2", "sixel"):
+        if _universe_live() and media_pref() != "ascii":
             try:
                 try:
                     from . import artifacts as vart
@@ -520,11 +519,22 @@ def _cmd(raw_args: str) -> str:
                         body = "\n".join(panel)
                         if stale:
                             body += f"\n\n{' ' * (res_cols + 17)}  {stale}"
-                        vterm.paint_over(path, res_rows, 0, delay=0.4)
+                        if vterm.detect_graphics() in ("kitty", "iterm2",
+                                                       "sixel"):
+                            vterm.paint_over(path, res_rows, 0, delay=0.4)
+                        else:
+                            # VIV-77b: headless surface — hand the paint
+                            # to whichever process sits on a terminal.
+                            # Same reserved rows; the relay lands there.
+                            vstate.request_paint("status")
                         return body
                     spacer = "\n".join(" " * res_cols
                                        for _ in range(res_rows))
-                    vterm.paint_over(path, res_rows, 0, delay=0.4)
+                    if vterm.detect_graphics() in ("kitty", "iterm2",
+                                                   "sixel"):
+                        vterm.paint_over(path, res_rows, 0, delay=0.4)
+                    else:
+                        vstate.request_paint("status")
                     # One empty line between the census and the picture
                     # (the overlay climbs to the second blank row).
                     return text + "\n\n\n" + spacer

@@ -286,6 +286,41 @@ def activity_summary() -> dict:
     return _state().get(_ACTIVITY_KEY, {})
 
 
+# ── cross-process paint requests (VIV-77b) ───────────────────────────────────
+def request_paint(kind: str = "status") -> None:
+    """A headless surface (gateway-side slash worker) cannot paint: it has
+    no TERM and no tty anywhere in its ancestry (the doctor trace proved
+    it). Drop a request; whichever process actually sits on a terminal
+    drains it (hooks._ensure_paint_relay) and overlays the current dish.
+    Kept tiny: at most the last 4 requests, each expires in seconds."""
+    import time as _t
+    reqs = _state().get("paint_requests") or []
+    if not isinstance(reqs, list):
+        reqs = []
+    reqs = [r for r in reqs if isinstance(r, dict)]
+    reqs.append({"kind": kind, "ts": _t.time()})
+    _state().set("paint_requests", reqs[-4:])
+
+
+def pop_paint_request(max_age_s: float = 12.0) -> Optional[dict]:
+    """Oldest live paint request, or None. Callers must have verified they
+    can paint (hooks._can_paint) — pop-after-claim, so two pollers never
+    paint twice. Stale requests (the TUI was closed) expire silently."""
+    import time as _t
+    reqs = _state().get("paint_requests") or []
+    if not isinstance(reqs, list) or not reqs:
+        return None
+    now = _t.time()
+    live = [r for r in reqs if isinstance(r, dict)
+            and now - float(r.get("ts", 0) or 0) < max_age_s]
+    if not live:
+        _state().set("paint_requests", [])
+        return None
+    req = live.pop(0)
+    _state().set("paint_requests", live)
+    return req
+
+
 # ── narration queue (hooks → next LLM turn) ──────────────────────────────────
 # VIV-31 lesson (user machine, 2026-11-09): the slot used to be a single
 # string, so a routine tick report queued one tool call later OVERWROTE

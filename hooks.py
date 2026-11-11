@@ -273,6 +273,72 @@ def _can_paint() -> bool:
         return False
 
 
+_PAINT_RELAY = {"started": False}
+
+
+def _ensure_paint_relay() -> None:
+    """VIV-77b: slash commands can execute in a fully headless process
+    (gateway-side session: no TERM, no tty anywhere in the ancestry — the
+    doctor trace proved it). No env fix can make that process paint; the
+    dish must be painted by whichever process sits on the terminal. This
+    poller (one per process, started at import) claims paint requests
+    dropped in state and overlays the current dish. Headless processes
+    fail _can_paint() and just idle; requests expire if no surface shows
+    up, so a closed TUI degrades to the whitespace fallback, never to a
+    stranded queue."""
+    if _PAINT_RELAY["started"]:
+        return
+    _PAINT_RELAY["started"] = True
+
+    def _poll():
+        import time as _t
+        while True:
+            _t.sleep(1.0)
+            try:
+                if not _can_paint():
+                    continue
+                try:
+                    from . import state as vst
+                except ImportError:  # pragma: no cover
+                    import state as vst
+                if vst.pop_paint_request() is None:
+                    continue
+                _paint_status_relay()
+            except Exception:
+                continue
+
+    import threading as _threading
+    _threading.Thread(target=_poll, daemon=True,
+                      name="vivarium-paint-relay").start()
+
+
+def _paint_status_relay() -> None:
+    """Overlay the CURRENT dish for a request a headless slash worker
+    dropped. The worker already reserved the rows in its returned text;
+    by the time this fires (>=1 poll tick after the reply rendered) the
+    rectangle sits in the TUI's scrollback — land the picture on it."""
+    try:
+        try:
+            from . import artifacts as vart
+            from . import termrender as vterm
+        except ImportError:  # pragma: no cover - flat-import mode
+            import artifacts as vart
+            import termrender as vterm
+        import math as _math
+        w = vstate.load_world()
+        if w is None:
+            return
+        path = vart.render_dish_png(
+            vstate.state(), w, f"status_{w.tick}")
+        if not path:
+            return
+        size = vterm.png_size(path) or (342, 339)
+        res_rows = max(1, _math.ceil(size[1] / vterm.CELL_H))
+        vterm.paint_over(path, res_rows, 0, delay=0.0)
+    except Exception:
+        pass
+
+
 
 _PT_APP = None
 
@@ -562,5 +628,10 @@ def _arm_print() -> None:
 
     import threading
     threading.Thread(target=_work, daemon=True).start()
+
+
+# VIV-77b: the paint relay starts in EVERY process at import — the TUI
+# process must be listening before its first slash command ever runs.
+_ensure_paint_relay()
 
 

@@ -467,16 +467,48 @@ class TestToolWiring(unittest.TestCase):
         self.assertIn("🖼️", out)                  # PNG path shown as artifact
         self.assertIn(".png", out)
 
-    def test_status_slash_includes_dish_map(self):
-        """/vivarium status must SHOW the dish (summary alone hid it)."""
+    def test_status_slash_rels_not_ascii_when_headless(self):
+        """VIV-77b contract: on a live universe with media auto, a headless
+        slash worker NEVER falls back to the ASCII map the user hated — it
+        reserves the picture rows and drops a paint request for whichever
+        process sits on a terminal. ASCII only when media_pref=ascii."""
         import tools
         tmp = tempfile.mkdtemp()
         store = self._bound(tmp)
         store["universe"] = {"status": "live", "era": 2}
         out = tools._cmd("status")
+        self.assertNotIn("The dish:", out)
+        self.assertNotIn("X = creatures", out)
+        self.assertTrue(store.get("paint_requests"),
+                        "headless status must drop a paint request")
+        self.assertEqual(store["paint_requests"][0]["kind"], "status")
+
+    def test_status_slash_ascii_only_when_media_pref_ascii(self):
+        import tools
+        tmp = tempfile.mkdtemp()
+        store = self._bound(tmp)
+        store["universe"] = {"status": "live", "era": 2}
+        store["media_pref"] = "ascii"
+        out = tools._cmd("status")
         self.assertIn("The dish:", out)
-        self.assertIn("X", out)          # creatures render as X
-        self.assertIn("X = creatures", out)   # legend line
+        self.assertIn("X = creatures", out)
+
+    def test_paint_request_fifo_and_expiry(self):
+        import time as _t
+        import state as vstate
+        tmp = tempfile.mkdtemp()
+        store = self._bound(tmp)
+        vstate.request_paint("status")
+        vstate.request_paint("birth")
+        req = vstate.pop_paint_request()
+        self.assertEqual(req["kind"], "status")     # oldest first
+        req2 = vstate.pop_paint_request()
+        self.assertEqual(req2["kind"], "birth")
+        self.assertIsNone(vstate.pop_paint_request())
+        # stale requests expire (the TUI was closed): nothing stranded
+        store["paint_requests"] = [{"kind": "status", "ts": _t.time() - 60}]
+        self.assertIsNone(vstate.pop_paint_request())
+        self.assertEqual(store["paint_requests"], [])
 
     def test_serve_slash_returns_localhost_url(self):
         import tools

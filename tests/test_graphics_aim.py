@@ -24,7 +24,10 @@ class TestGraphicsAim(unittest.TestCase):
         make_live(self.s)
         T.vstate._ctx = _C(self.s)
 
-    def test_slash_status_plain_terminal_keeps_ascii(self):
+    def test_slash_status_plain_terminal_rels_not_ascii(self):
+        """VIV-77b: a plain/headless surface never falls back to the ASCII
+        map (the user rejected it four times). It reserves the picture
+        rows and drops a paint request for a terminal-owning process."""
         import termrender as vterm
         old = vterm.detect_graphics
         vterm.detect_graphics = lambda: "none"
@@ -32,7 +35,9 @@ class TestGraphicsAim(unittest.TestCase):
             out = T._cmd("status")
         finally:
             vterm.detect_graphics = old
-        self.assertIn("X = creatures", out)
+        self.assertNotIn("X = creatures", out)
+        self.assertTrue(self.s.get("paint_requests"),
+                        "headless status must drop a paint request")
 
     def test_slash_status_graphics_no_ascii_map(self):
         import termrender as vterm
