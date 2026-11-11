@@ -256,7 +256,7 @@ def advance(w: World, ticks: int = 1, nutrients: float = 0.0) -> List[dict]:
                 seg = line.split("Codex entry:", 1)[1].split("confirmed", 1)[0]
                 label = seg.strip(" :") or label
             queue_narration(vacts.codex_narration(_state(), line, label),
-                            kind="codex")
+                            milestone=True, kind="codex")
     except Exception:
         pass  # detection is best-effort; the dish must never stop ticking
     if summaries:
@@ -323,15 +323,22 @@ def set_voice_mode(mode: str) -> str:
 
 
 def voice_allows(kind: str) -> bool:
-    """kind: birth | death | codex | report."""
+    """kind: birth | death | codex | report.
+
+    VIV-75: a Codex discovery is a birth — a pattern being born into the
+    dish — so it announces in every voice mode except "off". Era 9 ran
+    7290 ticks with the Pulse confirmed at tick 6980 and never announced:
+    the default "births" dial muted it at queue time and no card, relay
+    or trace ever existed.
+    """
     m = voice_mode()
     if m == "off":
         return False
-    if kind == "birth":
+    if kind in ("birth", "codex"):
         return True
     if m == "births":
         return False
-    if kind in ("death", "codex"):
+    if kind == "death":
         return True
     if kind == "report":
         return m == "daily"

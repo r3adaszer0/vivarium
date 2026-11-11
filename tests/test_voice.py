@@ -25,10 +25,13 @@ class TestVoiceDial(unittest.TestCase):
     def test_default_is_births(self):
         self.assertEqual(vstate.voice_mode(), "births")
 
-    def test_births_voice_allows_only_births(self):
+    def test_births_voice_allows_births_and_codex(self):
+        """VIV-75: a Codex discovery is a birth — a pattern being born into
+        the dish — so the default dial announces it like a birth. Only
+        deaths and the daily report stay behind the dial."""
         self.assertTrue(vstate.voice_allows("birth"))
+        self.assertTrue(vstate.voice_allows("codex"))
         self.assertFalse(vstate.voice_allows("death"))
-        self.assertFalse(vstate.voice_allows("codex"))
         self.assertFalse(vstate.voice_allows("report"))
 
     def test_milestones_adds_deaths_and_discoveries(self):
@@ -74,6 +77,46 @@ class TestContentIdentity(unittest.TestCase):
                              load_world=vstate.load_world)
         self.assertIsNotNone(r1)
         self.assertIsNone(r2)
+
+
+class TestCodexIsABirth(unittest.TestCase):
+    """VIV-75: a Codex discovery is the dish speaking a birth — the default
+    "births" dial must not mute it, and it rides the MILESTONE queue so
+    routine reports cannot clobber it. Era 9 ran 7290 ticks with the Pulse
+    confirmed at tick 6980 and never announced: the narration was dropped
+    at queue time, before any card, relay or trace existed."""
+
+    def setUp(self):
+        self.s = FakeState()
+        vstate._ctx = _C(self.s)
+
+    def test_codex_announces_in_default_voice_and_rides_milestones(self):
+        import world as W
+        make_live(self.s)
+        w = W.World.from_dict(self.s.d["world"],
+                              seed=self.s.get("seed", 0))
+        import codex as vcodex_mod
+        original = vcodex_mod.observe
+        vcodex_mod.observe = lambda *a, **k: [
+            "📖 Codex entry: Pulse confirmed — period 120 ticks."]
+        try:
+            vstate.advance(w, ticks=1, nutrients=0.0)
+        finally:
+            vcodex_mod.observe = original
+        # the discovery must sit in the milestone queue, first out even
+        # when routine reports pile up behind it
+        self.assertIn("Codex entry",
+                      (self.s.d.get("pending_narration_milestones") or [""])[-1])
+        for i in range(6):
+            vstate.queue_narration(f"routine report {i}")
+        got = vstate.pop_narration()
+        self.assertIsNotNone(got)
+        self.assertIn("Codex entry", got)
+        self.assertNotIn("routine report", got)
+
+    def test_off_still_silences_the_codex(self):
+        vstate.set_voice_mode("off")
+        self.assertFalse(vstate.voice_allows("codex"))
 
 
 if __name__ == "__main__":
