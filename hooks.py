@@ -453,9 +453,11 @@ def _paint_status_relay() -> None:
             return
         size = vterm.png_size(path) or (342, 339)
         res_rows = max(1, _math.ceil(size[1] / vterm.CELL_H))
-        # VIV-87: same one-row lift as the direct slash paint — the image
-        # top aligns with the TUI's tool-indicator row (⚙), both paths.
-        vterm.paint_over(path, res_rows, 0, delay=0.0, extra_climb=4)
+        # VIV-87 (corrected): the worker's text reserves res_rows + 3 rows
+        # (the dish sits 3 rows lower); the default climb from this later
+        # cursor lands the picture 3 rows into that taller rectangle —
+        # same geometry as the direct slash paint, both paths.
+        vterm.paint_over(path, res_rows, 0, delay=0.0)
     except Exception:
         pass
 

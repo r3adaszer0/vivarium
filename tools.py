@@ -498,7 +498,7 @@ def _cmd(raw_args: str) -> str:
                             from . import card as vcard
                         except ImportError:  # pragma: no cover
                             import card as vcard
-                        panel = vcard.status_panel(stats, res_rows,
+                        panel = vcard.status_panel(stats, res_rows + 3,
                                                    gutter=res_cols + 17)
                         # The panel IS the summary; the prose line would
                         # duplicate every number. The dish paints over the
@@ -521,11 +521,12 @@ def _cmd(raw_args: str) -> str:
                             body += f"\n\n{' ' * (res_cols + 17)}  {stale}"
                         if vterm.detect_graphics() in ("kitty", "iterm2",
                                                        "sixel"):
-                            # VIV-87: the image top aligns with the TUI's
-                            # tool-indicator row (the ⚙ the user sees) —
-                            # one row higher than the default 3-row climb.
-                            vterm.paint_over(path, res_rows, 0, delay=0.4,
-                                             extra_climb=4)
+                            # VIV-87 (corrected): the dish sits THREE rows
+                            # lower than before — three extra blank rows at
+                            # the panel's foot push the reserved rectangle
+                            # down; the paint keeps the measured default
+                            # climb, so the picture lands 3 rows into it.
+                            vterm.paint_over(path, res_rows, 0, delay=0.4)
                         else:
                             # VIV-77b: headless surface — hand the paint
                             # to whichever process sits on a terminal.
