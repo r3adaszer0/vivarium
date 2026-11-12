@@ -8,6 +8,8 @@ on:
 jobs:
   tests:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     strategy:
       fail-fast: false
       matrix:
@@ -46,7 +48,7 @@ jobs:
           tail -c 6000 /tmp/out.log > /tmp/tail.log || true
           echo "job: ${{ matrix.python }}" >> /tmp/tail.log
           jq -Rs '{body: ("CI failure tail (auto, for debugging):\n\n```\n" + . + "\n```")}' /tmp/tail.log > /tmp/body.json
-          curl -s -X POST \
+          curl -sf -X POST \
             -H "Authorization: Bearer $GH_TOKEN" \
             -H "Accept: application/vnd.github+json" \
             -d @/tmp/body.json \
