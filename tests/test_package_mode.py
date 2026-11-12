@@ -49,6 +49,13 @@ def _load_flat():
     return mods
 
 
+def _bundled_catalog_present() -> bool:
+    """True only where a real Hermes install ships its bundled skills catalog."""
+    import discovery as _d
+    p = getattr(_d, "BUNDLED_SKILLS_DIR", None)
+    return bool(p) and p.is_dir()
+
+
 class TestPackageMode(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -110,6 +117,8 @@ class TestPackageMode(unittest.TestCase):
         self.assertGreaterEqual(len(seeded), 4)     # the probe's pod
         self.assertIn("universe", store)
 
+    @unittest.skipUnless(_bundled_catalog_present(),
+                         "no bundled skills catalog on this machine (CI runner)")
     def test_bundled_skills_dir_resolves_without_hardcode(self):
         """The bundled-catalog path must come from the running Hermes package.
 

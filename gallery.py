@@ -504,7 +504,7 @@ def build_page(media_dir: str, dish_map: str, title: str = "The Hermi Gallery",
     nav_items = [(f"#u{_esc(key_fp)}", f"era {era}", True)] + [
         (f"#u{_esc(s['key'])}-fallen", s["key"][:8], False) for s in closed_list]
     nav = "".join(
-        f'<a href="{href}"{" class=\"cur\"" if cur else ""}>{_esc(lbl)}</a>'
+        '<a href="%s"%s>%s</a>' % (_esc(href), ' class="cur"' if cur else "", _esc(lbl))
         for href, lbl, cur in nav_items)
     # the masthead is navigation only (VIV-93): title, lock, era links,
     # search. Facts live where they are used — era/status/seed at NOW,
