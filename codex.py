@@ -11,7 +11,7 @@ constants, not vibes; nothing is ever seeded or invented.
 """
 from __future__ import annotations
 
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 
 try:  # package context (Hermes plugin) or flat import (tests)
     from . import world as W
@@ -125,14 +125,15 @@ def observe(s, w, summaries, day: Optional[str] = None) -> List[str]:
         else:
             sl_state = state
         if found:
-            record_discovery(s, found, day)
-            ev = found.get("evidence", {})
-            narrations.append(
-                f"📖 Codex entry: {label} confirmed — "
-                + (f"period ~{found['period']} ticks" if found.get("period")
-                   else f"population {ev.get('population')} held "
-                        f"{ev.get('duration_ticks')} ticks")
-                + ". The dish has a new pattern.")
+            _, first_confirmation = record_discovery(s, found, day)
+            if first_confirmation:
+                ev = found.get("evidence", {})
+                narrations.append(
+                    f"📖 Codex entry: {label} confirmed — "
+                    + (f"period ~{found['period']} ticks" if found.get("period")
+                       else f"population {ev.get('population')} held "
+                            f"{ev.get('duration_ticks')} ticks")
+                    + ". The dish has a new pattern.")
 
     # plateau break → cause attribution (the Codex becomes a linked history)
     end_pop = curve[-1]["population"]
@@ -301,21 +302,53 @@ def codex_all(s) -> List[dict]:
     return s.get(CODEX_KEY, [])
 
 
-def record_discovery(s, discovery: dict, day: str) -> dict:
-    """Append a discovery with its first-seen day; dedupe by pattern+period."""
+# A completed cycle RE-MEASURES its period (680, 682, 681...): the same
+# oscillation wobbles by sampling alone (the curve is sampled every
+# SAMPLE_EVERY ticks, so quantization alone is ~1.5% at a 680-tick period).
+# Two measurements of one pattern kind within this fraction of the recorded
+# period are the SAME pattern; farther drift is a different regime. A fixed
+# constant, not vibes.
+PATTERN_MATCH_TOLERANCE = 0.05
+
+
+def _same_pattern(entry: dict, discovery: dict) -> bool:
+    """Same pattern kind, period within PATTERN_MATCH_TOLERANCE (or both
+    periodless, as for a Still Life)."""
+    if entry.get("pattern") != discovery.get("pattern"):
+        return False
+    recorded, measured = entry.get("period"), discovery.get("period")
+    if recorded is None or measured is None:
+        return recorded == measured
+    return abs(measured - recorded) <= PATTERN_MATCH_TOLERANCE * recorded
+
+
+def record_discovery(s, discovery: dict, day: str) -> Tuple[dict, bool]:
+    """Record a discovery; dedupe by pattern, not by measured period.
+
+    Same pattern within PATTERN_MATCH_TOLERANCE updates the existing entry
+    (latest measured period as moving evidence, times_observed bumped,
+    last_seen refreshed) and never appends. Returns
+    ``(entry, first_confirmation)``: first_confirmation is True only when
+    this is the FIRST entry of that pattern kind in the Codex, the
+    milestone that narrates. A period drifted beyond tolerance is a new
+    entry, but a later confirmation of a known kind is still silent -
+    updates never narrate; the Codex speaks in /vivarium codex when asked
+    (VIV-46).
+    """
     codex = codex_all(s)
+    kind_known = any(e.get("pattern") == discovery.get("pattern")
+                     for e in codex)
     for entry in codex:
-        if entry["pattern"] == discovery["pattern"] and \
-                entry.get("period") == discovery.get("period"):
-            # same pattern, same period: extend the observation count instead
+        if _same_pattern(entry, discovery):
+            entry["period"] = discovery.get("period")
             entry["times_observed"] = entry.get("times_observed", 1) + 1
             entry["last_seen"] = day
             s.set(CODEX_KEY, codex)
-            return entry
+            return entry, False
     entry = {**discovery, "first_seen": day, "times_observed": 1}
     codex.append(entry)
     s.set(CODEX_KEY, codex)
-    return entry
+    return entry, not kind_known
 
 
 def export_codex(s) -> str:

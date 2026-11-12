@@ -65,14 +65,18 @@ class PulseDetection(unittest.TestCase):
 class Codex(unittest.TestCase):
     def test_record_and_dedupe(self):
         s = FakeState()
-        d1 = X.record_discovery(s, {"pattern": "pulse", "period": 612,
-                                    "evidence": {"peak_population": 104}}, "2026-11-05")
+        d1, first1 = X.record_discovery(
+            s, {"pattern": "pulse", "period": 612,
+                "evidence": {"peak_population": 104}}, "2026-11-05")
         self.assertEqual(d1["times_observed"], 1)
-        d2 = X.record_discovery(s, {"pattern": "pulse", "period": 612,
-                                    "evidence": {"peak_population": 104}}, "2026-11-06")
+        self.assertTrue(first1)                     # the milestone narrates
+        d2, first2 = X.record_discovery(
+            s, {"pattern": "pulse", "period": 612,
+                "evidence": {"peak_population": 104}}, "2026-11-06")
         self.assertEqual(d2["times_observed"], 2)
         self.assertEqual(len(X.codex_all(s)), 1)      # deduped
         self.assertEqual(d2["last_seen"], "2026-11-06")
+        self.assertFalse(first2)                    # the update is silent
 
     def test_different_periods_are_separate_entries(self):
         s = FakeState()
@@ -93,6 +97,60 @@ class Codex(unittest.TestCase):
 
     def test_export_empty(self):
         self.assertIn("No discoveries", X.export_codex(FakeState()))
+
+
+class PatternsNarrateOnce(unittest.TestCase):
+    """Fix 5: the Codex dedups by pattern, not by measured period.
+
+    Each completed cycle re-measures its period (680, 682, 681...), so the
+    old exact-equality dedup re-recorded and re-narrated on every cycle and
+    the Codex filled with near-duplicates. Within PATTERN_MATCH_TOLERANCE
+    the entry updates; only the FIRST confirmation of a pattern kind
+    narrates - updates are silent, the Codex speaks in /vivarium codex
+    when asked (VIV-46).
+    """
+
+    def _record(self, s, pattern, period, day):
+        return X.record_discovery(s, {"pattern": pattern, "period": period,
+                                      "evidence": {}}, day)
+
+    def test_two_cycles_one_entry_one_narration(self):
+        s = FakeState()
+        self._record(s, "pulse", 680, "2026-11-11")
+        _, first2 = self._record(s, "pulse", 682, "2026-11-12")
+        entries = X.codex_all(s)
+        self.assertEqual(len(entries), 1)             # never appended
+        self.assertEqual(entries[0]["times_observed"], 2)
+        self.assertEqual(entries[0]["period"], 682)   # moving evidence
+        self.assertEqual(entries[0]["first_seen"], "2026-11-11")
+        self.assertEqual(entries[0]["last_seen"], "2026-11-12")
+        self.assertFalse(first2)                      # the update is silent
+
+    def test_a_still_life_after_a_pulse_is_a_second_narrated_entry(self):
+        s = FakeState()
+        self._record(s, "pulse", 680, "2026-11-11")
+        _, first2 = self._record(s, "still_life", None, "2026-11-12")
+        self.assertTrue(first2)                       # new kind: the milestone
+        self.assertEqual(len(X.codex_all(s)), 2)
+
+    def test_drift_beyond_tolerance_is_a_new_silent_entry(self):
+        s = FakeState()
+        self._record(s, "pulse", 680, "2026-11-11")
+        _, first2 = self._record(s, "pulse", 900, "2026-11-12")
+        self.assertFalse(first2)                      # known kind stays silent
+        entries = X.codex_all(s)
+        self.assertEqual(len(entries), 2)             # beyond tolerance: new
+        self.assertEqual(entries[1]["period"], 900)
+        self.assertEqual(entries[1]["times_observed"], 1)
+
+    def test_a_near_miss_at_the_tolerance_edge_is_the_same_pattern(self):
+        # 5% of 680 is 34: 714 is inside, 715 is outside. The constant is a
+        # fixed fraction, so pin both sides of the edge.
+        s = FakeState()
+        self._record(s, "pulse", 680, "d1")
+        _, inside = self._record(s, "pulse", 680 + int(0.05 * 680), "d2")
+        self.assertFalse(inside)                      # still one entry
+        self.assertEqual(len(X.codex_all(s)), 1)
 
 
 class StillLife(unittest.TestCase):
@@ -186,6 +244,26 @@ class Observe(unittest.TestCase):
         X.observe(s, None, self._summaries(ticks, pops))   # same batch again
         self.assertEqual(len(X.codex_all(s)), 1)           # not re-recorded
         self.assertEqual(X.codex_all(s)[0]["times_observed"], 1)
+
+    def test_a_second_cycle_updates_silently(self):
+        # Fix 5: a re-measured cycle (680 then 682) bumps the SAME entry and
+        # does not narrate again. The detector is scripted here so the test
+        # pins the wiring (record + narrate-once), not detector dynamics.
+        s = FakeState()
+        found = [{"pattern": "pulse", "period": 680, "evidence": {}},
+                 {"pattern": "pulse", "period": 682, "evidence": {}}]
+        old = X.detect_pulse
+        X.detect_pulse = lambda curve, state=None: found.pop(0) if found else None
+        try:
+            lines1 = X.observe(s, None, self._summaries([10, 20], [50, 50]))
+            lines2 = X.observe(s, None, self._summaries([30, 40], [50, 50]))
+        finally:
+            X.detect_pulse = old
+        self.assertTrue(any("Pulse" in l for l in lines1))   # the milestone
+        self.assertEqual(lines2, [])                         # the update: silent
+        self.assertEqual(len(X.codex_all(s)), 1)
+        self.assertEqual(X.codex_all(s)[0]["times_observed"], 2)
+        self.assertEqual(X.codex_all(s)[0]["period"], 682)   # moving evidence
 
     def test_still_life_end_gets_cause_chapter(self):
         s = FakeState()
