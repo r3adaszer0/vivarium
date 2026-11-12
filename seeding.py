@@ -14,12 +14,12 @@ try:  # package context (Hermes plugin) or flat import (tests)
     from . import discovery as vdisc
     from . import universe as U
     from . import world as W
-    from .birth import BIRTHS_KEY
+    from .birth import BIRTHS_KEY, next_birth_seq
 except ImportError:  # pragma: no cover
     import discovery as vdisc
     import universe as U
     import world as W
-    from birth import BIRTHS_KEY
+    from birth import BIRTHS_KEY, next_birth_seq
 
 canon_digest = vdisc.canon_digest   # public derivation lives in discovery.py
 
@@ -107,9 +107,13 @@ def seed(s, skills: List[dict],
         d = canon_digest(sk["bytes"])
         _release_pod(w, d, eidos_id(d), bang)
         canon_species.append({"name": sk["name"], "eidos": eidos_id(d)})
+        # VIV-104: every seeding is a birth EVENT (a new era re-births the
+        # same skill) — stamp the monotonic seq in seed order so the shared
+        # newest-birth selector orders Big Bangs correctly too.
         births[sk["name"]] = {"eidos": eidos_id(d), "day": date.today().isoformat(),
                               "pod": POD_SIZE, "digest_fp": d[:8].hex(),
-                              "era": era, "genome": W.genome_from_bytes(d[:W.GENOME_BYTES])}
+                              "era": era, "seq": next_birth_seq(births),
+                              "genome": W.genome_from_bytes(d[:W.GENOME_BYTES])}
 
     # private species: keyed derivation (unique per universe)
     priv_species = []
@@ -119,7 +123,7 @@ def seed(s, skills: List[dict],
         priv_species.append({"name": sk["name"], "eidos": eidos_id(d)})
         births[sk["name"]] = {"eidos": eidos_id(d), "day": date.today().isoformat(),
                               "pod": POD_SIZE, "digest_fp": d[:8].hex(),
-                              "era": era,
+                              "era": era, "seq": next_birth_seq(births),
                               "genome": W.genome_from_bytes(d[:W.GENOME_BYTES])}
     s.set(BIRTHS_KEY, births)
 

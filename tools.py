@@ -27,10 +27,12 @@ def _tool_shim(data=None, error=None, **kwargs):
 try:  # package context (Hermes plugin) or flat import (tests)
     from . import state as vstate
     from . import world as vworld
+    from . import birth as vbirth
     from tools.registry import tool_error, tool_result   # Hermes runtime path
 except ImportError:  # pragma: no cover — flat test context
     import state as vstate
     import world as vworld
+    import birth as vbirth
     try:
         from tools.registry import tool_error, tool_result
     except ImportError:
@@ -776,6 +778,48 @@ def _doctor_text() -> str:
     return "\n".join(lines)
 
 
+def _latest_birth_payload(births: dict, extinct_hexes) -> dict | None:
+    """VIV-104: the featured card's live payload — the newest birth EVENT.
+
+    Selected by the ONE shared selector build_page uses
+    (birth.newest_birth), never by dict position: a re-birth re-assigns
+    an existing registry key and insertion order then points at whichever
+    new-name skill was inserted last. Returns None for an empty registry.
+    """
+    try:
+        pair = vbirth.newest_birth(births or {})
+    except Exception:
+        pair = None
+    if not pair:
+        return None
+    _sk, _rec = pair
+    if not isinstance(_rec, dict) or not _rec.get("eidos"):
+        return None
+    _gen = _rec.get("genome") or {}
+    _eidos = str(_rec.get("eidos"))
+    _hex = _eidos.replace("Eidos_", "")
+    try:
+        try:
+            from . import identity as _vid
+        except ImportError:  # pragma: no cover
+            import identity as _vid
+        _g, _e, _c = _vid.name_of(_gen)
+        _name = f"{_g} {_e}"
+    except Exception:
+        _name = "unnamed strain"
+    try:
+        try:
+            from . import gallery as _vgal
+        except ImportError:  # pragma: no cover
+            import gallery as _vgal
+        _face = _vgal._face_svg(_gen, _hex in set(extinct_hexes or ()), 64)
+    except Exception:
+        _face = ""
+    return {"eidos": _eidos, "era": _rec.get("era"),
+            "seq": _rec.get("seq"), "skill": _sk, "name": _name,
+            "genome": _gen, "face_svg": _face}
+
+
 def _serve_text(keep: bool) -> str:
     """VIV-28b: localhost-only gallery over the plugin's media dir."""
     try:  # package mode / flat mode
@@ -836,45 +880,18 @@ def _serve_text(keep: bool) -> str:
                                                     color=True)),
                        "status": st,
                        "births_total": len(vstate.state().get("births", {}))}
-                # VIV-101: the featured card's live payload. The newest
-                # birth — selected exactly as build_page selects it — with
-                # its face SVG from the ONE server renderer, so the page
-                # morphs the card in place instead of duplicating the
-                # pixel-art face in JavaScript.
+                # VIV-101/VIV-104: the featured card's live payload. The
+                # newest birth EVENT — selected by the ONE shared selector
+                # build_page uses (a re-birth re-assigns its existing
+                # registry key, so dict insertion order lies about what is
+                # newest) — with its face SVG from the ONE server renderer,
+                # so the page morphs the card in place instead of
+                # duplicating the pixel-art face in JavaScript.
                 _births = vstate.state().get("births", {}) or {}
-                latest = None
-                if _births:
-                    # Insertion-ordered registry: the LAST entry is the
-                    # newest. max((era, day)) froze the card on the first
-                    # same-era-same-day birth (max() keeps the first tie),
-                    # so new skill-births never replaced the featured Hermi.
-                    try:
-                        _sk, _rec = list(_births.items())[-1]
-                    except (AttributeError, TypeError, IndexError):
-                        _sk, _rec = None, None
-                    if _rec and _rec.get("eidos"):
-                        _gen = _rec.get("genome") or {}
-                        _eidos = str(_rec.get("eidos"))
-                        _hex = _eidos.replace("Eidos_", "")
-                        try:
-                            try:
-                                from . import identity as _vid
-                            except ImportError:  # pragma: no cover
-                                import identity as _vid
-                            _g, _e, _c = _vid.name_of(_gen)
-                            _name = f"{_g} {_e}"
-                        except Exception:
-                            _name = "unnamed strain"
-                        _extinct = {
-                            str(f.get("lineage", "")).replace("Eidos_", "")
-                            for f in (vstate.state().get("fossils") or [])}
-                        try:
-                            _face = vgal._face_svg(_gen, _hex in _extinct, 64)
-                        except Exception:
-                            _face = ""
-                        latest = {"eidos": _eidos, "era": _rec.get("era"),
-                                  "skill": _sk, "name": _name,
-                                  "genome": _gen, "face_svg": _face}
+                _extinct = {
+                    str(f.get("lineage", "")).replace("Eidos_", "")
+                    for f in (vstate.state().get("fossils") or [])}
+                latest = _latest_birth_payload(_births, _extinct)
                 out["latest"] = latest
                 if out["grid"]:
                     _last.clear()
