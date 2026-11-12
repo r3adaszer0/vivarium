@@ -292,7 +292,10 @@ def _tool_release(args: Dict[str, Any], **_) -> str:
         return _dormant_tool_result("release")
     w = _world()
     if code:
-        genome = vstate.decode_genome(code)
+        try:
+            genome = vstate.decode_genome(code)
+        except ValueError as exc:
+            return tool_error(f"Rejected challenge code: {exc}")
         if genome is None:
             return tool_error("Invalid challenge code. Codes are base64 strings "
                               "starting with VIV1.")

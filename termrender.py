@@ -465,7 +465,29 @@ def serve_gallery(media_dir: str, dish_map: str = "",
         def log_message(self, format, *args):    # silence request logging
             pass
 
+        def _host_allowed(self) -> bool:
+            # The server binds 127.0.0.1 only, but a web page in the user's
+            # browser can aim <attacker host> AT 127.0.0.1 (DNS rebinding);
+            # the browser then sends THAT Host header and the page could
+            # read /live/dish.json cross-origin. Only the loopback names on
+            # the actual serving port may pass.
+            host = (self.headers.get("Host") or "").strip().lower()
+            port = self.server.server_address[1]
+            return host in (f"127.0.0.1:{port}", f"localhost:{port}",
+                            f"[::1]:{port}")
+
+        def _deny_host(self) -> None:
+            body = b"forbidden host\n"
+            self.send_response(403)
+            self.send_header("Content-Type", "text/plain; charset=utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
         def do_GET(self):
+            if not self._host_allowed():
+                self._deny_host()
+                return
             if glyph_provider is not None and \
                     self.path.split("?")[0] == "/live/glyph.json":
                 try:

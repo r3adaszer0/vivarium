@@ -18,10 +18,24 @@ _MAX_LINES = 400
 
 
 def _path() -> Path:
+    # The trace lives next to the plugin state. The bound data dir is the
+    # running truth (whatever profile Hermes is actually running); env vars
+    # are explicit overrides for standalone runs; the bare default home is
+    # the LAST fallback only, so a non-default profile never writes into
+    # the default profile's tree.
+    try:  # package context (Hermes plugin) or flat import (tests)
+        from . import state as _state_mod
+    except ImportError:  # pragma: no cover
+        import state as _state_mod
+    bound = _state_mod.bound_data_dir()
+    if bound is not None:
+        p = Path(str(bound))
+        p.mkdir(parents=True, exist_ok=True)
+        return p / "delivery.log"
     root = os.environ.get("HERMES_PLUGIN_DATA") or ""
     if not root:
-        base = Path(os.environ.get("HERMES_HOME", Path.home() / ".hermes"))
-        root = str(base / "plugin-data" / "vivarium")
+        base = os.environ.get("HERMES_HOME") or str(Path.home() / ".hermes")
+        root = str(Path(base).expanduser() / "plugin-data" / "vivarium")
     p = Path(root)
     p.mkdir(parents=True, exist_ok=True)
     return p / "delivery.log"

@@ -13,7 +13,9 @@ from __future__ import annotations
 
 import base64
 import json
+import os
 import random
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 try:  # package context (Hermes plugin) or flat import (tests)
@@ -113,17 +115,54 @@ def universe_record() -> dict:
     return vuniverse.universe_record(_state())
 
 
+def bound_data_dir() -> Optional[Path]:
+    """The plugin's data dir for the RUNNING profile, or None when the
+    plugin is not bound to a Hermes context (tests, standalone runs)."""
+    if _ctx is None:
+        return None
+    try:
+        d = getattr(_state(), "data_dir", None)
+        if d is None:
+            d = getattr(_ctx, "data_dir", None)
+    except Exception:
+        return None
+    if callable(d):          # some contexts expose data_dir() as a method
+        try:
+            d = d()
+        except Exception:
+            return None
+    return Path(str(d)) if d else None
+
+
+def _hermes_skills_dirs() -> List[Path]:
+    """Candidate skills dirs, most specific first.
+
+    The running Hermes home wins: the bound plugin state's data dir is
+    ``<hermes-home>/plugin-data/<plugin>``, so two levels up is whatever
+    profile is actually running, default or not. ``$HERMES_HOME`` is the
+    explicit override. ``~/.hermes`` is only the LAST fallback, for
+    standalone runs. An authoritative source (bound dir or env) ends the
+    search even when it has no skills dir yet: a non-default profile must
+    never leak the DEFAULT profile's skills just because it has none of
+    its own.
+    """
+    bound = bound_data_dir()
+    if bound is not None:
+        return [bound.parent.parent / "skills"]
+    env = os.environ.get("HERMES_HOME")
+    if env:
+        return [Path(env).expanduser() / "skills"]
+    return [Path.home() / ".hermes" / "skills"]
+
+
 def skill_content(skill_name: str) -> Optional[str]:
     """Full SKILL.md bytes of a learned skill, or None when not found.
 
-    Resolves like Hermes does: frontmatter name match across the local
-    skills dir (flat or nested) plus the bundled catalog.
+    Resolves like Hermes does: frontmatter name match across the RUNNING
+    profile's skills dir (flat or nested) plus the bundled catalog. The
+    profile comes from _hermes_skills_dirs, never a hardcoded home.
     """
-    from pathlib import Path
-    bases = []
-    home = Path.home() / ".hermes" / "skills"
-    if home.exists():
-        bases.append(home)
+    bases = _hermes_skills_dirs()
     bundled = Path("/usr/local/lib/hermes-agent/skills")
     if bundled.exists():
         bases.append(bundled)
@@ -521,7 +560,16 @@ def decode_genome(code: str) -> Optional[Dict[str, float]]:
     if not isinstance(genome, dict) or not all(k in genome for k in required):
         return None
     genome.pop("eidos", None)  # the label rides the same envelope, OUT here
-    return vworld.with_defaults(genome)
+    genome = vworld.with_defaults(genome)
+    # A code is untrusted input. Every gene goes through the ONE clamp the
+    # birth path uses: sense = 10**9 would otherwise turn the sense scan
+    # into range(-10**9, 10**9) squared, per tick, on every tool call.
+    # Non-numeric and non-finite genes raise ValueError; big numbers are
+    # clamped, not refused. ndigits=None keeps an in-range gene's own
+    # precision: decode enforces the range, it does not re-canonicalize.
+    for k in vworld.GENOME_RANGES:
+        genome[k] = vworld.clamp_gene(k, genome[k], ndigits=None)
+    return genome
 
 
 def decode_code_label(code: str) -> Optional[str]:
@@ -567,6 +615,11 @@ def release_creatures(w: World, genomes: Optional[List[Dict[str, float]]] = None
     made: List[Creature] = []
     if genomes:
         for genome in genomes:
+            # Backstop clamp: imports already decode through clamp_gene, but
+            # release_creatures also takes raw dicts straight from callers.
+            genome = {k: (vworld.clamp_gene(k, v, ndigits=None)
+                          if k in vworld.GENOME_RANGES else v)
+                      for k, v in genome.items()}
             made.append(Creature(
                 gid=w.next_gid, genome=dict(genome),
                 x=w.rng.randrange(w.w), y=w.rng.randrange(w.h),

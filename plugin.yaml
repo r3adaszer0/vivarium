@@ -1,5 +1,5 @@
 name: vivarium
-version: 0.1.0
+version: 0.1.1
 description: "A persistent artificial life inside Hermes. Tool calls feed the dish; creatures forage, reproduce, mutate and go extinct on their own. Hermes narrates the living world day by day."
 author: "r3adaszer0 + Hermes"
 license: "MIT"
