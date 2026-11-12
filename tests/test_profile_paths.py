@@ -18,6 +18,7 @@ import unittest
 from pathlib import Path
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import delivery_trace as dt    # noqa: E402
 import state as vstate         # noqa: E402
@@ -159,6 +160,37 @@ class TestDeliveryTracePath(unittest.TestCase):
                     os.environ.pop("HERMES_PLUGIN_DATA", None)
                 else:
                     os.environ["HERMES_PLUGIN_DATA"] = old_pd
+
+
+class TestTempSkillsHarness(unittest.TestCase):
+    """The shared skills harness must pin BOTH knobs the resolver reads.
+
+    TempSkills used to patch only Path.home; with $HERMES_HOME set on the
+    host (every Hermes host) the env source is authoritative and the fake
+    skill was invisible: 7 harness-dependent failures in test_birth and
+    test_viv104, not security regressions. This guard keeps the harness
+    honest without needing HERMES_HOME to be set outside.
+    """
+
+    def test_tempskills_pins_and_restores_hermes_home(self):
+        from test_birth import TempSkills
+        old_env = os.environ.get("HERMES_HOME")
+        old_ctx = vstate._ctx
+        vstate._ctx = None                    # force the env source, not a bind
+        try:
+            with TempSkills("harness-probe-skill", "probe body one") as ts:
+                self.assertEqual(
+                    Path(os.environ["HERMES_HOME"]),
+                    Path(ts.tmp.name) / ".hermes")
+                self.assertIn("probe body one",
+                              vstate.skill_content("harness-probe-skill"))
+            self.assertEqual(os.environ.get("HERMES_HOME"), old_env)
+        finally:
+            vstate._ctx = old_ctx
+            if old_env is None:
+                os.environ.pop("HERMES_HOME", None)
+            else:
+                os.environ["HERMES_HOME"] = old_env
 
 
 if __name__ == "__main__":
