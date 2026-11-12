@@ -27,8 +27,10 @@ import time as _time
 
 try:  # package context (Hermes plugin) or flat import (tests)
     from . import identity as vid
+    from . import birth as vbirth
 except ImportError:  # pragma: no cover
     import identity as vid
+    import birth as vbirth
 
 
 # ── palette (the terminal's own) ──────────────────────────────────────────────
@@ -312,11 +314,35 @@ def _grid_json(rich_map: str) -> str:
     return "|".join(rows)
 
 
+def _fallback_face_cells():
+    """A deterministic 7x7 neutral face for genomes that cannot render
+    (VIV-104): ring outline, two eyes, a flat mouth. An EMPTY face_svg
+    makes the live card morph keep the PREVIOUS Hermi's face under the
+    new name — a half-morph — so a face is always shipped."""
+    g = [[(0, 0, 0)] * 7 for _ in range(7)]
+    for i in range(1, 6):
+        g[1][i] = g[5][i] = (152, 160, 170)
+        g[i][1] = g[i][5] = (152, 160, 170)
+    g[2][2] = g[2][4] = (58, 64, 74)     # eyes
+    g[4][3] = (58, 64, 74)               # mouth
+    return [tuple(row) for row in g]
+
+
 def _face_svg(genome: dict, dead: bool = False, size: int = 46) -> str:
-    """The REAL deterministic 7x7 glyph as inline SVG (identity spec)."""
-    hue = float(genome.get("hue", 0.0))
-    rgb = vid.color_for(hue)
-    cells = vid.glyph_rgb_cells(genome, rgb)
+    """The REAL deterministic 7x7 glyph as inline SVG (identity spec).
+
+    VIV-104: never raises, never returns empty. A genome the identity
+    renderer cannot read (hand-migrated state, a future genome shape)
+    degrades to the deterministic fallback face instead of an empty
+    string, so build_page cannot half-render and the live card morph
+    can never keep the old face under a new name.
+    """
+    try:
+        hue = float(genome.get("hue", 0.0))
+        rgb = vid.color_for(hue)
+        cells = vid.glyph_rgb_cells(genome, rgb)
+    except Exception:
+        cells = _fallback_face_cells()
     rects = []
     for y, row in enumerate(cells):
         for x, (r, g, b) in enumerate(row):
@@ -391,7 +417,8 @@ def _latest_species(skill: str, e: dict, extinct_hexes: frozenset) -> str:
         nm = f"{genus} {epithet}"
     except Exception:
         nm = "unnamed strain"
-    return (f'<a class="latest" href="#cert-{_esc(hexid)}">'
+    return (f'<a class="latest" data-seq="{_esc(e.get("seq", ""))}" '
+            f'href="#cert-{_esc(hexid)}">'
             f'<span class="face">{_face_svg(gen, dead, 64)}</span>'
             f'<span class="meta">'
             f'<span class="t">Latest birth · {_esc(nm)}</span>'
@@ -570,13 +597,18 @@ def build_page(media_dir: str, dish_map: str, title: str = "The Hermi Gallery",
     latest = ""
     if births:
         def _newest():
-            # The registry is insertion-ordered: the LAST entry is the
-            # newest birth. Selecting via max((era, day)) froze the card
-            # on the first same-era-same-day birth, because max() keeps
-            # the first of any tie - every birth of one day ties.
+            # VIV-104: newest is selected by DATA — a monotonic seq stamped
+            # into each birth record at write time — never by dict position.
+            # A re-birth (VIV-61) re-assigns an existing key, and Python
+            # keeps a re-assigned key's original position, so insertion
+            # order pointed at whichever new-name skill was inserted last.
+            # (max((era, day)) was tried before and froze the card on the
+            # first same-era-same-day tie, because max() keeps the first of
+            # any tie.) The ONE shared selector lives in birth.py, and the
+            # serve's live poll uses it too — the two paths must agree.
             try:
-                return list(births.items())[-1]
-            except (AttributeError, TypeError, IndexError):
+                return vbirth.newest_birth(births)
+            except Exception:
                 return None
         pair = _newest()
         if pair and isinstance(pair[1], dict) and pair[1].get("eidos"):
@@ -783,12 +815,51 @@ function dnaBars(genome){
          sees a newer birth, the card morphs in place. The face SVG comes
          from the same server renderer; the bars from dnaBars. */
       if(d.latest&&d.latest.eidos){
-        const card=document.querySelector('a.latest');
+        const hex=String(d.latest.eidos).replace('Eidos_','');
+        const seq=String(d.latest.seq==null?'':d.latest.seq);
+        let card=document.querySelector('a.latest');
+        if(!card){
+          /* VIV-104: a page built before the first birth has no featured
+             card to morph — build it from the live payload. The face SVG
+             still comes from the one server renderer; text goes through
+             textContent, never markup. */
+          const side=document.querySelector('.nowside');
+          if(side){
+            card=document.createElement('a');
+            card.className='latest';
+            const face=document.createElement('span');
+            face.className='face';
+            if(d.latest.face_svg)face.innerHTML=d.latest.face_svg;
+            const meta=document.createElement('span');
+            meta.className='meta';
+            const t=document.createElement('span');
+            t.className='t';
+            t.textContent='Latest birth · '+(d.latest.name||'unnamed strain');
+            const m=document.createElement('span');
+            m.className='d';
+            m.textContent=d.latest.eidos+' · era '+
+              (d.latest.era!=null?d.latest.era:'?')+
+              ' · from skill “'+(d.latest.skill||'')+'”';
+            const gl=document.createElement('span');
+            gl.className='genes lgenes';
+            if(d.latest.genome)gl.innerHTML=dnaBars(d.latest.genome);
+            const see=document.createElement('span');
+            see.className='d see';
+            see.textContent='see its certificate ↓';
+            meta.appendChild(t);meta.appendChild(m);
+            meta.appendChild(gl);meta.appendChild(see);
+            card.appendChild(face);card.appendChild(meta);
+            side.appendChild(card);
+          }
+        }
         if(card){
-          const hex=String(d.latest.eidos).replace('Eidos_','');
           const href=card.getAttribute('href')||'';
-          if(href.indexOf(hex)<0){
+          /* VIV-104: same-species RE-births keep the same hex (identity is
+             the content), so the hex alone cannot detect a newer birth —
+             compare the stamped seq as well. */
+          if(href.indexOf(hex)<0||card.dataset.seq!==seq){
             card.setAttribute('href','#cert-'+hex);
+            card.dataset.seq=seq;
             const face=card.querySelector('.face');
             if(face&&d.latest.face_svg)face.innerHTML=d.latest.face_svg;
             const t=card.querySelector('.meta .t');

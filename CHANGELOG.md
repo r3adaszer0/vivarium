@@ -5,6 +5,21 @@ Format follows [Keep a Changelog](https://keepachangelog.com/); versions follow 
 
 ## [Unreleased]
 
+### Fixed
+- VIV-104: the serve page's featured "latest birth" card follows the newest
+  birth EVENT, not dict insertion order. A re-birth (VIV-61: a skill with an
+  older-era registry row births again) re-assigns its existing key in the
+  births dict and Python keeps that key's original position, so picking the
+  last entry pinned the second-to-last birth forever ("first skill flips,
+  second doesn't"). Every birth-record writer (skill birth, older-era
+  re-birth, Big Bang seeding) now stamps a monotonic `seq`, and ONE shared
+  selector (`birth.newest_birth`) drives both the build-time page and the
+  serve's live poll. The live card morph can now CREATE the featured card on
+  a page built before the first birth, and guards on seq as well as the
+  Eidos hex so same-species re-births morph too. `_face_svg` never ships an
+  empty face: unrenderable genomes degrade to a deterministic fallback face
+  instead of leaving the previous Hermi's face under a new name.
+
 ## [0.1.0] - 2026-11-11
 
 First public release, submitted to the Hermes Agent Plugin Hackathon.

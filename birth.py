@@ -22,6 +22,58 @@ BIRTHS_KEY = "births"          # registry: skill name -> birth record (shared wi
 POD_SIZE = 4                   # landing party per birth
 
 
+def next_birth_seq(births: dict) -> int:
+    """The next monotonic birth sequence number (VIV-104).
+
+    One more than the highest seq already in the registry, so the count
+    keeps rising across eras and restarts — it is stamped into every
+    birth record at write time and travels with the saved state.
+    """
+    seqs = []
+    for r in (births or {}).values():
+        if isinstance(r, dict):
+            try:
+                seqs.append(int(r.get("seq") or 0))
+            except (TypeError, ValueError):
+                pass
+    return 1 + max(seqs) if seqs else 1
+
+
+def newest_birth(births: dict):
+    """The newest birth EVENT, selected by data — never by dict position.
+
+    A re-birth (VIV-61: a skill with an older-era registry row births
+    again) RE-ASSIGNS an existing key, and Python keeps a re-assigned
+    key's original position. So ``list(births.items())[-1]`` returns
+    whichever new-name skill was inserted last, not the re-birth — the
+    featured card pinned the second-to-last birth forever (the reported
+    "first skill flips, second doesn't"). Selection is therefore by the
+    write-time stamp: (seq, era, insertion order). Legacy records without
+    a seq rank below stamped ones and tie-break by era — a re-birth
+    updates its record's era, so even pre-VIV-104 data orders correctly.
+    Returns (skill_name, record) or None.
+    """
+    if not isinstance(births, dict):
+        return None
+    best = None
+    best_key = None
+    for idx, (name, rec) in enumerate(births.items()):
+        if not isinstance(rec, dict):
+            continue
+        try:
+            seq = int(rec.get("seq") or 0)
+        except (TypeError, ValueError):
+            seq = 0
+        try:
+            era = int(rec.get("era") or 0)
+        except (TypeError, ValueError):
+            era = 0
+        key = (seq, era, idx)
+        if best_key is None or key > best_key:
+            best, best_key = (name, rec), key
+    return best
+
+
 def birth_species(s, name: str, content: str,
                   save_world: Callable[[object], None],
                   load_world: Optional[Callable[[], object]] = None,
@@ -117,6 +169,7 @@ def birth_species(s, name: str, content: str,
         "pod": POD_SIZE,
         "digest_fp": digest[:8].hex(),
         "era": rec.get("era", 1),
+        "seq": next_birth_seq(births),   # VIV-104: newest-birth ordering
         "genome": dict(genome),   # VIV-13: enables challenge-code export
     }
     s.set(BIRTHS_KEY, births)
