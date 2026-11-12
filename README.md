@@ -1,5 +1,7 @@
 # 🧬 Vivarium - a living world inside your Hermes agent
 
+[![ci](https://github.com/r3adaszer0/vivarium/actions/workflows/ci.yml/badge.svg)](https://github.com/r3adaszer0/vivarium/actions/workflows/ci.yml)
+
 <div align="center">
 <table border="0" cellspacing="0" cellpadding="0">
 <tr>
