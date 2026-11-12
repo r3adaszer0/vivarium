@@ -33,5 +33,8 @@ jobs:
             echo '```' >> "$GITHUB_STEP_SUMMARY"
             tail -c 6000 /tmp/out.log >> "$GITHUB_STEP_SUMMARY" || true
             echo '```' >> "$GITHUB_STEP_SUMMARY"
+            while IFS= read -r line; do
+              printf '::error::%s\n' "${line:0:600}"
+            done < <(tail -c 3000 /tmp/out.log)
           fi
           exit $status
