@@ -144,25 +144,6 @@ speciation event. Time ticks; skills punctuate.
 </table>
 </div>
 
-## What you can do
-
-| Command | Effect |
-|---|---|
-| `/vivarium status` | population, lineages, age pyramid, ASCII map |
-| `/vivarium show <name\|id>` | a species up close: face, genes, founding skill |
-| `/vivarium clip [species] [ticks]` | your world as a short video |
-| `/vivarium explain` | how a hash becomes a living creature |
-| `/vivarium feed 0.5` | drop nutrients into the dish |
-| `/vivarium codex` | the Vivarium Codex: discoveries + artifacts |
-| `/vivarium release` | release fresh founders |
-| `/vivarium import <code>` | release a strain from a challenge code |
-| `/vivarium race <seed> <codes>` | a deterministic species duel, verifiable anywhere |
-| `/vivarium images on\|off\|auto` | inline dish painting in graphics terminals |
-| `/vivarium narration off\|births\|milestones\|daily` | how much the dish speaks: births by default, full milestones, one daily report, or silence. It never talks over your agent; it speaks after the turn is over |
-| `/vivarium start` | welcome briefing + the universe view |
-| `/vivarium staleness` | is the living world going stale? |
-| `/vivarium restart` | end the era (with a farewell picture); the next skill births a new universe |
-
 ## Hermi Gallery
 
 `/vivarium serve` turns your dish into a private web gallery. The live
@@ -211,6 +192,29 @@ for how lineages rise, crowd and go extinct on a bounded dish;
 for what selection does to variance; and
 [Wolfram's work on elementary cellular automata](https://en.wikipedia.org/wiki/Elementary_cellular_automaton)
 for why a fully deterministic world can still be unpredictable.
+
+## What you can do
+
+Every command, one table.
+
+| Command | Effect |
+|---|---|
+| `/vivarium status` | population, lineages, age pyramid, ASCII map |
+| `/vivarium render` | the dish itself: `--rich` dense blocks, `--color` colored creatures, `--image` a true PNG |
+| `/vivarium show <name\|id>` | a species up close: face, genes, founding skill |
+| `/vivarium clip [species] [ticks]` | your world as a short video - `--zoom` dives onto the action |
+| `/vivarium checkpoint <tick>` | numbered snapshots every 12 ticks; replay any exact moment |
+| `/vivarium explain` | how a hash becomes a living creature |
+| `/vivarium feed 0.5` | drop nutrients into the dish |
+| `/vivarium codex` | the Vivarium Codex: discoveries + artifacts |
+| `/vivarium release` | release fresh founders |
+| `/vivarium import <code>` | release a strain from a challenge code |
+| `/vivarium race <seed> <codes>` | a deterministic species duel, verifiable anywhere |
+| `/vivarium images on\|off\|auto` | inline dish painting in graphics terminals |
+| `/vivarium narration off\|births\|milestones\|daily` | how much the dish speaks: births by default, full milestones, one daily report, or silence. It never talks over your agent; it speaks after the turn is over |
+| `/vivarium start` | welcome briefing + the universe view |
+| `/vivarium staleness` | is the living world going stale? |
+| `/vivarium restart` | end the era (with a farewell picture); the next skill births a new universe |
 
 ## License
 
