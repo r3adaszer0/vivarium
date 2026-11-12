@@ -16,6 +16,8 @@ from tests.test_universe import FakeState  # noqa: E402
 
 
 class TestDiscovery(unittest.TestCase):
+    @unittest.skipUnless(vdisc.discover(),
+                         "no installed skills on this machine (CI runner)")
     def test_classifies_bundled_vs_private(self):
         # the real machine: bundled catalog exists; user dir may have extras
         skills = vdisc.discover()
