@@ -22,6 +22,7 @@ Design notes
 from __future__ import annotations
 
 import hashlib
+import math
 import random
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Tuple
@@ -156,9 +157,30 @@ def with_defaults(g: Dict[str, float]) -> Dict[str, float]:
     return out
 
 
-def clamp_gene(name: str, value: float) -> float:
+def clamp_gene(name: str, value: float, ndigits: int = 3) -> float:
+    """The ONE clamping helper for every gene value entering the dish.
+
+    The birth path, imported challenge codes and releases all clamp here,
+    so the legal ranges live in exactly one place (VIV-104's lesson: the
+    same logic pasted at two sites drifts apart). Non-numeric and
+    non-finite values are refused with ValueError: a NaN or inf gene is
+    hostile input, not a trait. Big numbers are NOT refused - they are
+    clamped to the declared range like any other value. `ndigits`
+    canonicalizes born genes to 3 decimals; imported codes pass None so an
+    in-range gene keeps the precision it was written with.
+    """
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise ValueError(f"gene {name!r} must be a number, "
+                         f"got {type(value).__name__}")
+    try:
+        v = float(value)
+    except OverflowError:   # an int too big for float is hostile too
+        raise ValueError(f"gene {name!r} is too large to be a trait") from None
+    if not math.isfinite(v):
+        raise ValueError(f"gene {name!r} must be finite, got {value!r}")
     lo, hi = GENOME_RANGES[name]
-    return round(min(hi, max(lo, value)), 3)
+    v = min(hi, max(lo, v))
+    return round(v, ndigits) if ndigits is not None else v
 
 
 def tag_hue(genome: Dict[str, float], lineage: str,

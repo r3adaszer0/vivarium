@@ -14,6 +14,7 @@ import base64
 import json
 import os
 import sys
+import types
 import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -164,3 +165,117 @@ class ANameIsGivenOnce(unittest.TestCase):
         res = {"eidos": "Eidos_0badc0de", "genome": g2, "name": "demo",
                "species": before}
         self.assertIn(before, birth.announcement(res))
+
+
+class HostileCodesAreClamped(unittest.TestCase):
+    """Phase 2 security: decode_genome is an attack surface.
+
+    A challenge code (or a model calling vivarium_release(code=...)) used
+    to inject sense = 10**9: the sense scan is range(-sense, sense+1)
+    squared per tick, ticks run synchronously in post_tool_call on every
+    tool call and the state is saved to disk, so one hostile code stalled
+    every future tool call, even after a restart. Codes now clamp through
+    the ONE helper the birth path uses; only non-finite values are refused.
+    """
+
+    BASE = {"forage": 1.0, "aggression": 0.5, "metabolism_mult": 1.0,
+            "sense": 2.0, "mutate": 1.0, "hue": 0.4, "dispersal": 0.3}
+
+    def _code(self, blob) -> str:
+        return "VIV1" + base64.urlsafe_b64encode(
+            json.dumps(blob).encode()).decode().rstrip("=")
+
+    def _code_text(self, text: str) -> str:
+        """Encode hand-built JSON text (for literals json.dumps refuses)."""
+        return "VIV1" + base64.urlsafe_b64encode(
+            text.encode()).decode().rstrip("=")
+
+    def _hostile(self, **over) -> str:
+        g = dict(self.BASE)
+        g.update(over)
+        return self._code(g)
+
+    def test_sense_1e9_clamps_to_the_legal_bound(self):
+        got = vstate.decode_genome(self._hostile(sense=10 ** 9))
+        self.assertEqual(got["sense"], W.GENOME_RANGES["sense"][1])
+
+    def test_every_gene_clamps_both_directions(self):
+        for k, (lo, hi) in W.GENOME_RANGES.items():
+            up = vstate.decode_genome(self._hostile(**{k: 10 ** 9}))
+            down = vstate.decode_genome(self._hostile(**{k: -10 ** 9}))
+            self.assertEqual(up[k], hi, k)
+            self.assertEqual(down[k], lo, k)
+
+    def test_nan_is_refused(self):
+        with self.assertRaises(ValueError):
+            vstate.decode_genome(self._hostile(sense=float("nan")))
+
+    def test_inf_is_refused(self):
+        with self.assertRaises(ValueError):
+            vstate.decode_genome(self._hostile(sense=float("inf")))
+
+    def test_a_1e400_literal_parses_to_inf_and_is_refused(self):
+        # json.dumps writes no inf for a float, but the JSON text "1e400"
+        # parses right back to float inf: that is the hostile form.
+        blob = json.dumps(dict(self.BASE, sense=0.123)).replace("0.123", "1e400")
+        with self.assertRaises(ValueError):
+            vstate.decode_genome(self._code_text(blob))
+
+    def test_a_non_numeric_gene_is_refused(self):
+        with self.assertRaises(ValueError):
+            vstate.decode_genome(self._hostile(sense="9"))
+
+    def test_release_backstop_clamps_raw_genomes(self):
+        old_ctx = vstate._ctx
+        store = {}
+        vstate._ctx = types.SimpleNamespace(state=types.SimpleNamespace(
+            get=lambda k, d=None: store.get(k, d),
+            set=lambda k, v: store.__setitem__(k, v)))
+        try:
+            w = W.new_world(seed=11)
+            made = vstate.release_creatures(
+                w, genomes=[dict(self.BASE, sense=10 ** 9, forage=50.0)],
+                lineage="imported")
+            self.assertEqual(made[0].genome["sense"],
+                             W.GENOME_RANGES["sense"][1])
+            self.assertEqual(made[0].genome["forage"],
+                             W.GENOME_RANGES["forage"][1])
+            self.assertEqual(w.creatures[-1].genome["sense"],
+                             W.GENOME_RANGES["sense"][1])
+        finally:
+            vstate._ctx = old_ctx
+
+    def test_release_tool_imports_a_hostile_code_clamped(self):
+        import tools as T
+        old_ctx = vstate._ctx
+        store = {"universe": {"status": "live", "era": 2},
+                 "world": W.new_world(seed=11).to_dict()}
+        vstate._ctx = types.SimpleNamespace(state=types.SimpleNamespace(
+            get=lambda k, d=None: store.get(k, d),
+            set=lambda k, v: store.__setitem__(k, v)))
+        try:
+            out = json.loads(T._tool_release(
+                {"code": self._hostile(sense=10 ** 9, forage=50.0)}))
+            self.assertTrue(out.get("success"), out)
+            w = W.World.from_dict(store["world"])
+            released = w.creatures[-1].genome
+            self.assertEqual(released["sense"], W.GENOME_RANGES["sense"][1])
+            self.assertEqual(released["forage"], W.GENOME_RANGES["forage"][1])
+        finally:
+            vstate._ctx = old_ctx
+
+    def test_release_tool_rejects_a_non_finite_code_gracefully(self):
+        import tools as T
+        old_ctx = vstate._ctx
+        store = {"universe": {"status": "live", "era": 2},
+                 "world": W.new_world(seed=11).to_dict()}
+        vstate._ctx = types.SimpleNamespace(state=types.SimpleNamespace(
+            get=lambda k, d=None: store.get(k, d),
+            set=lambda k, v: store.__setitem__(k, v)))
+        try:
+            out = json.loads(T._tool_release(
+                {"code": self._hostile(sense=float("nan"))}))
+            self.assertFalse(out.get("success"), out)
+            self.assertIn("Rejected challenge code", out.get("error", ""))
+        finally:
+            vstate._ctx = old_ctx

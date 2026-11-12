@@ -1,5 +1,5 @@
 """VIV-7 acceptance: on_skill_lifecycle -> automatic species birth."""
-import sys, unittest, tempfile
+import os, sys, unittest, tempfile
 from pathlib import Path
 sys.path.insert(0, '.')
 
@@ -30,7 +30,14 @@ class FakeCtx:
 
 
 class TempSkills:
-    """Point skill_content() at a temp dir with one fake skill."""
+    """Point skill_content() at a temp dir with one fake skill.
+
+    The resolver reads bound data dir -> $HERMES_HOME -> Path.home, so
+    pinning Path.home alone is not enough: on any machine where
+    HERMES_HOME is set (every Hermes host) the env source is
+    authoritative and the fake skill is not found. Both knobs are pinned
+    here and both are restored (the pattern test_profile_paths uses).
+    """
     def __init__(self, name, body):
         self.tmp = tempfile.TemporaryDirectory()
         d = Path(self.tmp.name) / ".hermes" / "skills" / name
@@ -39,9 +46,15 @@ class TempSkills:
     def __enter__(self):
         self.old = Path.home
         Path.home = lambda: Path(self.tmp.name)  # ~/.hermes/skills -> tmp
+        self.old_env = os.environ.get("HERMES_HOME")
+        os.environ["HERMES_HOME"] = str(Path(self.tmp.name) / ".hermes")
         return self
     def __exit__(self, *a):
         Path.home = self.old
+        if self.old_env is None:
+            os.environ.pop("HERMES_HOME", None)
+        else:
+            os.environ["HERMES_HOME"] = self.old_env
         self.tmp.cleanup()
 
 

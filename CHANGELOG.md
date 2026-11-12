@@ -5,6 +5,25 @@ Format follows [Keep a Changelog](https://keepachangelog.com/); versions follow 
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-11-12
+
+### Security
+- Imported challenge codes are clamped: `decode_genome` now pushes every gene
+  through the same clamp the birth path uses (one shared helper, `clamp_gene`),
+  so a hostile code carrying `sense = 10^9` can no longer turn the sense scan
+  into a four-quintillion-cell loop on every tool call. Non-finite values
+  (NaN, inf) are refused with a `ValueError`; big numbers are clamped, not
+  refused. `release_creatures` keeps a backstop clamp for callers that hand it
+  raw genomes.
+- Profile-safe paths: the skills-dir resolution and the delivery trace now
+  derive their Hermes home from the running profile (the bound plugin data
+  dir first, then `$HERMES_HOME`, with the default home only as the last
+  fallback), so a non-default Hermes profile no longer reads or writes the
+  default profile's tree.
+- The serve gallery answers 403 unless the Host header is a loopback name on
+  the actual serving port (127.0.0.1, localhost or [::1]), closing the
+  DNS-rebinding read of `/live/dish.json` from a browser page.
+
 ### Fixed
 - VIV-104: the serve page's featured "latest birth" card follows the newest
   birth EVENT, not dict insertion order. A re-birth (VIV-61: a skill with an

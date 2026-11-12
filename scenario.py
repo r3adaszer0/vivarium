@@ -127,7 +127,10 @@ def entry_digests(spec: dict) -> List[Tuple[str, bytes]]:
     out: List[Tuple[str, bytes]] = []
     seen = set()
     for code in spec.get("contestants", []):
-        genome = S.decode_genome(code)
+        try:
+            genome = S.decode_genome(code)
+        except ValueError:
+            continue          # a hostile (non-finite) code is not a contestant
         if genome is None:
             continue
         # Name the contestant by its species id when the code carries one;
@@ -195,10 +198,16 @@ def genome_for_label(spec: dict, label: str) -> Optional[Dict[str, float]]:
     import hashlib as _h
     for code in spec.get("contestants", []):
         if S.decode_code_label(code) == label and label is not None:
-            g = S.decode_genome(code)
+            try:
+                g = S.decode_genome(code)
+            except ValueError:
+                continue
             if g is not None:
                 return g
-        genome = S.decode_genome(code)
+        try:
+            genome = S.decode_genome(code)
+        except ValueError:
+            continue
         if genome is None:
             continue
         blob = json.dumps({k: round(v, 4) for k, v in genome.items()},

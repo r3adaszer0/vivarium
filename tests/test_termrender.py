@@ -755,5 +755,81 @@ class TestLiveDishEndpoint(unittest.TestCase):
             self.assertEqual(e.code, 404)
 
 
+class TestHostAllowlist(unittest.TestCase):
+    """Phase 2 security: DNS rebinding against the localhost gallery.
+
+    The server binds 127.0.0.1 only, but a web page in the user's browser
+    can aim <attacker host> AT 127.0.0.1; the browser then sends THAT Host
+    header and the page could read /live/dish.json cross-origin. Only the
+    loopback names on the actual serving port get answers.
+    """
+
+    def _serve(self, provider=None):
+        tmp = tempfile.mkdtemp()
+        Path(tmp, "keep.txt").write_text("x")
+        res = T.serve_gallery(tmp, dish_map="", title="t", open_browser=False,
+                              dish_provider=provider)
+        self.assertNotIn("error", res)
+        self.addCleanup(res["server"].server_close)
+        self.addCleanup(res["thread"].join, timeout=2)
+        return res
+
+    def _get(self, port, host, path="/"):
+        import http.client
+        conn = http.client.HTTPConnection("127.0.0.1", port, timeout=5)
+        try:
+            # putrequest(skip_host=True) is the only way to send NO Host
+            # header; conn.request() would silently add one.
+            conn.putrequest("GET", path, skip_host=True)
+            if host:
+                conn.putheader("Host", host)
+            conn.endheaders()
+            r = conn.getresponse()
+            return r.status, r.read()
+        finally:
+            conn.close()
+
+    def test_an_attacker_host_gets_403(self):
+        res = self._serve()
+        status, _ = self._get(res["port"], f"attacker.example:{res['port']}")
+        self.assertEqual(status, 403)
+
+    def test_an_attacker_host_without_a_port_gets_403(self):
+        res = self._serve()
+        status, _ = self._get(res["port"], "attacker.example")
+        self.assertEqual(status, 403)
+
+    def test_a_missing_host_gets_403(self):
+        res = self._serve()
+        status, _ = self._get(res["port"], None)
+        self.assertEqual(status, 403)
+
+    def test_the_right_name_on_the_wrong_port_gets_403(self):
+        res = self._serve()
+        status, _ = self._get(res["port"], f"127.0.0.1:{res['port'] + 1}")
+        self.assertEqual(status, 403)
+
+    def test_loopback_hosts_on_the_serving_port_get_200(self):
+        res = self._serve()
+        for host in (f"127.0.0.1:{res['port']}", f"localhost:{res['port']}",
+                     f"[::1]:{res['port']}", f"LOCALHOST:{res['port']}"):
+            status, body = self._get(res["port"], host)
+            self.assertEqual(status, 200, host)
+            self.assertIn(b"<!doctype html>", body)
+
+    def test_the_live_dish_endpoint_is_guarded_too(self):
+        def provider(fresh=False):
+            return {"tick": 7, "alive": 3, "grid": "0a0f0d1"}
+
+        res = self._serve(provider)
+        status, _ = self._get(res["port"], f"attacker.example:{res['port']}",
+                              "/live/dish.json")
+        self.assertEqual(status, 403)
+        status, body = self._get(res["port"], f"127.0.0.1:{res['port']}",
+                                 "/live/dish.json")
+        self.assertEqual(status, 200)
+        self.assertIn(b'"tick"', body)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
